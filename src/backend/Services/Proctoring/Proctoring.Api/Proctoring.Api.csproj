@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-rc.2.25502.107" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Proctoring.Application\Proctoring.Application.csproj" />
+    <ProjectReference Include="..\Proctoring.Infrastructure\Proctoring.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
+
