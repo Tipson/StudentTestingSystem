@@ -17,7 +17,7 @@ public sealed class QuestionOptionMedia
     public Guid QuestionOptionId { get; init; }
 
     [Required]
-    public Guid MediaId { get; init; }
+    public Guid MediaId { get; set; }
 
     [Range(0, int.MaxValue)]
     public int Order { get; set; }

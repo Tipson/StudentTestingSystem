@@ -29,4 +29,43 @@ public partial class Question
         foreach (var option in newOptions)
             Options.Add(option);
     }
+    
+    /// <summary>
+    /// Добавить медиафайл к вопросу.
+    /// </summary>
+    public void AddMedia(Guid mediaId, int order = 0)
+    {
+        if (mediaId == Guid.Empty)
+            throw new ArgumentException("MediaId не может быть пустым", nameof(mediaId));
+
+        var actualOrder = order > 0 ? order : Media.Count + 1;
+
+        Media.Add(new QuestionMedia
+        {
+            MediaId = mediaId,
+            Order = actualOrder
+        });
+    }
+
+    /// <summary>
+    /// Заменить все медиафайлы вопроса.
+    /// </summary>
+    public void SetMedia(IEnumerable<Guid> mediaIds)
+    {
+        Media.Clear();
+
+        var order = 1;
+        foreach (var mediaId in mediaIds)
+        {
+            AddMedia(mediaId, order++);
+        }
+    }
+
+    /// <summary>
+    /// Очистить все медиафайлы.
+    /// </summary>
+    public void ClearMedia()
+    {
+        Media.Clear();
+    }
 }

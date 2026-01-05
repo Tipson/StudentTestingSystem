@@ -7,7 +7,7 @@ namespace Assessment.Domain.Questions;
 ///     Вариант ответа для вопроса.
 /// </summary>
 [Table("QuestionOptions", Schema = "assessment")]
-public sealed class QuestionOption
+public partial class QuestionOption
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

@@ -28,18 +28,15 @@ public sealed class ListQuestionsHandler(
 
         var test = await tests.GetByIdAsync(request.TestId, ct)
                    ?? throw new EntityNotFoundException("Тест не найден.");
-        
+
         var isOwner = test.OwnerUserId == userId;
-        
+
         if (!isOwner && test.Status != TestStatus.Published)
             throw new ForbiddenException("Тест недоступен.");
 
-        if (test.OwnerUserId != userId)
-            throw new ForbiddenException("Нет доступа.");
-
         var list = await questions.ListByTestIdAsync(test.Id, ct);
         var result = list.Adapt<List<QuestionDto>>();
-        
+
         return isOwner ? result : result.HideCorrectAnswers();
     }
 }

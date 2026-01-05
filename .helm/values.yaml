@@ -1,0 +1,78 @@
+# Assessment API
+assessmentApi:
+  environment: "Staging"
+  replicaCount: 2
+  service:
+    name: "assessment-api"
+    portHttp: 8080
+  ingress:
+    enabled: true
+    host: assessment.oleg.agentik007.ru
+  auth:
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    clientId: "assessment-api"
+  database:
+    host: "postgres-postgresql.lms.svc.cluster.local"
+    port: "5432"
+    name: "assessment"
+  redis:
+    host: "redis-master.lms.svc.cluster.local"
+    port: "6379"
+  limits:
+    memoryRequests: "256Mi"
+    memoryLimits: "512Mi"
+    cpuRequests: "100m"
+    cpuLimits: "500m"
+
+# Media API
+mediaApi:
+  environment: "Staging"
+  replicaCount: 1
+  service:
+    name: "media-api"
+    portHttp: 8080
+  ingress:
+    enabled: true
+    host: media.oleg.agentik007.ru
+  auth:
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    clientId: "media-api"
+  database:
+    host: "postgres-postgresql.lms.svc.cluster.local"
+    port: "5432"
+    name: "media"
+  s3:
+    serviceUrl: "minio.lms.svc.cluster.local:9000"
+    defaultBucketName: "assessment"
+    withSsl: "false"
+  limits:
+    memoryRequests: "256Mi"
+    memoryLimits: "512Mi"
+    cpuRequests: "100m"
+    cpuLimits: "500m"
+
+# Identity API
+identityApi:
+  environment: "Staging"
+  replicaCount: 2
+  service:
+    name: "identity-api"
+    portHttp: 8080
+  ingress:
+    enabled: true
+    host: identity.oleg.agentik007.ru
+  auth:
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    clientId: "identity-api"
+  database:
+    host: "postgres-postgresql.lms.svc.cluster.local"
+    port: "5432"
+    name: "identity"
+  redis:
+    host: "redis-master.lms.svc.cluster.local"
+    port: "6379"
+  limits:
+    memoryRequests: "256Mi"
+    memoryLimits: "512Mi"
+    cpuRequests: "100m"
+    cpuLimits: "500m"

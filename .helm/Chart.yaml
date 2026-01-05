@@ -1,0 +1,4 @@
+name: lms
+apiVersion: v2
+type: application
+appVersion: 1.0.0

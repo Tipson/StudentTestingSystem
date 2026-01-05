@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.assessmentApi.service.name }}
+spec:
+  replicas: {{ .Values.assessmentApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.assessmentApi.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.assessmentApi.service.name }}
+    spec:
+      containers:
+        - name: {{ .Values.assessmentApi.service.name }}
+          image: {{ index .Values.werf.image "assessment-api" }}
+          ports:
+            - containerPort: {{ .Values.assessmentApi.service.portHttp }}
+          resources:
+            requests:
+              cpu: {{ .Values.assessmentApi.limits.cpuRequests }}
+              memory: {{ .Values.assessmentApi.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.assessmentApi.limits.cpuLimits }}
+              memory: {{ .Values.assessmentApi.limits.memoryLimits }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.assessmentApi.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.assessmentApi.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.assessmentApi.environment | quote }}
+            - name: ConnectionStrings__Default
+              valueFrom:
+                secretKeyRef:
+                  name: lms-db
+                  key: assessmentConnectionString
+            - name: Keycloak__Authority
+              value: {{ .Values.assessmentApi.auth.issuer | quote }}
+            - name: Keycloak__RequireHttpsMetadata
+              value: "false"
+            - name: RedisOptions__Host
+              value: {{ .Values.assessmentApi.redis.host | quote }}
+            - name: RedisOptions__Port
+              value: {{ .Values.assessmentApi.redis.port | quote }}
+            - name: RedisOptions__Password
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-password

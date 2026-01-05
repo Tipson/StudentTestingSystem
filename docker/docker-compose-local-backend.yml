@@ -1,0 +1,92 @@
+services:
+  # ============ Build Artifacts ============
+  solution-build-artifacts:
+    image: ${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+    build:
+      context: "./../src/backend"
+      dockerfile: "./Dockerfile"
+      args:
+        - DOTNET_SDK_VERSION=${DOTNET_SDK_VERSION}
+
+  # ============ Assessment Service ============
+  assessment-api:
+    image: ${DOCKER_REGISTRY}/assessment-api:${APP_VERSION}
+    build:
+      context: "./dotnet/Assessment"
+      dockerfile: "./Dockerfile"
+      args:
+        - SOLUTION_IMAGE_NAME=${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+        - ASPNET_VERSION=${ASPNET_VERSION}
+    ports:
+      - "5020:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Compose
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=assessment;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
+      - Keycloak__Authority=http://keycloak:8080/realms/lms
+      - Keycloak__RequireHttpsMetadata=false
+    depends_on:
+      - solution-build-artifacts
+    networks:
+      - lms-network
+
+  # ============ Media Service ============
+  media-api:
+    image: ${DOCKER_REGISTRY}/media-api:${APP_VERSION}
+    build:
+      context: "./dotnet/Media"
+      dockerfile: "./Dockerfile"
+      args:
+        - SOLUTION_IMAGE_NAME=${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+        - ASPNET_VERSION=${ASPNET_VERSION}
+    ports:
+      - "5025:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Compose
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=media;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
+      - StorageOptions__Host=minio:9000
+      - StorageOptions__AccessKey=${MINIO_ROOT_USER}
+      - StorageOptions__SecretKey=${MINIO_ROOT_PASSWORD}
+      - StorageOptions__DefaultBucketName=assessment
+      - StorageOptions__WithSsl=false
+      - Keycloak__Authority=http://keycloak:8080/realms/lms
+      - Keycloak__RequireHttpsMetadata=false
+    depends_on:
+      - solution-build-artifacts
+    networks:
+      - lms-network
+
+  # ============ Migrations ============
+  assessment-migrations:
+    image: ${DOCKER_REGISTRY}/assessment-migrations:${APP_VERSION}
+    build:
+      context: "./dotnet/Migrations/Assessment"
+      dockerfile: "./Dockerfile"
+      args:
+        - SOLUTION_IMAGE_NAME=${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+        - ASPNET_VERSION=${ASPNET_VERSION}
+    environment:
+      - DB_CONNECTION=Host=postgres;Port=5432;Database=assessment;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
+    depends_on:
+      - solution-build-artifacts
+    networks:
+      - lms-network
+
+  media-migrations:
+    image: ${DOCKER_REGISTRY}/media-migrations:${APP_VERSION}
+    build:
+      context: "./dotnet/Migrations/Media"
+      dockerfile: "./Dockerfile"
+      args:
+        - SOLUTION_IMAGE_NAME=${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+        - ASPNET_VERSION=${ASPNET_VERSION}
+    environment:
+      - DB_CONNECTION=Host=postgres;Port=5432;Database=media;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
+    depends_on:
+      - solution-build-artifacts
+    networks:
+      - lms-network
+
+networks:
+  lms-network:
+    external: true
+    name: docker_lms-network

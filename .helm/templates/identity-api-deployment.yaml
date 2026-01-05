@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.identityApi.service.name }}
+spec:
+  replicas: {{ .Values.identityApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.identityApi.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.identityApi.service.name }}
+    spec:
+      containers:
+        - name: {{ .Values.identityApi.service.name }}
+          image: {{ index .Values.werf.image "identity-api" }}
+          ports:
+            - containerPort: {{ .Values.identityApi.service.portHttp }}
+          resources:
+            requests:
+              cpu: {{ .Values.identityApi.limits.cpuRequests }}
+              memory: {{ .Values.identityApi.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.identityApi.limits.cpuLimits }}
+              memory: {{ .Values.identityApi.limits.memoryLimits }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.identityApi.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.identityApi.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.identityApi.environment | quote }}
+            - name: ConnectionStrings__Default
+              valueFrom:
+                secretKeyRef:
+                  name: lms-db
+                  key: identityConnectionString
+            - name: Keycloak__Authority
+              value: {{ .Values.identityApi.auth.issuer | quote }}
+            - name: Keycloak__RequireHttpsMetadata
+              value: "false"
+            - name: RedisOptions__Host
+              value: {{ .Values.identityApi.redis.host | quote }}
+            - name: RedisOptions__Port
+              value: {{ .Values.identityApi.redis.port | quote }}
+            - name: RedisOptions__Password
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-password

@@ -10,12 +10,14 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
     public Task<Question?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Questions
             .Include(q => q.Options)
+                .ThenInclude(o => o.Media)
             .Include(q => q.Media)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<List<Question>> ListByTestIdAsync(Guid testId, CancellationToken ct) =>
         db.Questions
             .Include(q => q.Options)
+                .ThenInclude(o => o.Media)
             .Include(q => q.Media)
             .Where(x => x.TestId == testId)
             .OrderBy(x => x.Order)
@@ -38,6 +40,19 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateAsync(Question question, CancellationToken ct)
     {
+        // Удаляем старые медиа записи
+        var existingMedia = await db.QuestionMedia
+            .Where(m => m.QuestionId == question.Id)
+            .ToListAsync(ct);
+        db.QuestionMedia.RemoveRange(existingMedia);
+
+        // Удаляем старые медиа записи вариантов
+        var optionIds = question.Options.Select(o => o.Id).ToList();
+        var existingOptionMedia = await db.QuestionOptionMedia
+            .Where(m => optionIds.Contains(m.QuestionOptionId))
+            .ToListAsync(ct);
+        db.QuestionOptionMedia.RemoveRange(existingOptionMedia);
+
         db.Questions.Update(question);
         await db.SaveChangesAsync(ct);
     }
@@ -49,10 +64,10 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
         await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        
+
             db.Questions.UpdateRange(questions);
             await db.SaveChangesAsync(ct);
-        
+
             await transaction.CommitAsync(ct);
         });
     }

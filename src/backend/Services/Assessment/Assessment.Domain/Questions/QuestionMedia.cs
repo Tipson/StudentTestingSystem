@@ -17,7 +17,7 @@ public sealed class QuestionMedia
     ///     Идентификатор файла/изображения.
     /// </summary>
     [Required]
-    public Guid MediaId { get; init; }
+    public Guid MediaId { get; set; }
 
     /// <summary>
     ///     Порядок отображения.

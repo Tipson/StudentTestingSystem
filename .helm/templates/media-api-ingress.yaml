@@ -1,0 +1,18 @@
+{{- if .Values.mediaApi.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.mediaApi.service.name }}-ingress
+spec:
+  rules:
+    - host: {{ .Values.mediaApi.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.mediaApi.service.name }}
+                port:
+                  number: {{ .Values.mediaApi.service.portHttp }}
+{{- end }}
