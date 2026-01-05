@@ -5,8 +5,6 @@ WORKDIR /src
 
 # Copy solution and project files for restore
 COPY *.sln .
-COPY Directory.Build.props .
-COPY Directory.Packages.props .
 
 # Copy all csproj files (preserving folder structure)
 COPY BuildingBlocks/BuildingBlocks.Api/*.csproj BuildingBlocks/BuildingBlocks.Api/
