@@ -8,7 +8,7 @@ namespace Assessment.Domain.Tests;
 ///     Представляет тест (оценочное задание),
 ///     содержащий настройки прохождения и принадлежность преподавателю.
 /// </summary>
-[Table("tests", Schema = "assessment")]
+[Table("Tests", Schema = "assessment")]
 public partial class Test
 {
     [Key]

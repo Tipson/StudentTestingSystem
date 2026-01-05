@@ -42,6 +42,13 @@ public sealed class CreateQuestionHandler(
             request.Dto.IsRequired,
             request.Dto.Points
         );
+        
+        question.UpdateOptions(request.Dto.Options?.Select(o => new QuestionOption
+        {
+            Text = o.Text,
+            IsCorrect = o.IsCorrect,
+            Order = o.Order
+        }) ?? []);
 
         await questions.AddAsync(question, ct);
 

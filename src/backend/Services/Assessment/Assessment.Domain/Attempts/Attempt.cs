@@ -20,7 +20,7 @@ public partial class Attempt
     ///     Идентификатор студента (sub из Identity).
     /// </summary>
     [Required]
-    public required string UserId { get; init; }
+    public string UserId { get; init; }
 
     [Required]
     public AttemptStatus Status { get; set; } = AttemptStatus.InProgress;

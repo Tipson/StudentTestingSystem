@@ -13,5 +13,17 @@ public sealed record CreateQuestionDto(
     bool IsRequired = true,
 
     [Range(0, 1000)]
-    int Points = 1
+    int Points = 1,
+    
+    List<CreateQuestionOptionDto>? Options = null
+
+);
+
+public sealed record CreateQuestionOptionDto(
+    [Required, MaxLength(2000)]
+    string Text,
+    
+    bool IsCorrect = false,
+    
+    int Order = 0
 );

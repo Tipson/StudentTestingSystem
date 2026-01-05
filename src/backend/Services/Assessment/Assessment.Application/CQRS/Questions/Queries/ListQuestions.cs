@@ -1,5 +1,7 @@
 ﻿using Assessment.Application.DTOs.Question;
+using Assessment.Application.Extensions;
 using Assessment.Application.Interfaces;
+using Assessment.Domain.Tests;
 using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Mapster;
@@ -26,11 +28,18 @@ public sealed class ListQuestionsHandler(
 
         var test = await tests.GetByIdAsync(request.TestId, ct)
                    ?? throw new EntityNotFoundException("Тест не найден.");
+        
+        var isOwner = test.OwnerUserId == userId;
+        
+        if (!isOwner && test.Status != TestStatus.Published)
+            throw new ForbiddenException("Тест недоступен.");
 
         if (test.OwnerUserId != userId)
             throw new ForbiddenException("Нет доступа.");
 
         var list = await questions.ListByTestIdAsync(test.Id, ct);
-        return list.Adapt<List<QuestionDto>>();
+        var result = list.Adapt<List<QuestionDto>>();
+        
+        return isOwner ? result : result.HideCorrectAnswers();
     }
 }

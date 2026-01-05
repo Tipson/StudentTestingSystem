@@ -42,10 +42,8 @@ public sealed class StartAttemptHandler(
             if (attemptsCount >= test.AttemptsLimit)
                 throw new BadRequestApiException("Лимит попыток исчерпан.");
 
-            attempt = new Attempt(test.Id, userId)
-            {
-                UserId = userId
-            };
+            attempt = new Attempt(test.Id, userId);
+            
             await attempts.AddAsync(attempt, ct);
         }
 

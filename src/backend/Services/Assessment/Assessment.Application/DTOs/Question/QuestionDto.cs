@@ -9,5 +9,13 @@ public sealed record QuestionDto(
     QuestionType Type,
     string Text,
     bool IsRequired,
-    int Points
+    int Points,
+    List<QuestionOptionDto> Options
+);
+
+public sealed record QuestionOptionDto(
+    Guid Id,
+    string Text,
+    int Order,
+    bool? IsCorrect
 );

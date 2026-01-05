@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
+      <ProjectReference Include="..\Media.Application\Media.Application.csproj" />
+      <ProjectReference Include="..\Media.Infrastructure\Media.Infrastructure.csproj" />
+    </ItemGroup>
+
+</Project>

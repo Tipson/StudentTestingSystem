@@ -1,6 +1,7 @@
 ﻿using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Attempts;
+using Assessment.Domain.Questions;
 using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Identity;
@@ -51,6 +52,8 @@ public sealed class SaveAnswerHandler(
         if (question.TestId != attempt.TestId)
             throw new BadRequestApiException("Вопрос не относится к данному тесту");
 
+        ValidateAnswerPayload(question, request.Dto);
+        
         // Создаём payload
         var payload = new AnswerPayload
         {
@@ -64,5 +67,41 @@ public sealed class SaveAnswerHandler(
         await attempts.UpdateAsync(attempt, cancellationToken);
 
         return saved.Adapt<AttemptAnswerDto>();
+    }
+    
+    private static void ValidateAnswerPayload(Question question, SaveAnswerDto dto)
+    {
+        switch (question.Type)
+        {
+            case QuestionType.SingleChoice:
+            case QuestionType.TrueFalse:
+                if (dto.OptionId is null)
+                    throw new BadRequestApiException("Для данного типа вопроса требуется выбрать вариант");
+                break;
+
+            case QuestionType.MultiChoice:
+                if (dto.OptionIds is null || dto.OptionIds.Count == 0)
+                    throw new BadRequestApiException("Для данного типа вопроса требуется выбрать хотя бы один вариант");
+                break;
+
+            case QuestionType.ShortText:
+            case QuestionType.LongText:
+                if (string.IsNullOrWhiteSpace(dto.Text))
+                    throw new BadRequestApiException("Для данного типа вопроса требуется текстовый ответ");
+                break;
+        }
+
+        // Проверка принадлежности вариантов к вопросу
+        var questionOptionIds = question.Options.Select(o => o.Id).ToHashSet();
+
+        if (dto.OptionId is not null && !questionOptionIds.Contains(dto.OptionId.Value))
+            throw new BadRequestApiException("Указанный вариант ответа не принадлежит данному вопросу");
+
+        if (dto.OptionIds is not null && dto.OptionIds.Count > 0)
+        {
+            var invalidOptions = dto.OptionIds.Where(id => !questionOptionIds.Contains(id)).ToList();
+            if (invalidOptions.Count > 0)
+                throw new BadRequestApiException("Один или несколько вариантов не принадлежат данному вопросу");
+        }
     }
 }
