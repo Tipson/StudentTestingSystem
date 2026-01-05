@@ -24,16 +24,11 @@ public sealed class FileService(
         CancellationToken ct)
     {
         var generatedName = StorageHelper.GenerateFileName(fileName);
-        var storagePath = StorageHelper.GetStoragePath(category, entityId, generatedName);
+        var key = StorageHelper.GetStoragePath(category, entityId, generatedName);
 
-        await storage.UploadAsync(stream, string.Empty, storagePath, contentType);
-
-        var mediaFile = new MediaFile(
-            fileName,
-            contentType,
-            sizeBytes,
-            storagePath,
-            userContext.UserId);
+        await storage.UploadAsync(stream, key, contentType, sizeBytes);
+        
+        var mediaFile = new MediaFile(fileName, contentType, sizeBytes, key, userContext.UserId);
 
         await repository.AddAsync(mediaFile, ct);
 

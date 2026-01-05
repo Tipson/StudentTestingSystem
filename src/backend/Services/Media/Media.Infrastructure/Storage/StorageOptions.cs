@@ -2,7 +2,8 @@
 
 public sealed class StorageOptions
 {
-    public string Host { get; set; } = "localhost:9000";
+    public string Host { get; set; } = "localhost";
+    public int Port { get; set; } = 9000;
     public string AccessKey { get; set; } = "minioadmin";
     public string SecretKey { get; set; } = "minioadmin";
     public string DefaultBucketName { get; set; } = "assessment";
