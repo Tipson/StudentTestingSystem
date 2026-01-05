@@ -2,7 +2,6 @@
 using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
-using Identity.Application.Interfaces;
 using Mapster;
 using MediatR;
 

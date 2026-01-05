@@ -1,7 +1,6 @@
 using Contracts.Identity;
 using Identity.Application.DTOs;
 using Identity.Application.Interfaces;
-using Identity.Domain.Users;
 using Mapster;
 using MediatR;
 

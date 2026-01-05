@@ -6,14 +6,15 @@ namespace Assessment.Infrastructure.Data.Configurations;
 
 public sealed class QuestionOptionConfiguration : IEntityTypeConfiguration<QuestionOption>
 {
-    public void Configure(EntityTypeBuilder<QuestionOption> b)
+    public void Configure(EntityTypeBuilder<QuestionOption> builder)
     {
-        b.HasOne<Question>()
-            .WithMany(x => x.Options)
-            .HasForeignKey(x => x.QuestionId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Индекс для производительности (уникальность через DEFERRABLE constraint)
+        builder.HasIndex(x => x.QuestionId);
 
-        b.HasIndex(x => new { x.QuestionId, x.Order })
-            .IsUnique();
+        // Связь QuestionOption -> Media
+        builder.HasMany(x => x.Media)
+            .WithOne()
+            .HasForeignKey(m => m.QuestionOptionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

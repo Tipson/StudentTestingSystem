@@ -20,8 +20,11 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
     public Task AddAsync(User user, CancellationToken ct) =>
         db.Users.AddAsync(user, ct).AsTask();
 
-    public Task UpdateAsync(User user, CancellationToken ct) =>
-        db.SaveChangesAsync(ct);
+    public async Task UpdateAsync(User user, CancellationToken ct)
+    {
+        db.Users.Update(user);
+        await db.SaveChangesAsync(ct);
+    }
     
     public Task RemoveAsync(User user, CancellationToken ct)
     {

@@ -1,6 +1,5 @@
 ﻿using Assessment.Application.CQRS.Tests.Commands;
 using Assessment.Application.CQRS.Tests.Queries;
-using Assessment.Application.DTOs;
 using Assessment.Application.DTOs.Test;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

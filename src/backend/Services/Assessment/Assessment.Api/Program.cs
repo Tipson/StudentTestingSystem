@@ -4,7 +4,6 @@ using Assessment.Api.Security;
 using Assessment.Application.Services;
 using BuildingBlocks.Api.Extensions;
 using Contracts.Identity;
-using Identity.Application.Interfaces;
 using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);

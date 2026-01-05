@@ -44,8 +44,17 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateRangeAsync(IEnumerable<Question> questions, CancellationToken ct)
     {
-        db.Set<Question>().UpdateRange(questions);
-        await db.SaveChangesAsync(ct);
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        
+            db.Questions.UpdateRange(questions);
+            await db.SaveChangesAsync(ct);
+        
+            await transaction.CommitAsync(ct);
+        });
     }
 
     public async Task DeleteAsync(Question question, CancellationToken ct)

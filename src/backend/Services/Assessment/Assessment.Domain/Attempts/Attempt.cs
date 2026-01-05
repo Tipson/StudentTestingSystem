@@ -7,7 +7,7 @@ namespace Assessment.Domain.Attempts;
 ///     Попытка прохождения теста студентом.
 /// </summary>
 [Table("Attempts", Schema = "assessment")]
-public sealed class Attempt
+public partial class Attempt
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -44,4 +44,18 @@ public sealed class Attempt
     ///     Ответы студента на вопросы в рамках попытки.
     /// </summary>
     public IList<AttemptAnswer> Answers { get; init; } = new List<AttemptAnswer>();
+    
+    public Attempt(Guid testId, string userId)
+    {
+        if (testId == Guid.Empty)
+            throw new ArgumentException("TestId не может быть пустым", nameof(testId));
+        
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("UserId не может быть пустым", nameof(userId));
+
+        TestId = testId;
+        UserId = userId;
+        Status = AttemptStatus.InProgress;
+        StartedAt = DateTimeOffset.UtcNow;
+    }
 }

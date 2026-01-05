@@ -1,6 +1,4 @@
-using BuildingBlocks.Api;
 using BuildingBlocks.Api.Extensions;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Assessment.Api.Security;
 

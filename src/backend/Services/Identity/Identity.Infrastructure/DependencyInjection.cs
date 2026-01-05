@@ -1,7 +1,6 @@
 using Identity.Application.Interfaces;
 using Identity.Infrastructure.Common;
 using Identity.Infrastructure.Data;
-using Identity.Infrastructure.Keycloak;
 using Identity.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

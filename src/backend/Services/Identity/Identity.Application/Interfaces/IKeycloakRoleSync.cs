@@ -1,5 +1,4 @@
 ﻿using Contracts.Identity;
-using Identity.Domain.Users;
 
 namespace Identity.Application.Interfaces;
 

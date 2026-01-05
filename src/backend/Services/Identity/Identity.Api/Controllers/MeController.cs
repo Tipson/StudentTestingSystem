@@ -1,5 +1,4 @@
-﻿using Identity.Application.Interfaces;
-using Identity.Application.Users.Queries;
+﻿using Identity.Application.Users.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

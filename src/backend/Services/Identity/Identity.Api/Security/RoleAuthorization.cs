@@ -1,6 +1,4 @@
-using System.Security.Claims;
 using Contracts.Identity;
-using Identity.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using UserRole = Contracts.Identity.UserRole;
 

@@ -1,7 +1,5 @@
 ﻿using System.Security.Claims;
 using Contracts.Identity;
-using Identity.Application.Interfaces;
-using Identity.Domain.Users;
 using Microsoft.AspNetCore.Http;
 
 namespace Assessment.Application.Services;

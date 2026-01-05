@@ -1,7 +1,6 @@
 ﻿using Contracts.Identity;
 using Identity.Application.Users.Commands;
 using Identity.Application.Users.Queries;
-using Identity.Domain.Users;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

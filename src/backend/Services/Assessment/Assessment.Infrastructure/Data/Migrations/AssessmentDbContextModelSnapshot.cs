@@ -53,6 +53,10 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TestId");
+
+                    b.HasIndex("UserId");
+
                     b.ToTable("Attempts", "assessment");
                 });
 
@@ -117,8 +121,7 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TestId", "Order")
-                        .IsUnique();
+                    b.HasIndex("TestId");
 
                     b.ToTable("Questions", "assessment");
                 });
@@ -167,8 +170,7 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("QuestionId", "Order")
-                        .IsUnique();
+                    b.HasIndex("QuestionId");
 
                     b.ToTable("QuestionOptions", "assessment");
                 });

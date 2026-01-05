@@ -1,7 +1,6 @@
 using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
-using Identity.Domain.Users;
 using MediatR;
 
 namespace Identity.Application.Users.Commands;

@@ -1,4 +1,3 @@
-﻿using Assessment.Application.CQRS.Questions;
 using Assessment.Application.CQRS.Questions.Commands;
 using Assessment.Application.CQRS.Questions.Queries;
 using Assessment.Application.DTOs.Question;
@@ -13,6 +12,14 @@ namespace Assessment.Api.Controllers;
 [Authorize]
 public sealed class QuestionsController(IMediator mediator) : ControllerBase
 {
+    [HttpPost("tests/{testId:guid}/questions")]
+    public async Task<IActionResult> Create(Guid testId, [FromBody] CreateQuestionDto dto, CancellationToken ct) =>
+        Ok(await mediator.Send(new CreateQuestion(testId, dto), ct));
+
+    [HttpGet("tests/{testId:guid}/questions")]
+    public async Task<IActionResult> List(Guid testId, CancellationToken ct) =>
+        Ok(await mediator.Send(new ListQuestions(testId), ct));
+
     [HttpPut("questions/{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateQuestionDto dto, CancellationToken ct) =>
         Ok(await mediator.Send(new UpdateQuestion(id, dto), ct));

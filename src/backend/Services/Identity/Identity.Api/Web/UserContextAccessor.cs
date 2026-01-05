@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using Contracts.Identity;
-using Identity.Application.Interfaces;
 using Identity.Domain.Users;
-using UserRole = Contracts.Identity.UserRole;
 
 namespace Identity.Api.Web;
 
@@ -13,119 +11,49 @@ public sealed class UserContextAccessor : IUserContext
     public string? FullName { get; }
     public UserRole Role { get; }
 
-    public UserContextAccessor(IHttpContextAccessor http, IUserRepository users)
+    public UserContextAccessor(IHttpContextAccessor http)
     {
-        var ctx = http.HttpContext ?? throw new UnauthorizedAccessException("Контекст HTTP недоступен.");
+        var ctx = http.HttpContext 
+                  ?? throw new InvalidOperationException("HTTP context unavailable");
 
-        if (ctx.Items.TryGetValue("IUserContext", out var cached) && cached is UserContextCache cache)
+        var principal = ctx.User;
+        if (principal.Identity?.IsAuthenticated != true)
+            throw new UnauthorizedAccessException("User not authenticated");
+
+        // Получаем из middleware (уже синхронизировано с БД)
+        if (ctx.Items.TryGetValue("SyncedUser", out var cached) && cached is User user)
         {
-            UserId = cache.UserId;
-            Email = cache.Email;
-            FullName = cache.FullName;
-            Role = cache.Role;
+            UserId = user.Id;
+            Email = user.Email;
+            FullName = user.FullName;
+            Role = user.Role;
             return;
         }
 
-        var principal = ctx.User;
-        if (principal?.Identity?.IsAuthenticated != true)
-            throw new UnauthorizedAccessException("Пользователь не аутентифицирован.");
+        // Fallback на claims (если middleware не отработал)
+        UserId = principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                 ?? principal.FindFirstValue("sub")
+                 ?? throw new UnauthorizedAccessException("User ID not found");
 
-        var userId =
-            principal.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? principal.FindFirstValue("sub");
+        Email = principal.FindFirstValue(ClaimTypes.Email)
+                ?? principal.FindFirstValue("email");
 
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new UnauthorizedAccessException("Не удалось определить идентификатор пользователя.");
+        FullName = principal.FindFirstValue(ClaimTypes.Name)
+                   ?? principal.FindFirstValue("name");
 
-        var email =
-            principal.FindFirstValue(ClaimTypes.Email)
-            ?? principal.FindFirstValue("email");
-
-        var fullName =
-            principal.FindFirstValue(ClaimTypes.Name)
-            ?? principal.FindFirstValue("name")
-            ?? principal.FindFirstValue("preferred_username");
-
-        // Определяем роль из клеймов токена
-        var roleFromClaims = GetRoleFromClaims(principal);
-
-        var user = users.GetById(userId, ctx.RequestAborted).GetAwaiter().GetResult();
-        if (user is null)
-        {
-            // Онбординг: создаём пользователя при первом запросе
-            var newUser = new User(userId, email);
-            if (!string.IsNullOrWhiteSpace(fullName)) newUser.SetFullName(fullName);
-            newUser.SetRole(roleFromClaims ?? UserRole.Student);
-
-            users.AddAsync(newUser, ctx.RequestAborted).GetAwaiter().GetResult();
-            // Сохраняем изменения
-            users.UpdateAsync(newUser, ctx.RequestAborted).GetAwaiter().GetResult();
-
-            user = newUser;
-        }
-        else
-        {
-            // Синхронизируем профиль из токена
-            var targetRole = roleFromClaims ?? user.Role;
-            if (user.ApplyIdentity(email, fullName, targetRole))
-            {
-                users.UpdateAsync(user, ctx.RequestAborted).GetAwaiter().GetResult();
-            }
-        }
-
-        UserId = userId;
-        Email = email ?? user.Email;
-        FullName = fullName ?? user.FullName;
-        Role = roleFromClaims ?? user.Role;
-
-        ctx.Items["IUserContext"] = new UserContextCache(UserId, Email, FullName, Role);
+        Role = GetRoleFromClaims(principal);
     }
 
-    private static UserRole? GetRoleFromClaims(ClaimsPrincipal principal)
+    private static UserRole GetRoleFromClaims(ClaimsPrincipal principal)
     {
-        // Сначала смотрим явные клеймы роли
-        var roleClaim = principal.FindFirst("role")?.Value
-                        ?? principal.FindFirst(ClaimTypes.Role)?.Value;
-        if (!string.IsNullOrWhiteSpace(roleClaim))
-        {
-            if (string.Equals(roleClaim, "admin", StringComparison.OrdinalIgnoreCase))
-                return UserRole.Admin;
-            if (string.Equals(roleClaim, "teacher", StringComparison.OrdinalIgnoreCase))
-                return UserRole.Teacher;
-            if (string.Equals(roleClaim, "student", StringComparison.OrdinalIgnoreCase))
-                return UserRole.Student;
-        }
+        var roleClaim = principal.FindFirstValue(ClaimTypes.Role)
+                        ?? principal.FindFirstValue("role");
 
-        // В Keycloak роли realm хранятся в клейме realm_access.roles (JSON)
-        var realmAccess = principal.FindFirst("realm_access")?.Value;
-        if (!string.IsNullOrWhiteSpace(realmAccess))
+        return roleClaim?.ToLowerInvariant() switch
         {
-            try
-            {
-                using var doc = System.Text.Json.JsonDocument.Parse(realmAccess);
-                if (doc.RootElement.TryGetProperty("roles", out var rolesEl)
-                    && rolesEl.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var r in rolesEl.EnumerateArray())
-                    {
-                        var v = r.GetString();
-                        if (string.Equals(v, "admin", StringComparison.OrdinalIgnoreCase))
-                            return UserRole.Admin;
-                        if (string.Equals(v, "teacher", StringComparison.OrdinalIgnoreCase))
-                            return UserRole.Teacher;
-                        if (string.Equals(v, "student", StringComparison.OrdinalIgnoreCase))
-                            return UserRole.Student;
-                    }
-                }
-            }
-            catch
-            {
-                // Игнорируем ошибки парсинга
-            }
-        }
-
-        return null;
+            "admin" => UserRole.Admin,
+            "teacher" => UserRole.Teacher,
+            _ => UserRole.Student
+        };
     }
 }
-
-internal sealed record UserContextCache(string UserId, string? Email, string? FullName, UserRole Role);

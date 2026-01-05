@@ -1,9 +1,9 @@
 using BuildingBlocks.Api.Extensions;
 using Contracts.Identity;
+using Identity.Api.Middleware;
 using Identity.Api.Security;
 using Identity.Api.Web;
 using Identity.Application;
-using Identity.Application.Interfaces;
 using Identity.Infrastructure;
 using Microsoft.IdentityModel.Logging;
 
@@ -28,6 +28,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<UserSyncMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

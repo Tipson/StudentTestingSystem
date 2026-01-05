@@ -1,6 +1,5 @@
 ﻿using Contracts.Identity;
 using Identity.Application.Interfaces;
-using Identity.Domain.Users;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Keycloak.AuthServices.Sdk.Kiota.Admin;
 using Microsoft.Extensions.Options;

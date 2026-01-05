@@ -1,5 +1,4 @@
 using Duende.AccessTokenManagement;
-using BuildingBlocks.Api;
 using BuildingBlocks.Api.Extensions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
@@ -8,7 +7,6 @@ using Keycloak.AuthServices.Common;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
-using Identity.Domain.Users;
 
 namespace Identity.Api.Security;
 
