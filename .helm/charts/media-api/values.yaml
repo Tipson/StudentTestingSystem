@@ -1,0 +1,30 @@
+environment: "Staging"
+replicaCount: 1
+
+service:
+  name: "media-api"
+  portHttp: 8080
+
+ingress:
+  enabled: true
+  host: media-api.lms.example.com
+
+auth:
+  issuer: "https://auth.lms.example.com/realms/lms"
+  clientId: "media-api"
+
+database:
+  host: "postgres.lms.svc.cluster.local"
+  port: "5432"
+  name: "media"
+
+s3:
+  serviceUrl: "minio.lms.svc.cluster.local:9000"
+  defaultBucketName: "assessment"
+  withSsl: "false"
+
+limits:
+  memoryRequests: "256Mi"
+  memoryLimits: "512Mi"
+  cpuRequests: "100m"
+  cpuLimits: "500m"

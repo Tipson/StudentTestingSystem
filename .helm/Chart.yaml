@@ -1,0 +1,15 @@
+name: lms
+apiVersion: v2
+type: application
+appVersion: 1.0.0
+dependencies:
+  - name: assessment-api
+    export-values:
+      - parent: werf
+        child: werf
+    version: 1.0.0
+  - name: media-api
+    export-values:
+      - parent: werf
+        child: werf
+    version: 1.0.0

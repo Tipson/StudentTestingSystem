@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+    spec:
+      containers:
+        - name: {{ .Values.service.name }}
+          image: {{ index .Values.werf.image "media-api" }}
+          ports:
+            - containerPort: {{ .Values.service.portHttp }}
+          resources:
+            requests:
+              cpu: {{ .Values.limits.cpuRequests }}
+              memory: {{ .Values.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.limits.cpuLimits }}
+              memory: {{ .Values.limits.memoryLimits }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: ConnectionStrings__Default
+              valueFrom:
+                secretKeyRef:
+                  name: lms-db
+                  key: mediaConnectionString
+            - name: Keycloak__Authority
+              value: {{ .Values.auth.issuer | quote }}
+            - name: Keycloak__RequireHttpsMetadata
+              value: "true"
+            - name: StorageOptions__Host
+              value: {{ .Values.s3.serviceUrl | quote }}
+            - name: StorageOptions__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: lms-s3
+                  key: accessKey
+            - name: StorageOptions__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: lms-s3
+                  key: secretKey
+            - name: StorageOptions__DefaultBucketName
+              value: {{ .Values.s3.defaultBucketName | quote }}
+            - name: StorageOptions__WithSsl
+              value: {{ .Values.s3.withSsl | quote }}

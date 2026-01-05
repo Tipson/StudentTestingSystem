@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+    spec:
+      containers:
+        - name: {{ .Values.service.name }}
+          image: {{ index .Values.werf.image "assessment-api" }}
+          ports:
+            - containerPort: {{ .Values.service.portHttp }}
+          resources:
+            requests:
+              cpu: {{ .Values.limits.cpuRequests }}
+              memory: {{ .Values.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.limits.cpuLimits }}
+              memory: {{ .Values.limits.memoryLimits }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: ConnectionStrings__Default
+              valueFrom:
+                secretKeyRef:
+                  name: lms-db
+                  key: assessmentConnectionString
+            - name: Keycloak__Authority
+              value: {{ .Values.auth.issuer | quote }}
+            - name: Keycloak__RequireHttpsMetadata
+              value: "true"
+            - name: RedisOptions__Host
+              value: {{ .Values.redis.host | quote }}
+            - name: RedisOptions__Port
+              value: {{ .Values.redis.port | quote }}
+            - name: RedisOptions__Password
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-password

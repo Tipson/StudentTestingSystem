@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/backend/LMS.sln
+
+      - name: Build
+        run: dotnet build src/backend/LMS.sln --no-restore -c Release
+
+      - name: Test
+        run: dotnet test src/backend/LMS.sln --no-build -c Release --verbosity normal
+
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: werf/actions/install@v2
+
+      - name: werf build (dry-run)
+        run: |
+          source "$(werf ci-env github --as-file)"
+          werf build --env dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
