@@ -7,8 +7,8 @@ WORKDIR /src
 COPY *.sln .
 
 # Copy all csproj files (preserving folder structure)
-COPY BuildingBlocks/BuildingBlocks.Api/*.csproj BuildingBlocks/BuildingBlocks.Api/
-COPY BuildingBlocks/Contracts/*.csproj BuildingBlocks/Contracts/
+COPY BuildingBlocks/Api/*.csproj BuildingBlocks/Api/
+COPY BuildingBlocks/Shared/Contracts/*.csproj BuildingBlocks/Shared/Contracts/
 
 COPY Services/Assessment/Assessment.Domain/*.csproj Services/Assessment/Assessment.Domain/
 COPY Services/Assessment/Assessment.Application/*.csproj Services/Assessment/Assessment.Application/
