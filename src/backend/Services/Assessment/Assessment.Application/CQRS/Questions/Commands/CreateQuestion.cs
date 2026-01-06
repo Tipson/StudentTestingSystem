@@ -42,16 +42,43 @@ public sealed class CreateQuestionHandler(
             request.Dto.IsRequired,
             request.Dto.Points
         );
-        
-        question.UpdateOptions(request.Dto.Options?.Select(o => new QuestionOption
+
+        // Добавляем варианты ответов
+        if (request.Dto.Options is { Count: > 0 })
         {
-            Text = o.Text,
-            IsCorrect = o.IsCorrect,
-            Order = o.Order
-        }) ?? []);
+            var options = CreateOptions(request.Dto.Options);
+            question.UpdateOptions(options);
+        }
+
+        // Добавляем медиа к вопросу
+        if (request.Dto.MediaIds is { Count: > 0 })
+        {
+            question.SetMedia(request.Dto.MediaIds);
+        }
 
         await questions.AddAsync(question, ct);
 
         return question.Adapt<QuestionDto>();
+    }
+
+    private static IEnumerable<QuestionOption> CreateOptions(List<CreateQuestionOptionDto> optionDtos)
+    {
+        var optionOrder = 1;
+        foreach (var dto in optionDtos)
+        {
+            var option = new QuestionOption
+            {
+                Text = dto.Text,
+                IsCorrect = dto.IsCorrect,
+                Order = dto.Order > 0 ? dto.Order : optionOrder++
+            };
+
+            if (dto.MediaIds is { Count: > 0 })
+            {
+                option.SetMedia(dto.MediaIds);
+            }
+
+            yield return option;
+        }
     }
 }
