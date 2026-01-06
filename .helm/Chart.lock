@@ -1,0 +1,12 @@
+dependencies:
+- name: assessment-api
+  repository: file://charts/assessment-api
+  version: 1.0.0
+- name: media-api
+  repository: file://charts/media-api
+  version: 1.0.0
+- name: identity-api
+  repository: file://charts/identity-api
+  version: 1.0.0
+digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+generated: "2026-01-06T00:00:00.000000000Z"

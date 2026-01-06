@@ -14,7 +14,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: {{ .Values.service.name }}-migrations
-          image: {{ index .Values.global.werf.image "media-migrations" }}
+          image: {{ index .Values.werf.image "media-migrations" }}
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: {{ .Values.environment | quote }}

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: {{ .Values.service.name }}
-          image: {{ index .Values.global.werf.image "assessment-api" }}
+          image: {{ index .Values.werf.image "assessment-api" }}
           ports:
             - containerPort: {{ .Values.service.portHttp }}
           resources:
