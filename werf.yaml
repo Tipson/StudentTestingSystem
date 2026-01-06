@@ -11,7 +11,7 @@ args:
 
 ---
 # Assessment WebAPI
-image: assessment-webapi
+image: assessment-api
 dockerfile: Dockerfile
 context: ./docker/dotnet/Assessment
 args:
@@ -24,7 +24,7 @@ dependencies:
 
 ---
 # Media WebAPI
-image: media-webapi
+image: media-api
 dockerfile: Dockerfile
 context: ./docker/dotnet/Media
 args:
@@ -37,7 +37,7 @@ dependencies:
 
 ---
 # Identity WebAPI
-image: identity-webapi
+image: identity-api
 dockerfile: Dockerfile
 context: ./docker/dotnet/Identity
 args:
