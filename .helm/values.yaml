@@ -1,14 +1,18 @@
-werf:
-  image: {}
+global:
+  werf:
+    image: {}
 
 assessment-api:
-  werf:
-    image: {}
+  images:
+    api: "{{ index .Values.global.werf.image \"assessment-api\" }}"
+    migrations: "{{ index .Values.global.werf.image \"assessment-migrations\" }}"
 
 media-api:
-  werf:
-    image: {}
+  images:
+    api: "{{ index .Values.global.werf.image \"media-api\" }}"
+    migrations: "{{ index .Values.global.werf.image \"media-migrations\" }}"
 
 identity-api:
-  werf:
-    image: {}
+  images:
+    api: "{{ index .Values.global.werf.image \"identity-api\" }}"
+    migrations: "{{ index .Values.global.werf.image \"identity-migrations\" }}"

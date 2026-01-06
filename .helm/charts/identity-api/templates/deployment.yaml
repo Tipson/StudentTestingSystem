@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: {{ .Values.service.name }}
-          image: {{ index .Values.werf.image "identity-api" }}
+          image: {{ tpl .Values.images.api . }}
           ports:
             - containerPort: {{ .Values.service.portHttp }}
           resources:
