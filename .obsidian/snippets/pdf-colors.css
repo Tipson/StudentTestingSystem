@@ -1,0 +1,13 @@
+@media print {
+  :root{
+    --yellow:#ffd94d;
+    --orange:#ff9a3c;
+    --green:#28c76f;
+    --red:#ff4d4f;
+  }
+  .legend-yellow{color:var(--yellow);}
+  .legend-orange{color:var(--orange);}
+  .legend-green{color:var(--green);}
+  .legend-red{color:var(--red);}
+  mark{background:var(--yellow) !important; color:#000 !important;}
+}

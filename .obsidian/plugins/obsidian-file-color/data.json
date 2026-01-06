@@ -1,0 +1,43 @@
+{
+  "cascadeColors": false,
+  "colorBackground": false,
+  "palette": [
+    {
+      "id": "fcCDDFtyfnPAClU0ySyn0",
+      "name": "Important",
+      "value": "#ff0000"
+    },
+    {
+      "id": "KBo5oLGXS8Wp4vydbYgQ1",
+      "name": "Tasks",
+      "value": "#f27800"
+    },
+    {
+      "id": "OSjzz2Q4lHibE9gJFAc_O",
+      "name": "Completed",
+      "value": "#065d00"
+    }
+  ],
+  "fileColors": [
+    {
+      "path": "Аналитика/Текущие задачи и их статус.md",
+      "color": "fcCDDFtyfnPAClU0ySyn0"
+    },
+    {
+      "path": "Аналитика/Задачи к ТИС.md",
+      "color": "KBo5oLGXS8Wp4vydbYgQ1"
+    },
+    {
+      "path": "Аналитика/Задачи к АИС.md",
+      "color": "KBo5oLGXS8Wp4vydbYgQ1"
+    },
+    {
+      "path": "Аналитика/Важные цепочки писем.md",
+      "color": "fcCDDFtyfnPAClU0ySyn0"
+    },
+    {
+      "path": "Аналитика/Рекомендации к требованиям.md",
+      "color": "fcCDDFtyfnPAClU0ySyn0"
+    }
+  ]
+}

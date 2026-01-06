@@ -1,0 +1,234 @@
+{
+  "main": {
+    "id": "1ca90bbfebe7b8ff",
+    "type": "split",
+    "children": [
+      {
+        "id": "37c7e8a09639e269",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8c0f98c683632841",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Задачи/Задачи.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Задачи"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "0ea0c1cba3141792",
+    "type": "split",
+    "children": [
+      {
+        "id": "9e16cb0e8992a798",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d01b957283cb14c8",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "98ced4962b5cff25",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "5e0f867eb7b60859",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 268.5
+  },
+  "right": {
+    "id": "9d1dcb3415f6b331",
+    "type": "split",
+    "children": [
+      {
+        "id": "84ff54e56d7c4a09",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9aef133d6213fab6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Задачи.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки для Задачи"
+            }
+          },
+          {
+            "id": "f1098a555c75fd5d",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Задачи.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки из Задачи"
+            }
+          },
+          {
+            "id": "7e34c5922ca1e9f4",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "c5b61e002306da20",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Задачи.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура Задачи"
+            }
+          },
+          {
+            "id": "62521edf7c82747e",
+            "type": "leaf",
+            "state": {
+              "type": "advanced-tables-toolbar",
+              "state": {},
+              "icon": "spreadsheet",
+              "title": "Advanced Tables"
+            }
+          }
+        ],
+        "currentTab": 4
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false,
+      "table-editor-obsidian:Advanced Tables Toolbar": false,
+      "obsidian-git:Open Git source control": false,
+      "obsidian-excalidraw-plugin:Создать новый чертеж": false
+    }
+  },
+  "active": "8c0f98c683632841",
+  "lastOpenFiles": [
+    "Задачи/Архив.md",
+    "Задачи/Задачи.md",
+    "conflict-files-obsidian-git.md",
+    "Фотки/Pasted image 20260104214219.png",
+    "Фотки/Pasted image 20260104214051.png",
+    "Задачи",
+    "Фотки",
+    "YouScoutsDocs/taskList/Задачи/Общие задачи.md",
+    "YouScoutsDocs/taskList/Архив/Архив.md",
+    "YouScoutsDocs/taskList/Архив/Подписки.md",
+    "YouScoutsDocs/taskList/Архив/Логика календаря.md",
+    "YouScoutsDocs/Поля каталогов.md",
+    "YouScoutsDocs/taskList/Архив/Дополнение подписок.md",
+    "Без названия.md",
+    "Фотки/Pasted image 20251220201051.png",
+    "Excalidraw/Drawing 2025-12-19 15.32.35.excalidraw.md",
+    "Excalidraw",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/VerificationController.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/BookingController.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/AuthController.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/Real-time уведомления.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/CatalogController.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/PaymentsController.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE/ReadMe.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Использование в FE/ReadMe.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/База данных/ReadMe.md",
+    "Excalidraw/Drawing 2025-11-26 11.27.25.excalidraw.md",
+    "Фотки/Pasted image 20251209165644.png",
+    "Фотки/Pasted image 20251209165638.png",
+    "Фотки/Pasted image 20251209165636.png",
+    "YouScoutsDocs/taskList/Архив/Изменения в логике подтверждения моб устройства готово 10.11.2025.md",
+    "Фотки/Pasted image 20251116212726.png",
+    "Фотки/Pasted image 20251116211453.png",
+    "Фотки/Pasted image 20251116211408.png",
+    "Фотки/Pasted image 20251116210835.png",
+    "2025-11-01.md",
+    "YouScoutsDocs/Взаимодействие FE и BE/Общее положение.md",
+    "YouScoutsDocs/Шаблоны/Шаблон задачи.md",
+    "YouScoutsDocs/Шаблоны/Шаблон бага.md",
+    "Фотки",
+    "YouScoutsDocs/Шаблоны",
+    "YouScoutsDocs/taskList/Задачи",
+    "YouScoutsDocs/taskList/Архив",
+    "YouScoutsDocs/Взаимодействие FE и BE/Контроллеры BE",
+    "YouScoutsDocs/Взаимодействие FE и BE/Использование в FE",
+    "YouScoutsDocs/Взаимодействие FE и BE/База данных"
+  ]
+}
