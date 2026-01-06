@@ -1,12 +1,16 @@
 configVersion: 1
 project: student-testing-system
+
 ---
+# Базовый образ со всеми build артефактами
 image: solution-build-artifacts
 dockerfile: Dockerfile
 context: ./src/backend
 args:
   DOTNET_SDK_VERSION: "10.0-alpine3.22"
+
 ---
+# Assessment WebAPI
 image: assessment-webapi
 dockerfile: Dockerfile
 context: ./docker/dotnet/Assessment
@@ -17,7 +21,9 @@ dependencies:
     imports:
       - type: ImageName
         targetBuildArg: SOLUTION_IMAGE_NAME
+
 ---
+# Media WebAPI
 image: media-webapi
 dockerfile: Dockerfile
 context: ./docker/dotnet/Media
@@ -28,7 +34,22 @@ dependencies:
     imports:
       - type: ImageName
         targetBuildArg: SOLUTION_IMAGE_NAME
+
 ---
+# Identity WebAPI
+image: identity-webapi
+dockerfile: Dockerfile
+context: ./docker/dotnet/Identity
+args:
+  ASPNET_VERSION: "10.0-alpine3.22"
+dependencies:
+  - image: solution-build-artifacts
+    imports:
+      - type: ImageName
+        targetBuildArg: SOLUTION_IMAGE_NAME
+
+---
+# Assessment Migrations
 image: assessment-migrations
 dockerfile: Dockerfile
 context: ./docker/dotnet/Migrations/Assessment
@@ -39,10 +60,25 @@ dependencies:
     imports:
       - type: ImageName
         targetBuildArg: SOLUTION_IMAGE_NAME
+
 ---
+# Media Migrations
 image: media-migrations
 dockerfile: Dockerfile
 context: ./docker/dotnet/Migrations/Media
+args:
+  ASPNET_VERSION: "10.0-alpine3.22"
+dependencies:
+  - image: solution-build-artifacts
+    imports:
+      - type: ImageName
+        targetBuildArg: SOLUTION_IMAGE_NAME
+
+---
+# Identity Migrations
+image: identity-migrations
+dockerfile: Dockerfile
+context: ./docker/dotnet/Migrations/Identity
 args:
   ASPNET_VERSION: "10.0-alpine3.22"
 dependencies:
