@@ -35,7 +35,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' && secrets.WERF_KUBECONFIG_BASE64 != '' }}
     name: Deploy to staging (werf converge)
     needs: build
     runs-on: ubuntu-latest
