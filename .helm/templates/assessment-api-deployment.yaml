@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.service.name }}
+  name: {{ .Values.assessmentApi.service.name }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.assessmentApi.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Values.service.name }}
+      app: {{ .Values.assessmentApi.service.name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.service.name }}
+        app: {{ .Values.assessmentApi.service.name }}
     spec:
       containers:
-        - name: {{ .Values.service.name }}
-          image: {{ tpl .Values.images.api . }}
+        - name: {{ .Values.assessmentApi.service.name }}
+          image: {{ index .Values.werf.image "assessment-api" }}
           ports:
-            - containerPort: {{ .Values.service.portHttp }}
+            - containerPort: {{ .Values.assessmentApi.service.portHttp }}
           resources:
             requests:
-              cpu: {{ .Values.limits.cpuRequests }}
-              memory: {{ .Values.limits.memoryRequests }}
+              cpu: {{ .Values.assessmentApi.limits.cpuRequests }}
+              memory: {{ .Values.assessmentApi.limits.memoryRequests }}
             limits:
-              cpu: {{ .Values.limits.cpuLimits }}
-              memory: {{ .Values.limits.memoryLimits }}
+              cpu: {{ .Values.assessmentApi.limits.cpuLimits }}
+              memory: {{ .Values.assessmentApi.limits.memoryLimits }}
           livenessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.portHttp }}
+              port: {{ .Values.assessmentApi.service.portHttp }}
               scheme: HTTP
             failureThreshold: 3
             initialDelaySeconds: 10
@@ -37,27 +37,27 @@ spec:
           readinessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.portHttp }}
+              port: {{ .Values.assessmentApi.service.portHttp }}
               scheme: HTTP
             failureThreshold: 3
             initialDelaySeconds: 5
             periodSeconds: 5
           env:
             - name: ASPNETCORE_ENVIRONMENT
-              value: {{ .Values.environment | quote }}
+              value: {{ .Values.assessmentApi.environment | quote }}
             - name: ConnectionStrings__Default
               valueFrom:
                 secretKeyRef:
                   name: lms-db
-                  key: identityConnectionString
+                  key: assessmentConnectionString
             - name: Keycloak__Authority
-              value: {{ .Values.auth.issuer | quote }}
+              value: {{ .Values.assessmentApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
               value: "true"
             - name: RedisOptions__Host
-              value: {{ .Values.redis.host | quote }}
+              value: {{ .Values.assessmentApi.redis.host | quote }}
             - name: RedisOptions__Port
-              value: {{ .Values.redis.port | quote }}
+              value: {{ .Values.assessmentApi.redis.port | quote }}
             - name: RedisOptions__Password
               valueFrom:
                 secretKeyRef:

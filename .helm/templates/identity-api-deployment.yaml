@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.service.name }}
+  name: {{ .Values.identityApi.service.name }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.identityApi.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Values.service.name }}
+      app: {{ .Values.identityApi.service.name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.service.name }}
+        app: {{ .Values.identityApi.service.name }}
     spec:
       containers:
-        - name: {{ .Values.service.name }}
-          image: {{ tpl .Values.images.api . }}
+        - name: {{ .Values.identityApi.service.name }}
+          image: {{ index .Values.werf.image "identity-api" }}
           ports:
-            - containerPort: {{ .Values.service.portHttp }}
+            - containerPort: {{ .Values.identityApi.service.portHttp }}
           resources:
             requests:
-              cpu: {{ .Values.limits.cpuRequests }}
-              memory: {{ .Values.limits.memoryRequests }}
+              cpu: {{ .Values.identityApi.limits.cpuRequests }}
+              memory: {{ .Values.identityApi.limits.memoryRequests }}
             limits:
-              cpu: {{ .Values.limits.cpuLimits }}
-              memory: {{ .Values.limits.memoryLimits }}
+              cpu: {{ .Values.identityApi.limits.cpuLimits }}
+              memory: {{ .Values.identityApi.limits.memoryLimits }}
           livenessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.portHttp }}
+              port: {{ .Values.identityApi.service.portHttp }}
               scheme: HTTP
             failureThreshold: 3
             initialDelaySeconds: 10
@@ -37,27 +37,27 @@ spec:
           readinessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.portHttp }}
+              port: {{ .Values.identityApi.service.portHttp }}
               scheme: HTTP
             failureThreshold: 3
             initialDelaySeconds: 5
             periodSeconds: 5
           env:
             - name: ASPNETCORE_ENVIRONMENT
-              value: {{ .Values.environment | quote }}
+              value: {{ .Values.identityApi.environment | quote }}
             - name: ConnectionStrings__Default
               valueFrom:
                 secretKeyRef:
                   name: lms-db
-                  key: assessmentConnectionString
+                  key: identityConnectionString
             - name: Keycloak__Authority
-              value: {{ .Values.auth.issuer | quote }}
+              value: {{ .Values.identityApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
               value: "true"
             - name: RedisOptions__Host
-              value: {{ .Values.redis.host | quote }}
+              value: {{ .Values.identityApi.redis.host | quote }}
             - name: RedisOptions__Port
-              value: {{ .Values.redis.port | quote }}
+              value: {{ .Values.identityApi.redis.port | quote }}
             - name: RedisOptions__Password
               valueFrom:
                 secretKeyRef:

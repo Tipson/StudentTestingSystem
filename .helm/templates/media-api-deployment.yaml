@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.service.name }}
+  name: {{ .Values.mediaApi.service.name }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.mediaApi.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Values.service.name }}
+      app: {{ .Values.mediaApi.service.name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.service.name }}
+        app: {{ .Values.mediaApi.service.name }}
     spec:
       containers:
-        - name: {{ .Values.service.name }}
-          image: {{ tpl .Values.images.api . }}
+        - name: {{ .Values.mediaApi.service.name }}
+          image: {{ index .Values.werf.image "media-api" }}
           ports:
-            - containerPort: {{ .Values.service.portHttp }}
+            - containerPort: {{ .Values.mediaApi.service.portHttp }}
           resources:
             requests:
-              cpu: {{ .Values.limits.cpuRequests }}
-              memory: {{ .Values.limits.memoryRequests }}
+              cpu: {{ .Values.mediaApi.limits.cpuRequests }}
+              memory: {{ .Values.mediaApi.limits.memoryRequests }}
             limits:
-              cpu: {{ .Values.limits.cpuLimits }}
-              memory: {{ .Values.limits.memoryLimits }}
+              cpu: {{ .Values.mediaApi.limits.cpuLimits }}
+              memory: {{ .Values.mediaApi.limits.memoryLimits }}
           livenessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.portHttp }}
+              port: {{ .Values.mediaApi.service.portHttp }}
               scheme: HTTP
             failureThreshold: 3
             initialDelaySeconds: 10
@@ -36,18 +36,18 @@ spec:
             timeoutSeconds: 1
           env:
             - name: ASPNETCORE_ENVIRONMENT
-              value: {{ .Values.environment | quote }}
+              value: {{ .Values.mediaApi.environment | quote }}
             - name: ConnectionStrings__Default
               valueFrom:
                 secretKeyRef:
                   name: lms-db
                   key: mediaConnectionString
             - name: Keycloak__Authority
-              value: {{ .Values.auth.issuer | quote }}
+              value: {{ .Values.mediaApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
               value: "true"
             - name: StorageOptions__Host
-              value: {{ .Values.s3.serviceUrl | quote }}
+              value: {{ .Values.mediaApi.s3.serviceUrl | quote }}
             - name: StorageOptions__AccessKey
               valueFrom:
                 secretKeyRef:
@@ -59,6 +59,6 @@ spec:
                   name: lms-s3
                   key: secretKey
             - name: StorageOptions__DefaultBucketName
-              value: {{ .Values.s3.defaultBucketName | quote }}
+              value: {{ .Values.mediaApi.s3.defaultBucketName | quote }}
             - name: StorageOptions__WithSsl
-              value: {{ .Values.s3.withSsl | quote }}
+              value: {{ .Values.mediaApi.s3.withSsl | quote }}
