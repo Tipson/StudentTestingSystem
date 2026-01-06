@@ -2,19 +2,3 @@ name: lms
 apiVersion: v2
 type: application
 appVersion: 1.0.0
-dependencies:
-  - name: assessment-api
-    version: 1.0.0
-    import-values:
-      - child: werf
-        parent: werf
-  - name: media-api
-    version: 1.0.0
-    import-values:
-      - child: werf
-        parent: werf
-  - name: identity-api
-    version: 1.0.0
-    import-values:
-      - child: werf
-        parent: werf

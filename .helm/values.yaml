@@ -1,0 +1,14 @@
+werf:
+  image: {}
+
+assessment-api:
+  werf:
+    image: {}
+
+media-api:
+  werf:
+    image: {}
+
+identity-api:
+  werf:
+    image: {}
