@@ -6,6 +6,9 @@ FROM ${SOLUTION_IMAGE_NAME} AS artifacts
 FROM mcr.microsoft.com/dotnet/aspnet:${ASPNET_VERSION} AS final
 WORKDIR /app
 
-COPY --from=artifacts /app/media-migrator .
+COPY --from=artifacts /app/identity-api .
 
-ENTRYPOINT ["dotnet", "Media.Migrator.dll"]
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+
+ENTRYPOINT ["dotnet", "Identity.Api.dll"]
