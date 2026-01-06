@@ -87,19 +87,6 @@ jobs:
           echo "$WERF_KUBECONFIG_BASE64" | base64 -d > kubeconfig
           kubectl --kubeconfig kubeconfig get ns
       
-      - name: Debug werf render
-        run: |
-          source "$(werf ci-env github --as-file)"
-          echo "=== Rendering templates to see what werf generates ==="
-          werf render --env "$WERF_ENV" --kube-config-base64 "$WERF_KUBECONFIG_BASE64" 2>&1 | head -200
-          echo ""
-          echo "=== Checking if werf values are set ==="
-          werf render --env "$WERF_ENV" --kube-config-base64 "$WERF_KUBECONFIG_BASE64" 2>&1 | grep -A 5 "image:" || echo "No image found in render"
-        env:
-          WERF_ENV: staging
-          WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: werf converge
         run: |
           source "$(werf ci-env github --as-file)"
@@ -110,6 +97,21 @@ jobs:
           WERF_ENV: staging
           WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Debug migration errors
+        if: failure()
+        run: |
+          echo "$WERF_KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          echo "=== Assessment migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=assessment-api-migrations --tail=50 || echo "No logs available"
+          echo ""
+          echo "=== Media migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=media-api-migrations --tail=50 || echo "No logs available"
+          echo ""
+          echo "=== Identity migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=identity-api-migrations --tail=50 || echo "No logs available"
+        env:
+          WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
       
       - name: Cleanup SSH tunnel
         if: always()
