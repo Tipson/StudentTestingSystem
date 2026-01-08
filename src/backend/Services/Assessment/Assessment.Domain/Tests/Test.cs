@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Assessment.Domain.Questions;
+using Assessment.Domain.Tests.Enums;
 using Contracts.Assessment.Enums;
 
 namespace Assessment.Domain.Tests;
@@ -71,6 +72,15 @@ public partial class Test
     ///     Дата и время публикации теста.
     /// </summary>
     public DateTimeOffset? PublishedAt { get; set; }
+    
+    /// <summary>
+    ///     Тип доступа (Приватный или Публичный).
+    /// </summary>
+    public TestAccessType AccessType { get; private set; } = TestAccessType.Private;
+    
+    // Время жизни теста
+    public DateTimeOffset? AvailableFrom { get; private set; }
+    public DateTimeOffset? AvailableUntil { get; private set; }
 
     public IList<Question> Questions { get; init; } = new List<Question>();
     

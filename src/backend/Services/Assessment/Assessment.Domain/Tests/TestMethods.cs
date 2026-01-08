@@ -1,4 +1,5 @@
-﻿using Contracts.Assessment.Enums;
+﻿using Assessment.Domain.Tests.Enums;
+using Contracts.Assessment.Enums;
 
 namespace Assessment.Domain.Tests;
 
@@ -76,5 +77,32 @@ public partial class Test
         AttemptsLimit = attemptsLimit;
     }
     
+    public void SetAccessType(TestAccessType accessType)
+    {
+        AccessType = accessType;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
     
+    public void SetAvailability(DateTimeOffset? from, DateTimeOffset? until)
+    {
+        if (from.HasValue && until.HasValue && from.Value >= until.Value)
+            throw new ArgumentException("AvailableFrom должен быть раньше AvailableUntil");
+
+        AvailableFrom = from;
+        AvailableUntil = until;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public bool IsAvailable()
+    {
+        var now = DateTimeOffset.UtcNow;
+        
+        if (AvailableFrom.HasValue && now < AvailableFrom.Value)
+            return false;
+            
+        if (AvailableUntil.HasValue && now > AvailableUntil.Value)
+            return false;
+            
+        return true;
+    }
 }
