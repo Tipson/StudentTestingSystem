@@ -8,4 +8,5 @@ public interface IUserContext
     string? Email { get; }
     string? FullName { get; }
     UserRole Role { get; }
+    Guid? GroupId { get; }
 }

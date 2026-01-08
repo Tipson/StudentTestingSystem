@@ -21,6 +21,16 @@ public interface ITestRepository
     /// Получить все опубликованные тесты.
     /// </summary>
     Task<List<Test>> ListPublishedAsync(CancellationToken ct);
+    
+    /// <summary>
+    /// Получить опубликованные публичные тесты.
+    /// </summary>
+    Task<List<Test>> ListPublishedPublicAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Получить тесты по списку ID.
+    /// </summary>
+    Task<List<Test>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct);
 
     /// <summary>
     /// Добавляет новый тест в хранилище.

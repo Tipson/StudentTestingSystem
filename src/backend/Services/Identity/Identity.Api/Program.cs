@@ -21,7 +21,7 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "Idempotency:";
 });
 
-builder.Services.AddScoped<IUserContext, UserContextAccessor>();
+builder.Services.AddScoped<IUserContext, UserContext>();
 
 builder.Services.AddIdentityApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);

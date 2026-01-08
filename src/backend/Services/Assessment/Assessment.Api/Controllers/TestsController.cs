@@ -73,4 +73,92 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
         await mediator.Send(new DeleteTest(id), ct);
         return NoContent();
     }
+    
+    #region Access Management
+
+    /// <summary>
+    /// Выдать доступ к тесту конкретному пользователю.
+    /// </summary>
+    [HttpPost("{id:guid}/access/users")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> GrantAccessToUser(
+        Guid id,
+        [FromBody] GrantAccessToUserDto dto,
+        CancellationToken ct)
+    {
+        var accessId = await mediator.Send(
+            new GrantAccessToUser(id, dto.UserId, dto.ExpiresAt),
+            ct);
+
+        return Ok(new { accessId });
+    }
+
+    /// <summary>
+    /// Выдать доступ к тесту группе.
+    /// </summary>
+    [HttpPost("{id:guid}/access/groups")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> GrantAccessToGroup(
+        Guid id,
+        [FromBody] GrantAccessToGroupDto dto,
+        CancellationToken ct)
+    {
+        var accessId = await mediator.Send(
+            new GrantAccessToGroup(id, dto.GroupId, dto.ExpiresAt),
+            ct);
+
+        return Ok(new { accessId });
+    }
+
+    /// <summary>
+    /// Создать ссылку-приглашение для теста.
+    /// </summary>
+    [HttpPost("{id:guid}/access/invite-links")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> CreateInviteLink(
+        Guid id,
+        [FromBody] CreateInviteLinkDto dto,
+        CancellationToken ct)
+    {
+        var result = await mediator.Send(
+            new CreateInviteLink(id, dto.MaxUses, dto.ExpiresAt),
+            ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Получить список доступов к тесту.
+    /// </summary>
+    [HttpGet("{id:guid}/access")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> GetAccesses(Guid id, CancellationToken ct)
+    {
+        var accesses = await mediator.Send(new GetTestAccesses(id), ct);
+        return Ok(accesses);
+    }
+
+    /// <summary>
+    /// Отозвать доступ к тесту.
+    /// </summary>
+    [HttpDelete("access/{accessId:guid}")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> RevokeAccess(Guid accessId, CancellationToken ct)
+    {
+        await mediator.Send(new RevokeAccess(accessId), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Присоединиться к тесту по ссылке-приглашению.
+    /// </summary>
+    [HttpPost("join/{inviteCode:guid}")]
+    [AllowAnonymous] // Или [Authorize] если требуется авторизация
+    public async Task<IActionResult> JoinByInvite(Guid inviteCode, CancellationToken ct)
+    {
+        var testId = await mediator.Send(new JoinTestByInvite(inviteCode), ct);
+        return Ok(new { testId, message = "Доступ к тесту предоставлен" });
+    }
+
+    #endregion
 }

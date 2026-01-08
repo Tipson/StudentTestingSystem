@@ -29,6 +29,7 @@ public partial class User
     
     [Required]
     public UserRole Role { get; private set; } = UserRole.Student;
+    public Guid? GroupId { get; private set; }
     
     public bool IsActive { get; private set; } = true;
     

@@ -39,4 +39,14 @@ public class UserContext(IHttpContextAccessor httpContextAccessor) : IUserContex
             };
         }
     }
+    
+    public Guid? GroupId // ⭐ ДОБАВИТЬ
+    {
+        get
+        {
+            var groupClaim = httpContextAccessor.HttpContext?.User.FindFirstValue("group_id");
+            return Guid.TryParse(groupClaim, out var groupId) ? groupId : null;
+        }
+    }
+
 }

@@ -5,14 +5,15 @@ using Identity.Domain.Users;
 
 namespace Identity.Api.Web;
 
-public sealed class UserContextAccessor : IUserContext
+public sealed class UserContext : IUserContext
 {
     public string UserId { get; }
     public string? Email { get; }
     public string? FullName { get; }
     public UserRole Role { get; }
+    public Guid? GroupId { get; }
 
-    public UserContextAccessor(IHttpContextAccessor http)
+    public UserContext(IHttpContextAccessor http)
     {
         var ctx = http.HttpContext 
                   ?? throw new InvalidOperationException("HTTP context unavailable");
@@ -28,6 +29,7 @@ public sealed class UserContextAccessor : IUserContext
             Email = user.Email;
             FullName = user.FullName;
             Role = user.Role;
+            GroupId = user.GroupId;
             return;
         }
 
@@ -43,6 +45,13 @@ public sealed class UserContextAccessor : IUserContext
                    ?? principal.FindFirstValue("name");
 
         Role = GetRoleFromClaims(principal);
+        
+        var groupIdClaim = principal.FindFirstValue("group_id")
+                           ?? principal.FindFirstValue("groupId")
+                           ?? principal.FindFirstValue("GroupId");
+        
+        if (Guid.TryParse(groupIdClaim, out var gid))
+            GroupId = gid;
     }
 
     private static UserRole GetRoleFromClaims(ClaimsPrincipal principal)
@@ -56,5 +65,5 @@ public sealed class UserContextAccessor : IUserContext
             "teacher" => UserRole.Teacher,
             _ => UserRole.Student
         };
-    }
+    }   
 }

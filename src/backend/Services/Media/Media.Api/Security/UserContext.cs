@@ -21,6 +21,18 @@ public sealed class UserContext(IHttpContextAccessor http) : IUserContext
     public string? FullName =>
         _user.FindFirst(ClaimTypes.Name)?.Value
         ?? _user.FindFirst("name")?.Value;
+    
+    public Guid? GroupId
+    {
+        get
+        {
+            var raw = _user.FindFirst("group_id")?.Value
+                      ?? _user.FindFirst("groupId")?.Value
+                      ?? _user.FindFirst("GroupId")?.Value;
+
+            return Guid.TryParse(raw, out var gid) ? gid : null;
+        }
+    }
 
     public UserRole Role => UserRole.Student;
 }
