@@ -1,12 +1,9 @@
-﻿using Identity.Application.Interfaces;
-using Identity.Domain.Users;
-using Identity.Domain.Groups;
 using System.Security.Claims;
 using System.Text.Json;
 using Contracts.Identity;
-using Identity.Infrastructure.Data;
+using Identity.Application.Interfaces;
+using Identity.Domain.Users;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Api.Middleware;
 
@@ -17,8 +14,7 @@ public sealed class UserSyncMiddleware(
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
-    // ДОБАВИЛИ IdentityDbContext db (замени на своё имя DbContext)
-    public async Task InvokeAsync(HttpContext context, IUserRepository users, IdentityDbContext db)
+    public async Task InvokeAsync(HttpContext context, IUserRepository users)
     {
         if (context.User.Identity?.IsAuthenticated != true)
         {
@@ -38,18 +34,52 @@ public sealed class UserSyncMiddleware(
         var cacheKey = $"user_synced:{userId}";
         var cachedData = await cache.GetStringAsync(cacheKey, context.RequestAborted);
 
+        User? user;
+
         if (cachedData is not null)
         {
-            var cachedUser = JsonSerializer.Deserialize<User>(cachedData);
-
-            // На всякий: если вдруг десериализация не удалась
-            if (cachedUser is not null)
-                context.Items["SyncedUser"] = cachedUser;
-
-            await next(context);
-            return;
+            user = JsonSerializer.Deserialize<User>(cachedData);
+        }
+        else
+        {
+            user = await SyncUserAsync(context, users, userId);
+            
+            if (user is not null)
+            {
+                var serialized = JsonSerializer.Serialize(user);
+                await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = CacheDuration
+                }, context.RequestAborted);
+            }
         }
 
+        if (user is not null)
+        {
+            // Добавляем enriched claims для других middleware/контроллеров
+            var identity = new ClaimsIdentity();
+            
+            identity.AddClaim(new Claim("user_id_verified", user.Id));
+            identity.AddClaim(new Claim("email_verified", user.Email ?? string.Empty));
+            
+            if (user.FullName is not null)
+                identity.AddClaim(new Claim("full_name_verified", user.FullName));
+            
+            identity.AddClaim(new Claim("role_verified", user.Role.ToString()));
+            
+            if (user.GroupId.HasValue)
+                identity.AddClaim(new Claim("group_id_verified", user.GroupId.Value.ToString()));
+
+            context.User.AddIdentity(identity);
+            context.Items["SyncedUser"] = user;
+        }
+
+        await next(context);
+    }
+
+    private async Task<User?> SyncUserAsync(HttpContext context, IUserRepository users, string userId)
+    {
+        // Твоя текущая логика синхронизации
         var user = await users.GetById(userId, context.RequestAborted);
 
         if (user is null)
@@ -100,28 +130,15 @@ public sealed class UserSyncMiddleware(
             }
         }
 
-        // === ВОТ ГЛАВНОЕ: GroupId из БД через GroupMembers ===
-        var groupIdFromDb = await db.Set<GroupMember>()
-            .Where(x => x.UserId == userId)
-            .Select(x => (Guid?)x.GroupId)
-            .FirstOrDefaultAsync(context.RequestAborted);
+        var groupIdFromClaims = GetGroupIdFromClaims(context.User);
 
-        // проставляем в user и сохраняем (чтобы ушло в кеш и дальше читалось из SyncedUser)
-        if (user.GroupId != groupIdFromDb)
+        if (user.GroupId != groupIdFromClaims)
         {
-            user.SetGroupId(groupIdFromDb);
+            user.SetGroupId(groupIdFromClaims);
             await users.UpdateAsync(user, context.RequestAborted);
         }
 
-        var serialized = JsonSerializer.Serialize(user);
-        await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = CacheDuration
-        }, context.RequestAborted);
-
-        context.Items["SyncedUser"] = user;
-
-        await next(context);
+        return user;
     }
 
     private static UserRole? GetRoleFromClaims(ClaimsPrincipal principal)
@@ -169,5 +186,14 @@ public sealed class UserSyncMiddleware(
         }
 
         return null;
+    }
+
+    private static Guid? GetGroupIdFromClaims(ClaimsPrincipal principal)
+    {
+        var groupClaim = principal.FindFirstValue("group_id")
+                         ?? principal.FindFirstValue("groupId")
+                         ?? principal.FindFirstValue("GroupId");
+
+        return Guid.TryParse(groupClaim, out var gid) ? gid : null;
     }
 }

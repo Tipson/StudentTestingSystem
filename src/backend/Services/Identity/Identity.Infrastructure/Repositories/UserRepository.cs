@@ -17,8 +17,11 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
     public Task<User?> GetByEmail(string email, CancellationToken ct) =>
         db.Users.FirstOrDefaultAsync(x => x.Email == email, ct);
 
-    public Task AddAsync(User user, CancellationToken ct) =>
-        db.Users.AddAsync(user, ct).AsTask();
+    public async Task AddAsync(User user, CancellationToken ct)
+    {
+        await db.Users.AddAsync(user, ct);
+        await db.SaveChangesAsync(ct);
+    }
 
     public async Task UpdateAsync(User user, CancellationToken ct)
     {

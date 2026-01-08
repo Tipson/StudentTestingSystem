@@ -2,9 +2,9 @@ using Application;
 using Assessment.Application;
 using Assessment.Infrastructure;
 using Assessment.Api.Security;
-using Assessment.Application.Services;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
+using BuildingBlocks.Api.Security;
 using Grading.Application;
 using Microsoft.IdentityModel.Logging;
 

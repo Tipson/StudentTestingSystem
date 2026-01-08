@@ -1,9 +1,9 @@
 using Application;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
+using BuildingBlocks.Api.Security;
 using Identity.Api.Middleware;
 using Identity.Api.Security;
-using Identity.Api.Web;
 using Identity.Application;
 using Identity.Infrastructure;
 using Microsoft.IdentityModel.Logging;

@@ -1,7 +1,7 @@
 using Application;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
-using Media.Api.Security;
+using BuildingBlocks.Api.Security;
 using Media.Application;
 using Media.Infrastructure;
 using Microsoft.IdentityModel.Logging;
