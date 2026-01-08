@@ -1,12 +1,16 @@
 ﻿using Identity.Application.Interfaces;
 using Identity.Domain.Users;
 using System.Security.Claims;
+using System.Text.Json;
 using Contracts.Identity;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Identity.Api.Middleware;
 
-public sealed class UserSyncMiddleware(RequestDelegate next)
+public sealed class UserSyncMiddleware(RequestDelegate next, IDistributedCache cache)
 {
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
+
     public async Task InvokeAsync(HttpContext context, IUserRepository users)
     {
         if (context.User.Identity?.IsAuthenticated != true)
@@ -20,6 +24,17 @@ public sealed class UserSyncMiddleware(RequestDelegate next)
 
         if (string.IsNullOrWhiteSpace(userId))
         {
+            await next(context);
+            return;
+        }
+        
+        var cacheKey = $"user_synced:{userId}";
+        var cachedData = await cache.GetStringAsync(cacheKey, context.RequestAborted);
+        
+        if (cachedData is not null)
+        {
+            var cachedUser = JsonSerializer.Deserialize<User>(cachedData);
+            context.Items["SyncedUser"] = cachedUser;
             await next(context);
             return;
         }
@@ -56,6 +71,12 @@ public sealed class UserSyncMiddleware(RequestDelegate next)
                 await users.UpdateAsync(user, context.RequestAborted);
             }
         }
+
+        var serialized = JsonSerializer.Serialize(user);
+        await cache.SetStringAsync(cacheKey, serialized, new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = CacheDuration
+        }, context.RequestAborted);
 
         // Сохраняем данные в Items для быстрого доступа
         context.Items["SyncedUser"] = user;

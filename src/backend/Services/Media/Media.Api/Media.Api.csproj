@@ -12,4 +12,8 @@
       <ProjectReference Include="..\Media.Infrastructure\Media.Infrastructure.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
+    </ItemGroup>
+
 </Project>

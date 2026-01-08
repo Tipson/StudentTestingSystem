@@ -1,4 +1,6 @@
 using BuildingBlocks.Api.Extensions;
+using BuildingBlocks.Api.Middlewares;
+using BuildingBlocks.Api.Middlewares;
 using Contracts.Identity;
 using Identity.Api.Middleware;
 using Identity.Api.Security;
@@ -12,6 +14,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"] 
+                            ?? "localhost:6379";
+    options.InstanceName = "Idempotency:";
+});
+
 builder.Services.AddScoped<IUserContext, UserContextAccessor>();
 
 builder.Services.AddIdentityApplication();
@@ -28,6 +38,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseMiddleware<IdempotencyMiddleware>();
 app.UseMiddleware<UserSyncMiddleware>();
 
 if (app.Environment.IsDevelopment())

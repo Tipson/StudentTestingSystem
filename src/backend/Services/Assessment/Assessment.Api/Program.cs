@@ -3,6 +3,7 @@ using Assessment.Infrastructure;
 using Assessment.Api.Security;
 using Assessment.Application.Services;
 using BuildingBlocks.Api.Extensions;
+using BuildingBlocks.Api.Middlewares;
 using Contracts.Identity;
 using Microsoft.IdentityModel.Logging;
 
@@ -11,6 +12,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"] 
+                            ?? "localhost:6379";
+    options.InstanceName = "Idempotency:";
+});
+
 builder.Services.AddScoped<IUserContext, UserContext>();
 
 
@@ -28,7 +37,9 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (app.Environment.IsDevelopment())
+app.UseMiddleware<IdempotencyMiddleware>();
+
+/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
 {
     IdentityModelEventSource.ShowPII = true;
 
@@ -40,5 +51,15 @@ if (app.Environment.IsDevelopment())
 app.UseAppExceptionHandling();
 
 app.MapControllers();
+
+// Health checks
+app.MapGet("/healthz", () => Results.Ok(new
+{
+    status = "healthy",
+    service = "assessment-api",
+    timestamp = DateTimeOffset.UtcNow
+}))
+.AllowAnonymous();
+
 
 app.Run();

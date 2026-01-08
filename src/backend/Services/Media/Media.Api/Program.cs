@@ -1,4 +1,5 @@
 using BuildingBlocks.Api.Extensions;
+using BuildingBlocks.Api.Middlewares;
 using Contracts.Identity;
 using Media.Api.Security;
 using Media.Application;
@@ -10,6 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"] 
+                            ?? "localhost:6379";
+    options.InstanceName = "Idempotency:";
+});
+
 builder.Services.AddScoped<IUserContext, UserContext>();
 
 builder.Services.AddMediaApplication();
@@ -27,16 +36,27 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (app.Environment.IsDevelopment())
+app.UseMiddleware<IdempotencyMiddleware>();
+
+/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
 {
     IdentityModelEventSource.ShowPII = true;
 
     app.UseSwaggerUiWithOAuth(builder.Configuration, 
         "/swagger/v1/swagger.json", 
-        "Storage API v1");
+        "Media API v1");
 }
 
 app.UseAppExceptionHandling();
+
+// Health checks
+app.MapGet("/healthz", () => Results.Ok(new
+{
+    status = "healthy",
+    service = "media-api",
+    timestamp = DateTimeOffset.UtcNow
+}))
+.AllowAnonymous();
 
 app.MapControllers();
 
