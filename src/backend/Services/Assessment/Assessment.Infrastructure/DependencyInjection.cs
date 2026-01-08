@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IQuestionRepository, QuestionRepository>();
         services.AddScoped<ITestRepository, TestRepository>();
         services.AddScoped<IAttemptRepository, AttemptRepository>();
+        services.AddScoped<ITestAccessRepository, TestAccessRepository>();
         
         return services;
     }
