@@ -1,6 +1,6 @@
-﻿using Assessment.Application.Interfaces;
+﻿using Application;
+using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
-using Contracts.Identity;
 using MediatR;
 
 namespace Assessment.Application.CQRS.Tests.Commands;

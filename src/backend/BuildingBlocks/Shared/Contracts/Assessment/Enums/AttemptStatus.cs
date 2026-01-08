@@ -1,4 +1,4 @@
-﻿namespace Assessment.Domain.Attempts;
+﻿namespace Contracts.Assessment.Enums;
 
 /// <summary>
 ///     Состояние попытки прохождения теста.

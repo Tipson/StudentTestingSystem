@@ -1,4 +1,4 @@
-﻿namespace Assessment.Domain.Tests;
+﻿namespace Contracts.Assessment.Enums;
 
 public enum TestStatus
 {

@@ -1,4 +1,6 @@
-﻿namespace Assessment.Domain.Tests;
+﻿using Contracts.Assessment.Enums;
+
+namespace Assessment.Domain.Tests;
 
 public partial class Test
 {

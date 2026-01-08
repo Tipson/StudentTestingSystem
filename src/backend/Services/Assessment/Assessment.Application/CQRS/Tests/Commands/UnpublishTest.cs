@@ -1,7 +1,7 @@
-﻿using Assessment.Application.Interfaces;
-using Assessment.Domain.Tests;
+﻿using Application;
+using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
-using Contracts.Identity;
+using Contracts.Assessment.Enums;
 using MediatR;
 
 namespace Assessment.Application.CQRS.Tests.Commands;

@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Assessment.Domain.Questions;
+using Contracts.Assessment.Enums;
 
 namespace Assessment.Domain.Tests;
 

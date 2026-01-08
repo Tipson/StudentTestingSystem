@@ -1,6 +1,7 @@
 ﻿using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
 using Assessment.Infrastructure.Data;
+using Contracts.Assessment.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Assessment.Infrastructure.Repositories;

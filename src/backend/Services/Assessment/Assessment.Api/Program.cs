@@ -1,10 +1,11 @@
+using Application;
 using Assessment.Application;
 using Assessment.Infrastructure;
 using Assessment.Api.Security;
 using Assessment.Application.Services;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
-using Contracts.Identity;
+using Grading.Application;
 using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +26,7 @@ builder.Services.AddScoped<IUserContext, UserContext>();
 
 builder.Services.AddAssessmentApplication();
 builder.Services.AddAssessmentInfrastructure(builder.Configuration);
+builder.Services.AddGradingService();
 
 builder.Services.AddKeycloakAuth(builder.Configuration);
 builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");

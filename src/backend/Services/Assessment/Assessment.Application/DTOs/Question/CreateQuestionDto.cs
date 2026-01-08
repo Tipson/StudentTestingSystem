@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Assessment.Domain.Questions;
+using Contracts.Assessment.Enums;
 
 namespace Assessment.Application.DTOs.Question;
 

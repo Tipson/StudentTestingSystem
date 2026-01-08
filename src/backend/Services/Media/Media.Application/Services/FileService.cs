@@ -1,5 +1,5 @@
-﻿using BuildingBlocks.Api.Exceptions;
-using Contracts.Identity;
+﻿using Application;
+using BuildingBlocks.Api.Exceptions;
 using Mapster;
 using Media.Application.DTOs;
 using Media.Application.Helpers;

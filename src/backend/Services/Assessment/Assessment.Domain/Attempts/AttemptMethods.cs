@@ -1,4 +1,7 @@
-﻿namespace Assessment.Domain.Attempts;
+﻿using Contracts.Assessment;
+using Contracts.Assessment.Enums;
+
+namespace Assessment.Domain.Attempts;
 
 public partial class Attempt
 {

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Contracts.Assessment.Enums;
 
 namespace Assessment.Domain.Attempts;
 

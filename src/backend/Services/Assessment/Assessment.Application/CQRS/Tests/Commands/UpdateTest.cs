@@ -1,9 +1,9 @@
-﻿using Assessment.Application.DTOs.Test;
+﻿using Application;
+using Assessment.Application.DTOs.Test;
 using Assessment.Application.Interfaces;
-using Assessment.Domain.Tests;
 using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
-using Contracts.Identity;
+using Contracts.Assessment.Enums;
 using Mapster;
 using MediatR;
 

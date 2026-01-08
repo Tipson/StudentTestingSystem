@@ -1,5 +1,6 @@
 ﻿using System;
 using Assessment.Domain.Attempts;
+using Contracts.Assessment;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

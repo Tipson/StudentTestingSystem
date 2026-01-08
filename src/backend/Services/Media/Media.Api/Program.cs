@@ -1,6 +1,6 @@
+using Application;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
-using Contracts.Identity;
 using Media.Api.Security;
 using Media.Application;
 using Media.Infrastructure;

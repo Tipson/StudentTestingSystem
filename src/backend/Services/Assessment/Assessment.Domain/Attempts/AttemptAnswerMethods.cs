@@ -1,4 +1,6 @@
-﻿namespace Assessment.Domain.Attempts;
+﻿using Contracts.Assessment;
+
+namespace Assessment.Domain.Attempts;
 
 public partial class AttemptAnswer
 {

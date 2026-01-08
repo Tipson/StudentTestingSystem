@@ -1,4 +1,4 @@
-﻿namespace Assessment.Domain.Questions;
+namespace Contracts.Assessment.Enums;
 
 /// <summary>
 ///     Тип вопроса в тесте.

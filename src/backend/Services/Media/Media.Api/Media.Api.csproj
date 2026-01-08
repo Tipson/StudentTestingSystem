@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Application\Application.csproj" />
       <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
       <ProjectReference Include="..\Media.Application\Media.Application.csproj" />
       <ProjectReference Include="..\Media.Infrastructure\Media.Infrastructure.csproj" />

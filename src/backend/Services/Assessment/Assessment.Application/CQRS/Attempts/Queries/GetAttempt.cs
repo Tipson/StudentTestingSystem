@@ -1,7 +1,7 @@
+using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
-using Contracts.Identity;
 using MediatR;
 
 namespace Assessment.Application.CQRS.Attempts.Queries;

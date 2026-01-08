@@ -1,6 +1,6 @@
+using Application;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
-using Contracts.Identity;
 using Identity.Api.Middleware;
 using Identity.Api.Security;
 using Identity.Api.Web;
