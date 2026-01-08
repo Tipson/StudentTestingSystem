@@ -6,7 +6,6 @@ using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Identity;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
@@ -48,7 +47,7 @@ public sealed class StartAttemptHandler(
         {
             await attempts.AddAsync(newAttempt, ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("duplicate key") == true)
+        catch (Exception ex) when (ex.InnerException?.Message.Contains("duplicate key") == true)
         {
             // Параллельный запрос уже создал attempt - загружаем его
             var existingAttempt = await attempts.GetActiveAsync(userId, request.TestId, ct)
