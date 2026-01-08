@@ -9,7 +9,6 @@ public partial class Group
     public int Course { get; private set; }
     public int GroupNumber { get; private set; }
     public bool IsActive { get; private set; } = true;
-    public List<GroupMember> Members { get; private set; } = new();
 
     public int EnrollmentYear => CalculateEnrollmentYear(Course);
 

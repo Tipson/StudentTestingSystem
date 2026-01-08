@@ -2,26 +2,11 @@ namespace Identity.Domain.Groups;
 
 public partial class Group
 {
-    public void AddMember(string userId)
-    {
-        if (Members.Any(m => m.UserId == userId))
-            throw new InvalidOperationException("Пользователь уже в группе");
-
-        Members.Add(new GroupMember(Id, userId));
-    }
-
-    public void RemoveMember(string userId)
-    {
-        var member = Members.FirstOrDefault(m => m.UserId == userId);
-        if (member is not null)
-            Members.Remove(member);
-    }
-    
-    public void Archive()
+    public void Deactivate()
     {
         IsActive = false;
     }
-    
+
     public void Activate()
     {
         IsActive = true;
@@ -36,7 +21,7 @@ public partial class Group
     
     public void PromoteCourse()
     {
-        if (Course >= 6)
+        if (Course >= 4)
             throw new InvalidOperationException("Группа уже на максимальном курсе.");
 
         Course++;
