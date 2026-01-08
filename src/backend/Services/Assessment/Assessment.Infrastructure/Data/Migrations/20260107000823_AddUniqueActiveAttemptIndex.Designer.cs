@@ -4,6 +4,7 @@ using Assessment.Domain.Attempts;
 using Assessment.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Assessment.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AssessmentDbContext))]
-    partial class AssessmentDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260107000823_AddUniqueActiveAttemptIndex")]
+    partial class AddUniqueActiveAttemptIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -80,18 +83,11 @@ namespace Assessment.Infrastructure.Data.Migrations
                     b.Property<bool?>("IsCorrect")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("ManualGradingRequired")
-                        .HasColumnType("boolean");
-
                     b.Property<int?>("PointsAwarded")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("TeacherComment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -245,9 +241,6 @@ namespace Assessment.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 

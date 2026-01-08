@@ -1,5 +1,5 @@
 using System.Net;
-using BuildingBlocks.Api.Exceptions;
+using BuildingBlocks.Api.Exceptions.Base;
 using BuildingBlocks.Api.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

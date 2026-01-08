@@ -16,6 +16,11 @@ public interface ITestRepository
     /// Возвращает список тестов, принадлежащих пользователю.
     /// </summary>
     Task<List<Test>> ListByOwnerAsync(string ownerId, CancellationToken ct);
+    
+    /// <summary>
+    /// Получить все опубликованные тесты.
+    /// </summary>
+    Task<List<Test>> ListPublishedAsync(CancellationToken ct);
 
     /// <summary>
     /// Добавляет новый тест в хранилище.

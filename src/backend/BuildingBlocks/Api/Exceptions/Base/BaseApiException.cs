@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace BuildingBlocks.Api.Exceptions;
+namespace BuildingBlocks.Api.Exceptions.Base;
 
 /// <summary>
 /// Базовое исключение для API, содержащее статус HTTP и внутренний код ошибки.

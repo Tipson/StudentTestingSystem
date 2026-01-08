@@ -64,6 +64,8 @@ public partial class Test
     /// </summary>
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
 
+    public DateTimeOffset? UpdatedAt { get; private set; } = null;
+
     /// <summary>
     ///     Дата и время публикации теста.
     /// </summary>

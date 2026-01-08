@@ -6,6 +6,7 @@ using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Identity;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
@@ -29,24 +30,32 @@ public sealed class StartAttemptHandler(
             throw new BadRequestApiException("Тест ещё не опубликован.");
 
         var activeAttempt = await attempts.GetActiveAsync(userId, request.TestId, ct);
-        Attempt attempt;
 
         if (activeAttempt is not null)
         {
-            attempt = await attempts.GetWithAnswersAsync(activeAttempt.Id, ct)
-                      ?? throw new EntityNotFoundException("Попытка не найдена.");
+            var attempt = await attempts.GetWithAnswersAsync(activeAttempt.Id, ct)
+                          ?? throw new EntityNotFoundException("Попытка не найдена.");
+            return AttemptDtoFactory.CreateDetailDto(attempt, test);
         }
-        else
+
+        var attemptsCount = await attempts.CountByUserAndTestAsync(userId, request.TestId, ct);
+        if (attemptsCount >= test.AttemptsLimit)
+            throw new BadRequestApiException("Лимит попыток исчерпан.");
+
+        var newAttempt = new Attempt(test.Id, userId);
+    
+        try
         {
-            var attemptsCount = await attempts.CountByUserAndTestAsync(userId, request.TestId, ct);
-            if (attemptsCount >= test.AttemptsLimit)
-                throw new BadRequestApiException("Лимит попыток исчерпан.");
-
-            attempt = new Attempt(test.Id, userId);
-            
-            await attempts.AddAsync(attempt, ct);
+            await attempts.AddAsync(newAttempt, ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("duplicate key") == true)
+        {
+            // Параллельный запрос уже создал attempt - загружаем его
+            var existingAttempt = await attempts.GetActiveAsync(userId, request.TestId, ct)
+                                  ?? throw new EntityNotFoundException("Попытка не найдена.");
+            return AttemptDtoFactory.CreateDetailDto(existingAttempt, test);
         }
 
-        return AttemptDtoFactory.CreateDetailDto(attempt, test);
+        return AttemptDtoFactory.CreateDetailDto(newAttempt, test);
     }
 }

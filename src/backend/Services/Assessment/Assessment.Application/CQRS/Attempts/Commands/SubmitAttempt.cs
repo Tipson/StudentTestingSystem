@@ -42,6 +42,9 @@ public sealed class SubmitAttemptHandler(
         var test = await tests.GetByIdAsync(attempt.TestId, ct)
                    ?? throw new EntityNotFoundException("Тест не найден");
 
+        if (attempt.IsTimeExpired(test.TimeLimitSeconds))
+            throw new BadRequestApiException("Время на прохождение теста истекло");
+        
         var testQuestions = await questions.ListByTestIdAsync(test.Id, ct);
 
         // Рассчитываем результат
@@ -85,11 +88,15 @@ public sealed class SubmitAttemptHandler(
             var answer = attempt.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
             
             if (answer is null)
+                continue;
+            
+            if (question.Type == QuestionType.LongText)
             {
-                // Нет ответа — 0 баллов
+                answer.ManualGradingRequired = true;
+                answer.SetResult(false, 0);
                 continue;
             }
-
+            
             var (isCorrect, points) = CheckAnswer(answer.Answer, question);
             answer.SetResult(isCorrect, points);
             earnedPoints += points;
@@ -163,6 +170,22 @@ public sealed class SubmitAttemptHandler(
         return (false, points);
     }
 
+    /*private static (bool IsCorrect, int Points) CheckMultiChoice(
+        AnswerPayload answer,
+        List<QuestionOption> correctOptions,
+        int maxPoints)
+    {
+        if (answer.OptionIds is null || answer.OptionIds.Count == 0 || correctOptions.Count == 0)
+            return (false, 0);
+
+        var correctIds = correctOptions.Select(o => o.Id).ToHashSet();
+        var selectedIds = answer.OptionIds.ToHashSet();
+
+        // Балл только если выбраны ВСЕ правильные ответы и НЕТ неправильных
+        var isCorrect = correctIds.SetEquals(selectedIds);
+        return (isCorrect, isCorrect ? maxPoints : 0);
+    }*/
+    
     private static (bool IsCorrect, int Points) CheckShortText(
         AnswerPayload answer,
         List<QuestionOption> correctOptions,

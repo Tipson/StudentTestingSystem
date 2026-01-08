@@ -23,6 +23,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Получить все попытки по тесту (для преподавателя).
     /// </summary>
     [HttpGet("tests/{testId:guid}/attempts")]
+    [Authorize(Roles = "Teacher,Admin")]
     public async Task<IActionResult> GetByTest(Guid testId, CancellationToken ct) =>
         Ok(await mediator.Send(new GetTestAttempts(testId), ct));
 
@@ -30,6 +31,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Получить попытку по ID.
     /// </summary>
     [HttpGet("attempts/{id:guid}")]
+    // Проверка прав доступа в handler
     public async Task<IActionResult> Get(Guid id, CancellationToken ct) =>
         Ok(await mediator.Send(new GetAttempt(id), ct));
 
@@ -55,6 +57,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Получить результат попытки.
     /// </summary>
     [HttpGet("attempts/{id:guid}/result")]
+    // Проверка прав доступа в handler
     public async Task<IActionResult> GetResult(Guid id, CancellationToken ct) =>
         Ok(await mediator.Send(new GetAttemptResult(id), ct));
 
@@ -64,4 +67,19 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     [HttpGet("attempts/my")]
     public async Task<IActionResult> GetMy(CancellationToken ct) =>
         Ok(await mediator.Send(new GetMyAttempts(), ct));
+    
+    /// <summary>
+    /// Оценить ответ вручную (только для преподавателя).
+    /// </summary>
+    [HttpPut("attempts/{attemptId:guid}/answers/{questionId:guid}/grade")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> GradeAnswer(
+        Guid attemptId,
+        Guid questionId,
+        [FromBody] GradeAnswerDto dto,
+        CancellationToken ct)
+    {
+        await mediator.Send(new GradeAnswer(attemptId, questionId, dto), ct);
+        return NoContent();
+    }
 }

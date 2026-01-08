@@ -11,6 +11,11 @@ public class AttemptConfiguration : IEntityTypeConfiguration<Attempt>
         // Индекс для поиска попыток по тесту
         builder.HasIndex(x => x.TestId);
         
+        //Индекс один активный attempt на пользователя+тест
+        builder.HasIndex(a => new { a.UserId, a.TestId, a.Status })
+            .HasFilter("\"Status\" = 0") // 0 = InProgress
+            .IsUnique();
+        
         // Индекс для поиска попыток пользователя
         builder.HasIndex(x => x.UserId);
 

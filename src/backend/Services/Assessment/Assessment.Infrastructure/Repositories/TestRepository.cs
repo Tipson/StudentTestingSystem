@@ -16,6 +16,12 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(ct);
     
+    public Task<List<Test>> ListPublishedAsync(CancellationToken ct) =>
+        db.Tests
+            .Where(t => t.Status == TestStatus.Published)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync(ct);
+    
     public async Task AddAsync(Test test, CancellationToken ct)
     {
         await db.Tests.AddAsync(test, ct);

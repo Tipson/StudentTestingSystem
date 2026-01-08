@@ -1,6 +1,5 @@
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
-using BuildingBlocks.Api.Middlewares;
 using Contracts.Identity;
 using Identity.Api.Middleware;
 using Identity.Api.Security;
@@ -42,7 +41,7 @@ app.UseAuthorization();
 app.UseMiddleware<IdempotencyMiddleware>();
 app.UseMiddleware<UserSyncMiddleware>();
 
-if (app.Environment.IsDevelopment())
+/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
 {
     IdentityModelEventSource.ShowPII = true;
 
@@ -53,4 +52,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseAppExceptionHandling();
 app.MapControllers();
+
+// Health checks
+app.MapGet("/healthz", () => Results.Ok(new
+{
+    status = "healthy",
+    service = "identity-api",
+    timestamp = DateTimeOffset.UtcNow
+}))
+.AllowAnonymous();
+
 app.Run();
