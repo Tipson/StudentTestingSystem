@@ -1,17 +1,13 @@
 ﻿using System.Security.Claims;
+using Application;
 using Contracts.Identity;
 
 namespace Media.Api.Security;
 
-public sealed class UserContext : IUserContext
+public sealed class UserContext(IHttpContextAccessor http) : IUserContext
 {
-    private readonly ClaimsPrincipal _user;
-
-    public UserContext(IHttpContextAccessor http)
-    {
-        _user = http.HttpContext?.User
-                ?? throw new UnauthorizedAccessException("Пользователь не аутентифицирован");
-    }
+    private readonly ClaimsPrincipal _user = http.HttpContext?.User
+                                             ?? throw new UnauthorizedAccessException("Пользователь не аутентифицирован");
 
     public string UserId =>
         _user.FindFirst(ClaimTypes.NameIdentifier)?.Value

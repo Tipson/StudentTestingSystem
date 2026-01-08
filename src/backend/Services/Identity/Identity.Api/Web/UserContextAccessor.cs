@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Application;
 using Contracts.Identity;
 using Identity.Domain.Users;
 

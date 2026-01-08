@@ -1,4 +1,6 @@
-﻿namespace Contracts.Identity;
+﻿using Contracts.Identity;
+
+namespace Application;
 
 public interface IUserContext
 {

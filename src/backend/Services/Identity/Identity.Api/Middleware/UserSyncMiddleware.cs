@@ -7,7 +7,9 @@ using Microsoft.Extensions.Caching.Distributed;
 
 namespace Identity.Api.Middleware;
 
-public sealed class UserSyncMiddleware(RequestDelegate next, IDistributedCache cache)
+public sealed class UserSyncMiddleware(RequestDelegate next,
+    IDistributedCache cache,
+    IKeycloakRoleSync keycloak)
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
@@ -53,9 +55,23 @@ public sealed class UserSyncMiddleware(RequestDelegate next, IDistributedCache c
             var newUser = new User(userId, email);
             if (!string.IsNullOrWhiteSpace(fullName)) 
                 newUser.SetFullName(fullName);
+            
+            var assignedRole = role ?? UserRole.Student;
             newUser.SetRole(role ?? UserRole.Student);
-
+            
             await users.AddAsync(newUser, context.RequestAborted);
+            
+            try
+            {
+                await keycloak.ReplaceRealmRoleAsync(userId, assignedRole, context.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                // Игнорируем ошибки синхронизации с Keycloak
+                // Пользователь всё равно будет создан в БД
+                // Роль можно будет синхронизировать позже через SetUserRole
+            }
+            
             user = newUser;
         }
         else
