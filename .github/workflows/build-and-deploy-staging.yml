@@ -1,19 +1,15 @@
 name: build-and-deploy-staging
-
 on:
   workflow_dispatch: {}
   push:
     branches:
       - develop
-
 permissions:
   contents: read
   packages: write
-
 concurrency:
   group: werf-deploy-${{ github.ref_name }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: Build images (werf)
@@ -23,9 +19,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.ref }}
-
       - uses: werf/actions/install@v2
-
       - name: werf build
         run: |
           source "$(werf ci-env github --as-file)"
@@ -33,8 +27,8 @@ jobs:
         env:
           WERF_ENV: staging
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' && secrets.WERF_KUBECONFIG_BASE64 != '' }}
     name: Deploy to staging (werf converge)
     needs: build
     runs-on: ubuntu-latest
@@ -44,9 +38,56 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.ref }}
-
       - uses: werf/actions/install@v2
-
+      
+      - name: Setup SSH tunnel to k3s apiserver
+        env:
+          SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
+          SSH_HOST: ${{ secrets.K3S_HOST }}
+          SSH_PORT: ${{ secrets.K3S_SSH_PORT }}
+          SSH_USER: ${{ secrets.K3S_SSH_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+          
+          ssh -i ~/.ssh/id_rsa -p "$SSH_PORT" \
+            -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=60 \
+            -o ServerAliveCountMax=3 \
+            -f -N \
+            -L 16443:127.0.0.1:6443 \
+            "$SSH_USER@$SSH_HOST"
+          
+          echo "SSH_TUNNEL_PID=$(pgrep -f 'ssh.*16443:127.0.0.1:6443')" >> "$GITHUB_ENV"
+          
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 16443 2>/dev/null; then
+              echo "SSH tunnel established successfully"
+              exit 0
+            fi
+            echo "Waiting for SSH tunnel... ($i/30)"
+            sleep 1
+          done
+          echo "Failed to establish SSH tunnel"
+          exit 1
+      
+      - name: Prepare kubeconfig for tunnel
+        env:
+          WERF_KUBECONFIG_BASE64: ${{ secrets.WERF_KUBECONFIG_BASE64 }}
+        run: |
+          echo "$WERF_KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          sed -i 's#https://[^:]*:6443#https://127.0.0.1:16443#g' kubeconfig
+          echo "WERF_KUBECONFIG_BASE64=$(base64 -w 0 kubeconfig)" >> "$GITHUB_ENV"
+      
+      - name: Smoke test k8s connectivity
+        env:
+          WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
+        run: |
+          echo "$WERF_KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          kubectl --kubeconfig kubeconfig get ns
+      
       - name: werf converge
         run: |
           source "$(werf ci-env github --as-file)"
@@ -55,5 +96,27 @@ jobs:
             --kube-config-base64 "$WERF_KUBECONFIG_BASE64"
         env:
           WERF_ENV: staging
-          WERF_KUBECONFIG_BASE64: ${{ secrets.WERF_KUBECONFIG_BASE64 }}
+          WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Debug migration errors
+        if: failure()
+        run: |
+          echo "$WERF_KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          echo "=== Assessment migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=assessment-api-migrations --tail=50 || echo "No logs available"
+          echo ""
+          echo "=== Media migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=media-api-migrations --tail=50 || echo "No logs available"
+          echo ""
+          echo "=== Identity migrations logs ==="
+          kubectl --kubeconfig kubeconfig -n student-testing-system-staging logs -l job-name=identity-api-migrations --tail=50 || echo "No logs available"
+        env:
+          WERF_KUBECONFIG_BASE64: ${{ env.WERF_KUBECONFIG_BASE64 }}
+      
+      - name: Cleanup SSH tunnel
+        if: always()
+        run: |
+          if [ -n "$SSH_TUNNEL_PID" ]; then
+            kill "$SSH_TUNNEL_PID" 2>/dev/null || true
+          fi
