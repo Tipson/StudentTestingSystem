@@ -2,7 +2,7 @@
 using Identity.Domain.Users;
 using Mapster;
 
-namespace Identity.Application.Users.Mapping;
+namespace Identity.Application.CQRS.Users.Mapping;
 
 public class UserMappingConfig : IRegister
 {

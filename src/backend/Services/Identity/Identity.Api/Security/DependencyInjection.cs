@@ -74,7 +74,7 @@ public static class DependencyInjection
             );
 
         services
-            .AddHttpClient<IKeycloakUserService, KeycloakUserService>((sp, client) =>
+            .AddHttpClient<IKeycloakService, KeycloakService>((sp, client) =>
             {
                 var opts = sp.GetRequiredService<IOptions<KeycloakAdminClientOptions>>().Value;
                 client.BaseAddress = BuildAdminBaseAddress(opts);
@@ -88,7 +88,6 @@ public static class DependencyInjection
                 ClientCredentialsClientName.Parse(tokenName)
             );
 
-        services.AddScoped<IKeycloakRoleSync, KeycloakRoleSync>();
 
         return services;
     }

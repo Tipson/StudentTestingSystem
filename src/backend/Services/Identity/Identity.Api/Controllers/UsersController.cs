@@ -1,6 +1,6 @@
 ﻿using Contracts.Identity;
-using Identity.Application.Users.Commands;
-using Identity.Application.Users.Queries;
+using Identity.Application.CQRS.Users.Commands;
+using Identity.Application.CQRS.Users.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,17 +16,10 @@ namespace Identity.Api.Controllers;
 public sealed class UsersController(IMediator mediator) : ControllerBase
 {
     /// <summary>
-    /// Получить информацию о текущем пользователе.
-    /// </summary>
-    [HttpGet("me")]
-    public async Task<IActionResult> GetMe(CancellationToken ct) =>
-        Ok(await mediator.Send(new GetMe(), ct));
-
-    /// <summary>
     /// Получить пользователя по ID (только админ).
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin")] // ⭐ ДОБАВИТЬ
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Get(string id, CancellationToken ct) =>
         Ok(await mediator.Send(new GetUser(id), ct));
 

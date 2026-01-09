@@ -2,7 +2,7 @@ using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
 
-namespace Identity.Application.Users.Commands;
+namespace Identity.Application.CQRS.Users.Commands;
 
 public sealed record DeactivateUser(string UserId) : IRequest;
 

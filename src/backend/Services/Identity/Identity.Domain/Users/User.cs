@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Contracts.Identity;
+using Identity.Domain.Groups;
 
 namespace Identity.Domain.Users;
 
@@ -8,6 +10,7 @@ namespace Identity.Domain.Users;
 ///     Представляет локальный профиль пользователя,
 ///     связанный с внешней системой аутентификации.
 /// </summary>
+[Table("Users", Schema = "identity")]
 public partial class User
 {
     [Key]
@@ -32,6 +35,8 @@ public partial class User
     public Guid? GroupId { get; private set; }
     
     public bool IsActive { get; private set; } = true;
+    
+    public Group? Group { get; private set; }
     
     [Required]
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;

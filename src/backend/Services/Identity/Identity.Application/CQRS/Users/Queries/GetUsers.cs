@@ -3,7 +3,7 @@ using Identity.Application.Interfaces;
 using Mapster;
 using MediatR;
 
-namespace Identity.Application.Users.Queries;
+namespace Identity.Application.CQRS.Users.Queries;
 
 public sealed record GetUsers : IRequest<IList<UserDto>>;
 

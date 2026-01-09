@@ -1,7 +1,6 @@
-using Identity.Domain;
+using Identity.Application.Interfaces;
 using Identity.Domain.Users;
 using Identity.Domain.Groups;
-using Identity.Domain.Users;
 using Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,16 +11,13 @@ public sealed class GroupRepository(IdentityDbContext context) : IGroupRepositor
     public async Task<Group?> GetById(Guid id, CancellationToken ct = default)
     {
         return await context.Groups
-            .AsNoTracking()
             .FirstOrDefaultAsync(g => g.Id == id, ct);
     }
 
-    public async Task<(List<Group> Items, int Total)> GetActiveAsync(
+    public async Task<List<Group>> GetActiveAsync(
         string? institution,
         string? specialization,
         int? course,
-        int page,
-        int pageSize,
         CancellationToken ct = default)
     {
         var query = context.Groups
@@ -37,18 +33,12 @@ public sealed class GroupRepository(IdentityDbContext context) : IGroupRepositor
         if (course.HasValue)
             query = query.Where(g => g.Course == course.Value);
 
-        var total = await query.CountAsync(ct);
-
-        var items = await query
+        return await query
             .OrderBy(g => g.Institution)
             .ThenBy(g => g.Specialization)
             .ThenBy(g => g.Course)
             .ThenBy(g => g.GroupNumber)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .ToListAsync(ct);
-
-        return (items, total);
     }
 
     public async Task<List<User>> GetMembersAsync(Guid groupId, CancellationToken ct = default)
@@ -69,6 +59,12 @@ public sealed class GroupRepository(IdentityDbContext context) : IGroupRepositor
     public async Task UpdateAsync(Group group, CancellationToken ct = default)
     {
         context.Groups.Update(group);
+        await context.SaveChangesAsync(ct);
+    }
+    
+    public async Task RemoveAsync(Group group, CancellationToken ct = default)
+    {
+        context.Groups.Remove(group);
         await context.SaveChangesAsync(ct);
     }
 }
