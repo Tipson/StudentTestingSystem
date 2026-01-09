@@ -10,7 +10,8 @@ namespace Identity.Api.Middleware;
 public sealed class UserSyncMiddleware(
     RequestDelegate next,
     IDistributedCache cache,
-    IKeycloakRoleSync keycloak)
+    IKeycloakRoleSync roleSync,
+    IKeycloakUserService keycloakUserService)
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
@@ -60,7 +61,9 @@ public sealed class UserSyncMiddleware(
             var identity = new ClaimsIdentity();
             
             identity.AddClaim(new Claim("user_id_verified", user.Id));
-            identity.AddClaim(new Claim("email_verified", user.Email ?? string.Empty));
+            
+            if (user.Email is not null)
+                identity.AddClaim(new Claim("email_verified", user.Email));       
             
             if (user.FullName is not null)
                 identity.AddClaim(new Claim("full_name_verified", user.FullName));
@@ -77,13 +80,13 @@ public sealed class UserSyncMiddleware(
         await next(context);
     }
 
-    private async Task<User?> SyncUserAsync(HttpContext context, IUserRepository users, string userId)
+private async Task<User?> SyncUserAsync(HttpContext context, IUserRepository users, string userId)
     {
-        // Твоя текущая логика синхронизации
         var user = await users.GetById(userId, context.RequestAborted);
 
         if (user is null)
         {
+            // Создание нового пользователя
             var email = context.User.FindFirstValue(ClaimTypes.Email)
                         ?? context.User.FindFirstValue("email");
 
@@ -101,11 +104,16 @@ public sealed class UserSyncMiddleware(
             var assignedRole = role ?? UserRole.Student;
             newUser.SetRole(assignedRole);
 
+            // GroupId для новых пользователей можно взять из claims
+            var groupIdFromClaims = GetGroupIdFromClaims(context.User);
+            if (groupIdFromClaims.HasValue)
+                newUser.SetGroupId(groupIdFromClaims);
+
             await users.AddAsync(newUser, context.RequestAborted);
 
             try
             {
-                await keycloak.ReplaceRealmRoleAsync(userId, assignedRole, context.RequestAborted);
+                await roleSync.ReplaceRealmRoleAsync(userId, assignedRole, context.RequestAborted);
             }
             catch
             {
@@ -116,6 +124,7 @@ public sealed class UserSyncMiddleware(
         }
         else
         {
+            // Синхронизация существующего пользователя
             var email = context.User.FindFirstValue(ClaimTypes.Email)
                         ?? context.User.FindFirstValue("email");
 
@@ -128,19 +137,37 @@ public sealed class UserSyncMiddleware(
             {
                 await users.UpdateAsync(user, context.RequestAborted);
             }
-        }
 
-        var groupIdFromClaims = GetGroupIdFromClaims(context.User);
-
-        if (user.GroupId != groupIdFromClaims)
-        {
-            user.SetGroupId(groupIdFromClaims);
-            await users.UpdateAsync(user, context.RequestAborted);
+            // GroupId: БД - источник правды, но синхронизируем с Keycloak при расхождении
+            var groupIdFromClaims = GetGroupIdFromClaims(context.User);
+            
+            // Если в claims есть значение, отличное от БД - обновляем БД
+            // (это может быть если студент выбрал группу в другом сервисе)
+            if (groupIdFromClaims.HasValue && user.GroupId != groupIdFromClaims)
+            {
+                user.SetGroupId(groupIdFromClaims);
+                await users.UpdateAsync(user, context.RequestAborted);
+            }
+            
+            // Обратная синхронизация: если в БД есть GroupId, но в Keycloak устарело
+            else if (user.GroupId.HasValue && user.GroupId != groupIdFromClaims)
+            {
+                try
+                {
+                    await keycloakUserService.SetUserGroupAsync(
+                        userId, 
+                        user.GroupId.Value, 
+                        context.RequestAborted);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
         }
 
         return user;
     }
-
     private static UserRole? GetRoleFromClaims(ClaimsPrincipal principal)
     {
         var roleClaim = principal.FindFirstValue("role")

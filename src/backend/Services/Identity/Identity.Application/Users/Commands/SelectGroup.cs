@@ -1,7 +1,6 @@
 using Application;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
-using Identity.Application.Services;
 using Identity.Domain;
 using Identity.Domain.Groups;
 using Identity.Domain.Users;

@@ -321,7 +321,7 @@ namespace Assessment.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasFilter("[UserId] IS NOT NULL");
 
-                    b.ToTable("TestAccesses");
+                    b.ToTable("TestAccesses", (string)null);
                 });
 
             modelBuilder.Entity("Assessment.Domain.Attempts.AttemptAnswer", b =>

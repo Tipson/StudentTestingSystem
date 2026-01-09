@@ -7,6 +7,8 @@ using Keycloak.AuthServices.Common;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Identity.Api.Security;
 
@@ -71,9 +73,36 @@ public static class DependencyInjection
                 ClientCredentialsClientName.Parse(tokenName)
             );
 
+        services
+            .AddHttpClient<IKeycloakUserService, KeycloakUserService>((sp, client) =>
+            {
+                var opts = sp.GetRequiredService<IOptions<KeycloakAdminClientOptions>>().Value;
+                client.BaseAddress = BuildAdminBaseAddress(opts);
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                UseProxy = false,
+                Proxy = null
+            })
+            .AddClientCredentialsTokenHandler(
+                ClientCredentialsClientName.Parse(tokenName)
+            );
+
         services.AddScoped<IKeycloakRoleSync, KeycloakRoleSync>();
 
         return services;
     }
-}
 
+    private static Uri BuildAdminBaseAddress(KeycloakAdminClientOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.AuthServerUrl))
+            throw new InvalidOperationException("Keycloak AuthServerUrl is not configured");
+
+        if (string.IsNullOrWhiteSpace(options.Realm))
+            throw new InvalidOperationException("Keycloak realm is not configured");
+
+        var root = options.AuthServerUrl.TrimEnd('/');
+        var realm = options.Realm.Trim('/');
+        return new Uri($"{root}/admin/realms/{realm}/", UriKind.Absolute);
+    }
+}
