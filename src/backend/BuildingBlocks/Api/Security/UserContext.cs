@@ -1,5 +1,3 @@
-// BuildingBlocks/Api/Security/UserContext.cs
-
 using System.Security.Claims;
 using Application;
 using Contracts.Identity;

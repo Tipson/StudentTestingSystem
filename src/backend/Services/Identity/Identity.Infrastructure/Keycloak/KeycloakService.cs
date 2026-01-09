@@ -1,4 +1,4 @@
-﻿using Contracts.Identity;
+using Contracts.Identity;
 using Identity.Application.Interfaces;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Keycloak.AuthServices.Sdk.Kiota.Admin;
@@ -6,15 +6,15 @@ using Microsoft.Extensions.Options;
 
 namespace Identity.Infrastructure.Keycloak;
 
-public sealed class KeycloakRoleSync(
+public sealed class KeycloakService(
     KeycloakAdminApiClient kc,
     IOptions<KeycloakAdminClientOptions> options
-) : IKeycloakRoleSync
+) : IKeycloakService
 {
     private readonly string _realm = options.Value.Realm;
     private static readonly string[] ManagedRoles = ["admin", "teacher", "student"];
 
-    public async Task ReplaceRealmRoleAsync(string userId, UserRole role, CancellationToken ct)
+    public async Task SetUserRealmRoleAsync(string userId, UserRole role, CancellationToken ct)
     {
         var realmRoles = await kc.Admin.Realms[_realm].Roles.GetAsync(cancellationToken: ct)
                          ?? throw new InvalidOperationException("Keycloak: не удалось загрузить роли realm.");
