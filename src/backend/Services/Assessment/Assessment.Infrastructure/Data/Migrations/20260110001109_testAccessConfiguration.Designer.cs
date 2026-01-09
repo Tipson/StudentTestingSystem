@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Assessment.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AssessmentDbContext))]
-    [Migration("20260108194055_AddTestAccessAndAvailability")]
-    partial class AddTestAccessAndAvailability
+    [Migration("20260110001109_testAccessConfiguration")]
+    partial class testAccessConfiguration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -318,11 +318,11 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.HasIndex("TestId", "GroupId")
                         .IsUnique()
-                        .HasFilter("[GroupId] IS NOT NULL");
+                        .HasFilter("\"GroupId\" IS NOT NULL");
 
                     b.HasIndex("TestId", "UserId")
                         .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL");
+                        .HasFilter("\"UserId\" IS NOT NULL");
 
                     b.ToTable("TestAccesses");
                 });

@@ -73,35 +73,10 @@ public static class DependencyInjection
                 ClientCredentialsClientName.Parse(tokenName)
             );
 
-        services
-            .AddHttpClient<IKeycloakService, KeycloakService>((sp, client) =>
-            {
-                var opts = sp.GetRequiredService<IOptions<KeycloakAdminClientOptions>>().Value;
-                client.BaseAddress = BuildAdminBaseAddress(opts);
-            })
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                UseProxy = false,
-                Proxy = null
-            })
-            .AddClientCredentialsTokenHandler(
-                ClientCredentialsClientName.Parse(tokenName)
-            );
+        services.AddScoped<IKeycloakService, KeycloakService>();
+
 
 
         return services;
-    }
-
-    private static Uri BuildAdminBaseAddress(KeycloakAdminClientOptions options)
-    {
-        if (string.IsNullOrWhiteSpace(options.AuthServerUrl))
-            throw new InvalidOperationException("Keycloak AuthServerUrl is not configured");
-
-        if (string.IsNullOrWhiteSpace(options.Realm))
-            throw new InvalidOperationException("Keycloak realm is not configured");
-
-        var root = options.AuthServerUrl.TrimEnd('/');
-        var realm = options.Realm.Trim('/');
-        return new Uri($"{root}/admin/realms/{realm}/", UriKind.Absolute);
     }
 }

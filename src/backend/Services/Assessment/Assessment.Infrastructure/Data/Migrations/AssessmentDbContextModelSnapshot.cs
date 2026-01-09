@@ -315,13 +315,13 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.HasIndex("TestId", "GroupId")
                         .IsUnique()
-                        .HasFilter("[GroupId] IS NOT NULL");
+                        .HasFilter("\"GroupId\" IS NOT NULL");
 
                     b.HasIndex("TestId", "UserId")
                         .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL");
+                        .HasFilter("\"UserId\" IS NOT NULL");
 
-                    b.ToTable("TestAccesses", (string)null);
+                    b.ToTable("TestAccesses");
                 });
 
             modelBuilder.Entity("Assessment.Domain.Attempts.AttemptAnswer", b =>

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Assessment.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class AddTestAccessAndAvailability : Migration
+    public partial class testAccessConfiguration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -82,14 +82,14 @@ namespace Assessment.Infrastructure.Data.Migrations
                 table: "TestAccesses",
                 columns: new[] { "TestId", "GroupId" },
                 unique: true,
-                filter: "[GroupId] IS NOT NULL");
+                filter: "\"GroupId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TestAccesses_TestId_UserId",
                 table: "TestAccesses",
                 columns: new[] { "TestId", "UserId" },
                 unique: true,
-                filter: "[UserId] IS NOT NULL");
+                filter: "\"UserId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TestAccesses_UserId",

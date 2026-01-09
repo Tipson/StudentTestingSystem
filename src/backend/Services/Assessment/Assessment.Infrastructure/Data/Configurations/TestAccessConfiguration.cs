@@ -28,11 +28,10 @@ public class TestAccessConfiguration : IEntityTypeConfiguration<TestAccess>
         // Уникальность: один пользователь не может иметь два доступа к одному тесту
         builder.HasIndex(e => new { e.TestId, e.UserId })
             .IsUnique()
-            .HasFilter("[UserId] IS NOT NULL");
+            .HasFilter("\"UserId\" IS NOT NULL");
         
         // Уникальность: одна группа не может иметь два доступа к одному тесту
         builder.HasIndex(e => new { e.TestId, e.GroupId })
             .IsUnique()
-            .HasFilter("[GroupId] IS NOT NULL");
-    }
+            .HasFilter("\"GroupId\" IS NOT NULL");    }
 }
