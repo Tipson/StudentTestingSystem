@@ -1,4 +1,4 @@
-﻿using Application;
+using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
@@ -10,11 +10,14 @@ using MediatR;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
+/// <summary>
+/// Вручную оценить ответ.
+/// </summary>
 public sealed record GradeAnswer(
     Guid AttemptId,
     Guid QuestionId,
     GradeAnswerDto Dto
-) : IRequest;
+ ) : IRequest<AttemptScoreDto>;
 
 public sealed class GradeAnswerHandler(
     IUserContext userContext,
@@ -23,9 +26,9 @@ public sealed class GradeAnswerHandler(
     IQuestionRepository questions,
     IGradingService? grading,
     IMapper mapper)
-    : IRequestHandler<GradeAnswer>
+    : IRequestHandler<GradeAnswer, AttemptScoreDto>
 {
-    public async Task Handle(GradeAnswer request, CancellationToken ct)
+    public async Task<AttemptScoreDto> Handle(GradeAnswer request, CancellationToken ct)
     {
         var userId = userContext.UserId
                      ?? throw new UnauthorizedApiException("Пользователь не аутентифицирован.");
@@ -71,10 +74,23 @@ public sealed class GradeAnswerHandler(
             .Select(mapper.Map<QuestionData>)
             .ToList();
 
-        var (score, _, _) = grading.CalculateScore(gradingResults, questionsData);
+        var gradingService = grading ?? throw new InvalidOperationException("Grading service is not available");
+        var (scorePercent, _, _) = gradingService.CalculateScore(gradingResults, questionsData);
 
-        attempt.UpdateScore(score, test.PassScore);
+        attempt.UpdateScore(scorePercent, test.PassScore);
+
+        var correctCount = gradingResults.Count(r => r.IsCorrect);
+
+        attempt.UpdateScore(scorePercent, test.PassScore);
 
         await attempts.UpdateAsync(attempt, ct);
+
+        return new AttemptScoreDto(
+            attempt.Id,
+            attempt.TestId,
+            scorePercent,
+            correctCount,
+            attempt.IsPassed ?? false
+        );
     }
 }

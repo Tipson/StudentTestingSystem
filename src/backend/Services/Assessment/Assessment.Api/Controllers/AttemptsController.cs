@@ -85,9 +85,6 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
         Guid attemptId,
         Guid questionId,
         [FromBody] GradeAnswerDto dto,
-        CancellationToken ct)
-    {
-        await mediator.Send(new GradeAnswer(attemptId, questionId, dto), ct);
-        return NoContent();
-    }
+        CancellationToken ct) =>
+        Ok(await mediator.Send(new GradeAnswer(attemptId, questionId, dto), ct));
 }

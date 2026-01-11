@@ -1,4 +1,4 @@
-﻿using Application;
+using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Attempts;
@@ -56,11 +56,11 @@ public sealed class SubmitAttemptHandler(
             .Select(q => mapper.Map<QuestionData>(q))
             .ToList();
 
-        var (score, totalPoints, earnedPoints) = grading.CalculateScore(gradingResults, questionsData);
+        var (scorePercent, totalPoints, earnedPoints) = grading.CalculateScore(gradingResults, questionsData);
         var correctCount = gradingResults.Count(r => r.IsCorrect);
 
         // Завершаем попытку
-        attempt.Submit(score, test.PassScore);
+        attempt.Submit(scorePercent, test.PassScore);
         await attempts.UpdateAsync(attempt, ct);
 
         // Формируем результат через Mapster
@@ -68,11 +68,10 @@ public sealed class SubmitAttemptHandler(
             .Select(q => mapper.Map<QuestionResultDto>((q, attempt.Answers.FirstOrDefault(a => a.QuestionId == q.Id))))
             .ToList();
 
-        return new AttemptResultDto(
-            attempt.Id,
+        return new AttemptResultDto(attempt.Id,
             test.Id,
             test.Title,
-            score,
+            scorePercent,
             test.PassScore,
             attempt.IsPassed ?? false,
             totalPoints,
