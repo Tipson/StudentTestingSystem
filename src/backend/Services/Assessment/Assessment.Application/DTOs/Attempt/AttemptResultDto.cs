@@ -1,4 +1,4 @@
-﻿namespace Assessment.Application.DTOs.Attempt;
+namespace Assessment.Application.DTOs.Attempt;
 
 public sealed record AttemptResultDto(
     Guid AttemptId,
@@ -7,6 +7,7 @@ public sealed record AttemptResultDto(
     int Score,
     int PassScore,
     bool IsPassed,
+    bool RequiresManualReview,
     int TotalPoints,
     int EarnedPoints,
     int TotalQuestions,

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Contracts.Assessment.Enums;
 
@@ -33,7 +33,7 @@ public partial class Attempt
     /// <summary>
     ///     Итоговый процент (0..100). Заполняется при отправке.
     /// </summary>
-    [Range(0, 100)]
+    [Range(0, int.MaxValue)]
     public int? Score { get; set; }
 
     /// <summary>

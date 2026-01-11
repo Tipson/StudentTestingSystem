@@ -1,4 +1,4 @@
-﻿using Application;
+using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Attempts;
@@ -12,7 +12,7 @@ using QuestionType = Contracts.Assessment.Enums.QuestionType;
 namespace Assessment.Application.CQRS.Attempts.Queries;
 
 /// <summary>
-/// Получить результат завершённой попытки.
+/// Возвращает подробный результат попытки после проверки.
 /// </summary>
 public sealed record GetAttemptResult(Guid AttemptId) : IRequest<AttemptResultDto>;
 
@@ -26,7 +26,7 @@ public sealed class GetAttemptResultHandler(
     public async Task<AttemptResultDto> Handle(GetAttemptResult request, CancellationToken ct)
     {
         var userId = userContext.UserId
-                     ?? throw new UnauthorizedApiException("Пользователь не аутентифицирован.");
+                     ?? throw new UnauthorizedApiException("Пользователь не авторизован");
 
         var attempt = await attempts.GetWithAnswersAsync(request.AttemptId, ct)
                       ?? throw new EntityNotFoundException("Попытка не найдена");
@@ -34,11 +34,9 @@ public sealed class GetAttemptResultHandler(
         var test = await tests.GetByIdAsync(attempt.TestId, ct)
                    ?? throw new EntityNotFoundException("Тест не найден");
 
-        // Проверка доступа: студент (владелец попытки) или преподаватель (владелец теста)
         if (attempt.UserId != userId && test.OwnerUserId != userId)
-            throw new ForbiddenException("Нет доступа к результатам");
+            throw new ForbiddenException("Нет доступа к результату");
 
-        // Результат доступен только для завершённых попыток
         if (attempt.Status != AttemptStatus.Submitted)
             throw new BadRequestApiException("Попытка ещё не завершена");
 
@@ -49,6 +47,9 @@ public sealed class GetAttemptResultHandler(
         var correctCount = attempt.Answers.Count(a => a.IsCorrect == true);
 
         var questionResults = BuildQuestionResults(attempt, testQuestions);
+        var requiresManualReview = testQuestions.Any(q =>
+            q.Type == QuestionType.LongText &&
+            attempt.Answers.Any(a => a.QuestionId == q.Id && a.ManualGradingRequired));
 
         return new AttemptResultDto(
             attempt.Id,
@@ -57,6 +58,7 @@ public sealed class GetAttemptResultHandler(
             attempt.Score ?? 0,
             test.PassScore,
             attempt.IsPassed ?? false,
+            requiresManualReview,
             totalPoints,
             earnedPoints,
             testQuestions.Count,

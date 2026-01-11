@@ -11,7 +11,7 @@ using MediatR;
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
 /// <summary>
-/// Вручную оценить ответ.
+/// Пересчитывает ответ вручную и возвращает обновлённый счёт.
 /// </summary>
 public sealed record GradeAnswer(
     Guid AttemptId,
@@ -31,7 +31,7 @@ public sealed class GradeAnswerHandler(
     public async Task<AttemptScoreDto> Handle(GradeAnswer request, CancellationToken ct)
     {
         var userId = userContext.UserId
-                     ?? throw new UnauthorizedApiException("Пользователь не аутентифицирован.");
+                     ?? throw new UnauthorizedApiException("Пользователь не авторизован.");
 
         var attempt = await attempts.GetWithAnswersAsync(request.AttemptId, ct)
                       ?? throw new EntityNotFoundException("Попытка не найдена");
@@ -40,16 +40,16 @@ public sealed class GradeAnswerHandler(
                    ?? throw new EntityNotFoundException("Тест не найден");
 
         if (test.OwnerUserId != userId)
-            throw new ForbiddenException("Только владелец теста может оценивать ответы");
+            throw new ForbiddenException("Можно оценивать только свои тесты");
 
         if (attempt.Status != AttemptStatus.Submitted)
-            throw new BadRequestApiException("Можно оценивать только завершённые попытки");
+            throw new BadRequestApiException("Попытка ещё не завершена");
 
         var question = await questions.GetByIdAsync(request.QuestionId, ct)
                        ?? throw new EntityNotFoundException("Вопрос не найден");
 
         if (question.TestId != attempt.TestId)
-            throw new BadRequestApiException("Вопрос не относится к данному тесту");
+            throw new BadRequestApiException("Вопрос не относится к этому тесту");
 
         var answer = attempt.Answers.FirstOrDefault(a => a.QuestionId == request.QuestionId)
                      ?? throw new EntityNotFoundException("Ответ не найден");
@@ -57,13 +57,18 @@ public sealed class GradeAnswerHandler(
         if (!answer.ManualGradingRequired)
             throw new BadRequestApiException("Этот ответ не требует ручной проверки");
 
-        // Используем GradingService для валидации и создания результата
-        var gradingResult = grading?.GradeManually(request.Dto.Points, question.Points, request.Dto.Comment);
+        if (request.Dto.Points < 0)
+            throw new BadRequestApiException("Количество баллов не может быть отрицательным.");
 
-        // Обновляем ответ
-        if (gradingResult != null) answer.SetManualGrade(gradingResult.PointsAwarded, gradingResult.Feedback);
+        if (request.Dto.Points > question.Points)
+            throw new BadRequestApiException($"Максимум за этот вопрос: {question.Points}.");
 
-        // Пересчитываем баллы через GradingService
+        var gradingService = grading ?? throw new InvalidOperationException("Grading service is not available");
+
+        var gradingResult = gradingService.GradeManually(request.Dto.Points, question.Points, request.Dto.Comment);
+
+        answer.SetManualGrade(gradingResult.PointsAwarded, gradingResult.Feedback);
+
         var testQuestions = await questions.ListByTestIdAsync(attempt.TestId, ct);
 
         var gradingResults = attempt.Answers
@@ -74,22 +79,17 @@ public sealed class GradeAnswerHandler(
             .Select(mapper.Map<QuestionData>)
             .ToList();
 
-        var gradingService = grading ?? throw new InvalidOperationException("Grading service is not available");
-        var (scorePercent, _, _) = gradingService.CalculateScore(gradingResults, questionsData);
+        var (_, _, earnedPoints) = gradingService.CalculateScore(gradingResults, questionsData);
 
-        attempt.UpdateScore(scorePercent, test.PassScore);
-
-        var correctCount = gradingResults.Count(r => r.IsCorrect);
-
-        attempt.UpdateScore(scorePercent, test.PassScore);
+        attempt.UpdateScore(earnedPoints, test.PassScore);
 
         await attempts.UpdateAsync(attempt, ct);
 
         return new AttemptScoreDto(
             attempt.Id,
             attempt.TestId,
-            scorePercent,
-            correctCount,
+            earnedPoints,
+            test.PassScore,
             attempt.IsPassed ?? false
         );
     }

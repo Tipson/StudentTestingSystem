@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Assessment.Application.DTOs.Test;
 
@@ -9,11 +9,11 @@ public sealed record UpdateTestSettingsDto(
     [MaxLength(2000)]
     string? Description,
 
-    // null — без ограничения, иначе >= 1
+    // null - без ограничения, иначе >= 1
     [Range(1, int.MaxValue)]
     int? TimeLimitSeconds,
 
-    [Range(0, 100)]
+    [Range(0, int.MaxValue)]
     int PassScore,
 
     [Range(1, 20)]

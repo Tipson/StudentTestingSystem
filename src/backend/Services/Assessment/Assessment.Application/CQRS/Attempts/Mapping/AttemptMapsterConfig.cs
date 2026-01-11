@@ -52,7 +52,7 @@ public sealed class AttemptMapsterConfig : IRegister
             .Map(dest => dest.Id, src => src.Id)
             .Map(dest => dest.Type, src => src.Type)
             .Map(dest => dest.MaxPoints, src => src.Points)
-            .Map(dest => dest.CorrectOptions, src => new List<CorrectOptionData>()); // Пустой список
+            .Map(dest => dest.CorrectOptions, src => new List<CorrectOptionData>()); // ���⮩ ᯨ᮪
     }
 
     private static AnswerPayloadDto? MapUserAnswer(AttemptAnswer? answer)

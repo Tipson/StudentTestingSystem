@@ -13,7 +13,7 @@ using MediatR;
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
 /// <summary>
-/// Завершить попытку и получить результат.
+/// Завершает попытку и возвращает итоговый результат.
 /// </summary>
 public sealed record SubmitAttempt(Guid AttemptId) : IRequest<AttemptResultDto>;
 
@@ -56,24 +56,30 @@ public sealed class SubmitAttemptHandler(
             .Select(q => mapper.Map<QuestionData>(q))
             .ToList();
 
-        var (scorePercent, totalPoints, earnedPoints) = grading.CalculateScore(gradingResults, questionsData);
+        var (_, totalPoints, earnedPoints) = grading.CalculateScore(gradingResults, questionsData);
         var correctCount = gradingResults.Count(r => r.IsCorrect);
 
-        // Завершаем попытку
-        attempt.Submit(scorePercent, test.PassScore);
+        // сохраняем результат
+        attempt.Submit(earnedPoints, test.PassScore);
         await attempts.UpdateAsync(attempt, ct);
 
-        // Формируем результат через Mapster
+        var requiresManualReview = testQuestions.Any(q =>
+            q.Type == QuestionType.LongText &&
+            attempt.Answers.Any(a => a.QuestionId == q.Id && a.ManualGradingRequired));
+
+        // Формируем результат
         var questionResults = testQuestions
             .Select(q => mapper.Map<QuestionResultDto>((q, attempt.Answers.FirstOrDefault(a => a.QuestionId == q.Id))))
             .ToList();
 
-        return new AttemptResultDto(attempt.Id,
+        return new AttemptResultDto(
+            attempt.Id,
             test.Id,
             test.Title,
-            scorePercent,
+            earnedPoints,
             test.PassScore,
             attempt.IsPassed ?? false,
+            requiresManualReview,
             totalPoints,
             earnedPoints,
             testQuestions.Count,

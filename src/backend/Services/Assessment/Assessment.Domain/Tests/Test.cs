@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Assessment.Domain.Questions;
 using Assessment.Domain.Tests.Enums;
@@ -7,8 +7,8 @@ using Contracts.Assessment.Enums;
 namespace Assessment.Domain.Tests;
 
 /// <summary>
-///     Представляет тест (оценочное задание),
-///     содержащий настройки прохождения и принадлежность преподавателю.
+///     Настраиваемый тест (совокупность вопросов),
+///     предназначенный для прохождения и проверки студентов.
 /// </summary>
 [Table("Tests", Schema = "assessment")]
 public partial class Test
@@ -38,7 +38,7 @@ public partial class Test
     public string OwnerUserId { get; private set; }
 
     /// <summary>
-    ///     Статус теста.
+    ///     Текущий статус теста.
     /// </summary>
     [Required]
     public TestStatus Status { get; set; } = TestStatus.Draft;
@@ -50,9 +50,9 @@ public partial class Test
     public int? TimeLimitSeconds { get; set; }
 
     /// <summary>
-    ///     Проходной балл (в процентах).
+    ///     Проходной балл (в абсолютных баллах).
     /// </summary>
-    [Range(0, 100)]
+    [Range(0, int.MaxValue)]
     public int PassScore { get; set; }
 
     /// <summary>
@@ -87,10 +87,10 @@ public partial class Test
     public Test(string ownerUserId, string title, string? description = null)
     {
         if (string.IsNullOrWhiteSpace(ownerUserId))
-            throw new ArgumentException("OwnerId обязателен.", nameof(ownerUserId));
+            throw new ArgumentException("OwnerId не должен быть пустым.", nameof(ownerUserId));
 
         if (string.IsNullOrWhiteSpace(title))
-            throw new ArgumentException("Title обязателен.", nameof(title));
+            throw new ArgumentException("Title не должен быть пустым.", nameof(title));
 
         OwnerUserId = ownerUserId;
         Title = title.Trim();
