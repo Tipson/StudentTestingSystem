@@ -8,13 +8,11 @@
 <!-- template: register.ftl -->
 
     <#if section = "header">
-        <#if messageHeader??>
-            ${msg(messageHeader)}
-        <#else>
-            ${msg("registerTitle")}
-        </#if>
+        <#assign headerText = messageHeader?? ? msg(messageHeader) : msg("registerTitle")>
+        <span class="kc-title">${headerText}</span>
+        <span class="kc-subtitle">${msg("registerSubtitle")}</span>
     <#elseif section = "form">
-        <form id="kc-register-form" class="${properties.kcFormClass!}" action="${url.registrationAction}" method="post" novalidate="novalidate">
+        <form id="kc-register-form" class="${properties.kcFormClass!} kc-form-animate" action="${url.registrationAction}" method="post" novalidate="novalidate">
             <@userProfileCommons.userProfileFormFields; callback, attribute>
                 <#if callback = "afterField">
                 <#-- render password fields just under the username or email (if used as username) -->
@@ -25,7 +23,7 @@
                 </#if>
             </@userProfileCommons.userProfileFormFields>
 
-            <@profileSummary.profileSummary title="Profile snapshot" />
+            <@profileSummary.profileSummary title=msg("profileSummaryTitle") />
 
             <@registerCommons.termsAcceptance/>
 
