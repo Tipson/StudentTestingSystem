@@ -8,7 +8,11 @@
 <!-- template: register.ftl -->
 
     <#if section = "header">
-        <#assign headerText = messageHeader?? ? msg(messageHeader) : msg("registerTitle")>
+        <#if messageHeader??>
+            <#assign headerText = msg(messageHeader)>
+        <#else>
+            <#assign headerText = msg("registerTitle")>
+        </#if>
         <span class="kc-title">${headerText}</span>
         <span class="kc-subtitle">${msg("registerSubtitle")}</span>
     <#elseif section = "form">
