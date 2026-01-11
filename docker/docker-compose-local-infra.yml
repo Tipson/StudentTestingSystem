@@ -73,7 +73,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
-    command: start-dev
+    volumes:
+      - ./docker/keycloak/themes:/opt/keycloak/themes:ro
+    command:
+      - start-dev
+      - --spi-theme-cache-themes=false
+      - --spi-theme-cache-templates=false
+      - --spi-theme-static-max-age=-1
     depends_on:
       postgres:
         condition: service_healthy
