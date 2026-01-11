@@ -16,6 +16,10 @@ public sealed class AttemptMapsterConfig : IRegister
         config.NewConfig<Attempt, AttemptDto>()
             .Map(d => d.Status, s => s.Status.ToString());
 
+        config.NewConfig<Attempt, StudentTestResultDto>()
+            .Map(d => d.AttemptId, s => s.Id)
+            .Map(d => d.StudentId, s => s.UserId);
+
         config.NewConfig<AttemptAnswer, AttemptAnswerDto>();
 
         config.NewConfig<AnswerPayload, AnswerPayloadDto>();

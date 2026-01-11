@@ -1,4 +1,4 @@
-﻿using Assessment.Application.CQRS.Attempts.Commands;
+using Assessment.Application.CQRS.Attempts.Commands;
 using Assessment.Application.CQRS.Attempts.Queries;
 using Assessment.Application.DTOs.Attempt;
 using MediatR;
@@ -26,6 +26,14 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     [Authorize(Roles = "Teacher,Admin")]
     public async Task<IActionResult> GetByTest(Guid testId, CancellationToken ct) =>
         Ok(await mediator.Send(new GetTestAttempts(testId), ct));
+
+    /// <summary>
+    /// Получить результаты теста
+    /// </summary>
+    [HttpGet("tests/{testId:guid}/results")]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> GetResults(Guid testId, CancellationToken ct) =>
+        Ok(await mediator.Send(new GetTestResults(testId), ct));
 
     /// <summary>
     /// Получить попытку по ID.
