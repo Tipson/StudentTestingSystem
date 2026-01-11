@@ -2,6 +2,7 @@
 using System;
 using Assessment.Domain.Attempts;
 using Assessment.Infrastructure.Data;
+using Contracts.Assessment;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;

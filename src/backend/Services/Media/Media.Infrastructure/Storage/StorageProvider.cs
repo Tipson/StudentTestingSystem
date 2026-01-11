@@ -1,9 +1,5 @@
-﻿// Media.Infrastructure/Storage/StorageProvider.cs
-
-using BuildingBlocks.Api.Extensions;
-using Media.Application.Interfaces;
+﻿using Media.Application.Interfaces;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Minio;
 using Minio.DataModel.Args;

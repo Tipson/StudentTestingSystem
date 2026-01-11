@@ -45,7 +45,7 @@ spec:
             - name: Keycloak__Authority
               value: {{ .Values.mediaApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
-              value: "true"
+              value: "false"
             - name: StorageOptions__Host
               value: {{ .Values.mediaApi.s3.serviceUrl | quote }}
             - name: StorageOptions__AccessKey

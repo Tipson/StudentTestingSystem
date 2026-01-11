@@ -7,6 +7,8 @@ using Keycloak.AuthServices.Common;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Identity.Api.Security;
 
@@ -71,9 +73,10 @@ public static class DependencyInjection
                 ClientCredentialsClientName.Parse(tokenName)
             );
 
-        services.AddScoped<IKeycloakRoleSync, KeycloakRoleSync>();
+        services.AddScoped<IKeycloakService, KeycloakService>();
+
+
 
         return services;
     }
 }
-

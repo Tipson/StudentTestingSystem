@@ -7,12 +7,12 @@ assessmentApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: assessment-api.lms.example.com
+    host: assessment.oleg.agentik007.ru
   auth:
-    issuer: "https://auth.lms.example.com/realms/lms"
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
     clientId: "assessment-api"
   database:
-    host: "postgres.lms.svc.cluster.local"
+    host: "postgres-postgresql.lms.svc.cluster.local"
     port: "5432"
     name: "assessment"
   redis:
@@ -33,18 +33,18 @@ mediaApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: media-api.lms.example.com
+    host: media.oleg.agentik007.ru
   auth:
-    issuer: "https://auth.lms.example.com/realms/lms"
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
     clientId: "media-api"
   database:
-    host: "postgres.lms.svc.cluster.local"
+    host: "postgres-postgresql.lms.svc.cluster.local"
     port: "5432"
     name: "media"
   s3:
-    serviceUrl: "minio.lms.svc.cluster.local:9000"
+    serviceUrl: "minio.lms.svc.cluster.local"
     defaultBucketName: "assessment"
-    withSsl: "false"
+    withSsl: false
   limits:
     memoryRequests: "256Mi"
     memoryLimits: "512Mi"
@@ -60,12 +60,12 @@ identityApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: identity-api.lms.example.com
+    host: identity.oleg.agentik007.ru
   auth:
-    issuer: "https://auth.lms.example.com/realms/lms"
+    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
     clientId: "identity-api"
   database:
-    host: "postgres.lms.svc.cluster.local"
+    host: "postgres-postgresql.lms.svc.cluster.local"
     port: "5432"
     name: "identity"
   redis:

@@ -1,5 +1,5 @@
-﻿using Assessment.Domain.Questions;
-using Media.Application.DTOs;
+﻿using Media.Application.DTOs;
+using QuestionType = Contracts.Assessment.Enums.QuestionType;
 
 namespace Assessment.Application.DTOs.Question;
 

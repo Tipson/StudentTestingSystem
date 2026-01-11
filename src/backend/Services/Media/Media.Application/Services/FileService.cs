@@ -1,5 +1,5 @@
-﻿using BuildingBlocks.Api.Exceptions;
-using Contracts.Identity;
+﻿using Application;
+using BuildingBlocks.Api.Exceptions;
 using Mapster;
 using Media.Application.DTOs;
 using Media.Application.Helpers;
@@ -11,7 +11,7 @@ namespace Media.Application.Services;
 public sealed class FileService(
     IStorageProvider storage,
     IMediaRepository repository,
-    IUserContext userContext)
+    IUserContext? userContext)
     : IFileService
 {
     public async Task<MediaFileDto> UploadAsync(
@@ -23,12 +23,17 @@ public sealed class FileService(
         Guid? entityId,
         CancellationToken ct)
     {
+        var userId = userContext?.UserId
+                     ?? throw new UnauthorizedApiException("Пользователь не аутентифицирован.");
+
+        FileValidatorHelper.ValidateMimeType(contentType, fileName);
+        
         var generatedName = StorageHelper.GenerateFileName(fileName);
         var key = StorageHelper.GetStoragePath(category, entityId, generatedName);
 
         await storage.UploadAsync(stream, key, contentType, sizeBytes);
         
-        var mediaFile = new MediaFile(fileName, contentType, sizeBytes, key, userContext.UserId);
+        var mediaFile = new MediaFile(fileName, contentType, sizeBytes, key, userId);
 
         await repository.AddAsync(mediaFile, ct);
 
@@ -60,7 +65,7 @@ public sealed class FileService(
         var file = await repository.GetByIdAsync(id, ct)
                    ?? throw new EntityNotFoundException("Файл не найден");
 
-        if (file.OwnerUserId != userContext.UserId)
+        if (file.OwnerUserId != userContext?.UserId)
             throw new ForbiddenException("Нет прав на удаление файла");
 
         await storage.DeleteAsync(file.StoragePath);

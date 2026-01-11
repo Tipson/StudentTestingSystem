@@ -9,5 +9,6 @@ public sealed record UserDto(
     long? TelegramId,
     UserRole Role,
     bool IsActive,
-    DateTimeOffset CreatedAt
+    DateTimeOffset CreatedAt,
+    Guid? GroupId
 );

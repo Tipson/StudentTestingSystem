@@ -53,7 +53,7 @@ spec:
             - name: Keycloak__Authority
               value: {{ .Values.identityApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
-              value: "true"
+              value: "false"
             - name: RedisOptions__Host
               value: {{ .Values.identityApi.redis.host | quote }}
             - name: RedisOptions__Port

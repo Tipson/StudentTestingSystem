@@ -1,7 +1,38 @@
-﻿namespace Assessment.Domain.Tests;
+﻿using Assessment.Domain.Tests.Enums;
+using Contracts.Assessment.Enums;
+
+namespace Assessment.Domain.Tests;
 
 public partial class Test
 {
+    /// <summary>
+    /// Обновить тест (только для черновиков).
+    /// </summary>
+    public void Update(string title, string? description, int passScore, int attemptsLimit, int? timeLimitSeconds)
+    {
+        if (Status == TestStatus.Published)
+            throw new InvalidOperationException("Нельзя обновлять опубликованный тест.");
+
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Название теста обязательно", nameof(title));
+
+        if (passScore < 0 || passScore > 100)
+            throw new ArgumentException("Проходной балл должен быть от 0 до 100", nameof(passScore));
+
+        if (attemptsLimit <= 0)
+            throw new ArgumentException("Лимит попыток должен быть больше 0", nameof(attemptsLimit));
+
+        if (timeLimitSeconds.HasValue && timeLimitSeconds.Value <= 0)
+            throw new ArgumentException("Время должно быть больше 0", nameof(timeLimitSeconds));
+
+        Title = title;
+        Description = description;
+        PassScore = passScore;
+        AttemptsLimit = attemptsLimit;
+        TimeLimitSeconds = timeLimitSeconds;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+    
     public void Publish()
     {
         if (Status != TestStatus.Draft)
@@ -44,5 +75,34 @@ public partial class Test
         TimeLimitSeconds = timeLimitSeconds;
         PassScore = passScore;
         AttemptsLimit = attemptsLimit;
+    }
+    
+    public void SetAccessType(TestAccessType accessType)
+    {
+        AccessType = accessType;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+    
+    public void SetAvailability(DateTimeOffset? from, DateTimeOffset? until)
+    {
+        if (from.HasValue && until.HasValue && from.Value >= until.Value)
+            throw new ArgumentException("AvailableFrom должен быть раньше AvailableUntil");
+
+        AvailableFrom = from;
+        AvailableUntil = until;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public bool IsAvailable()
+    {
+        var now = DateTimeOffset.UtcNow;
+        
+        if (AvailableFrom.HasValue && now < AvailableFrom.Value)
+            return false;
+            
+        if (AvailableUntil.HasValue && now > AvailableUntil.Value)
+            return false;
+            
+        return true;
     }
 }

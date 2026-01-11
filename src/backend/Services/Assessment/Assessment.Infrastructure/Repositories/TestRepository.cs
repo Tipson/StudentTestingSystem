@@ -1,6 +1,8 @@
 ﻿using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
+using Assessment.Domain.Tests.Enums;
 using Assessment.Infrastructure.Data;
+using Contracts.Assessment.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Assessment.Infrastructure.Repositories;
@@ -14,6 +16,23 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
         db.Tests
             .Where(x => x.OwnerUserId == ownerId)
             .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct);
+    
+    public Task<List<Test>> ListPublishedAsync(CancellationToken ct) =>
+        db.Tests
+            .Where(t => t.Status == TestStatus.Published)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync(ct);
+    
+    public Task<List<Test>> ListPublishedPublicAsync(CancellationToken ct) =>
+        db.Tests
+            .Where(t => t.Status == TestStatus.Published && t.AccessType == TestAccessType.Public)
+            .OrderByDescending(t => t.UpdatedAt)
+            .ToListAsync(ct);
+
+    public Task<List<Test>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct) =>
+        db.Tests
+            .Where(t => ids.Contains(t.Id))
             .ToListAsync(ct);
     
     public async Task AddAsync(Test test, CancellationToken ct)

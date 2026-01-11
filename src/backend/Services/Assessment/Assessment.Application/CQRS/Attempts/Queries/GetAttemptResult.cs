@@ -1,11 +1,13 @@
-﻿using Assessment.Application.DTOs.Attempt;
+﻿using Application;
+using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Attempts;
 using Assessment.Domain.Questions;
 using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
-using Contracts.Identity;
+using Contracts.Assessment.Enums;
 using MediatR;
+using QuestionType = Contracts.Assessment.Enums.QuestionType;
 
 namespace Assessment.Application.CQRS.Attempts.Queries;
 

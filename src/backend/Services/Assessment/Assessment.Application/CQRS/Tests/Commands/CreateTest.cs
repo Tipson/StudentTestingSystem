@@ -1,7 +1,7 @@
-﻿using Assessment.Application.DTOs.Test;
+﻿using Application;
+using Assessment.Application.DTOs.Test;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
-using Contracts.Identity;
 using Mapster;
 using MediatR;
 

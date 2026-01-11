@@ -1,4 +1,4 @@
-﻿namespace Media.Application.DTOs;
+namespace Media.Application.DTOs;
 
 public sealed record MediaFileDto(
     Guid Id,

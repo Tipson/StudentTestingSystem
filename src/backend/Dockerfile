@@ -10,6 +10,7 @@ COPY *.sln .
 # BuildingBlocks
 COPY BuildingBlocks/Api/*.csproj BuildingBlocks/Api/
 COPY BuildingBlocks/Shared/Contracts/*.csproj BuildingBlocks/Shared/Contracts/
+COPY BuildingBlocks/Shared/Application/*.csproj BuildingBlocks/Shared/Application/
 
 # Identity
 COPY Services/Identity/Identity.Domain/*.csproj Services/Identity/Identity.Domain/
@@ -44,6 +45,10 @@ COPY Services/Proctoring/Proctoring.Application/*.csproj Services/Proctoring/Pro
 COPY Services/Proctoring/Proctoring.Domain/*.csproj Services/Proctoring/Proctoring.Domain/
 COPY Services/Proctoring/Proctoring.Infrastructure/*.csproj Services/Proctoring/Proctoring.Infrastructure/
 
+# Grading
+COPY Services/Grading/Grading.Application/*.csproj Services/Grading/Grading.Application/
+
+
 # Общий restore (кешируется)
 RUN dotnet restore StudentTestingSystem.sln --disable-parallel
 
@@ -58,8 +63,10 @@ COPY Services/ Services/
 # Точечный restore для publish-проектов (иначе словишь NETSDK1064 на analyzers)
 RUN dotnet restore Services/Identity/Identity.Api/Identity.Api.csproj --disable-parallel
 RUN dotnet restore Services/Identity/Identity.Migrator/Identity.Migrator.csproj --disable-parallel
+
 RUN dotnet restore Services/Assessment/Assessment.Api/Assessment.Api.csproj --disable-parallel
 RUN dotnet restore Services/Assessment/Assessment.Migrator/Assessment.Migrator.csproj --disable-parallel
+
 RUN dotnet restore Services/Media/Media.Api/Media.Api.csproj --disable-parallel
 RUN dotnet restore Services/Media/Media.Migrator/Media.Migrator.csproj --disable-parallel
 
@@ -72,6 +79,7 @@ RUN dotnet publish Services/Assessment/Assessment.Migrator/Assessment.Migrator.c
 
 RUN dotnet publish Services/Media/Media.Api/Media.Api.csproj -c Release -o /app/media-api --no-restore -p:PublishTrimmed=false
 RUN dotnet publish Services/Media/Media.Migrator/Media.Migrator.csproj -c Release -o /app/media-migrator --no-restore -p:PublishTrimmed=false
+
 
 # ==========================================================
 # Final artifacts image (runnable to avoid "no command specified")

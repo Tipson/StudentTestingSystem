@@ -1,5 +1,4 @@
-﻿using System.Net.Http;
-using Media.Application.Interfaces;
+﻿using Media.Application.Interfaces;
 using Media.Infrastructure.Data;
 using Media.Infrastructure.Repositories;
 using Media.Infrastructure.Storage;

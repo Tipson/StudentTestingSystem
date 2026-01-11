@@ -5,13 +5,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Media.Api.Controllers;
 
+/// <summary>
+/// Управление файлами.
+/// </summary>
 [ApiController]
 [Route("api/files")]
 [Authorize]
 public sealed class FilesController(IFileService fileService) : ControllerBase
 {
     /// <summary>
-    /// Загрузить файл.
+    /// Загрузить файл (все авторизованные пользователи).
     /// </summary>
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
@@ -37,7 +40,7 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
     }
 
     /// <summary>
-    /// Получить информацию о файле.
+    /// Получить метаданные файла (все авторизованные).
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
@@ -47,7 +50,7 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
     }
 
     /// <summary>
-    /// Скачать файл.
+    /// Скачать файл (публичный доступ).
     /// </summary>
     [HttpGet("{id:guid}/download")]
     [AllowAnonymous]
@@ -61,16 +64,17 @@ public sealed class FilesController(IFileService fileService) : ControllerBase
     }
 
     /// <summary>
-    /// Мои файлы.
+    /// Получить свои файлы (все авторизованные).
     /// </summary>
     [HttpGet("my")]
     public async Task<IActionResult> GetMy(CancellationToken ct) =>
         Ok(await fileService.GetMyFilesAsync(ct));
 
     /// <summary>
-    /// Удалить файл.
+    /// Удалить файл (владелец файла или админ).
     /// </summary>
     [HttpDelete("{id:guid}")]
+    // Проверка владельца в FileService
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await fileService.DeleteAsync(id, ct);

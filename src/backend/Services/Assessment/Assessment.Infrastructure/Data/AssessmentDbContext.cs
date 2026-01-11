@@ -17,6 +17,8 @@ public sealed class AssessmentDbContext(DbContextOptions<AssessmentDbContext> op
 
     public DbSet<Attempt> Attempts => Set<Attempt>();
     public DbSet<AttemptAnswer> AttemptAnswers => Set<AttemptAnswer>();
+    public DbSet<TestAccess> TestAccesses => Set<TestAccess>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

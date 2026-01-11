@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Contracts.Assessment;
 
 namespace Assessment.Domain.Attempts;
 
@@ -7,7 +8,7 @@ namespace Assessment.Domain.Attempts;
 ///     Ответ студента на конкретный вопрос в рамках попытки.
 /// </summary>
 [Table("AttemptAnswers", Schema = "assessment")]
-public sealed class AttemptAnswer
+public partial class AttemptAnswer
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -36,6 +37,17 @@ public sealed class AttemptAnswer
     /// </summary>
     [Range(0, 1000)]
     public int? PointsAwarded { get; set; }
+    
+    /// <summary>
+    /// Требуется ручная проверка преподавателем (для LongText вопросов).
+    /// </summary>
+    public bool ManualGradingRequired { get; set; }
+
+    /// <summary>
+    /// Комментарий преподавателя при ручной проверке.
+    /// </summary>
+    [MaxLength(2000)]
+    public string? TeacherComment { get; set; }
 
     public AttemptAnswer(Guid attemptId, Guid questionId, AnswerPayload answer)
     {
@@ -49,23 +61,5 @@ public sealed class AttemptAnswer
         QuestionId = questionId;
         Answer = answer ?? throw new ArgumentNullException(nameof(answer));
         UpdatedAt = DateTimeOffset.UtcNow;
-    }
-
-    /// <summary>
-    /// Обновить ответ.
-    /// </summary>
-    public void SetAnswer(AnswerPayload payload)
-    {
-        Answer = payload ?? throw new ArgumentNullException(nameof(payload));
-        UpdatedAt = DateTimeOffset.UtcNow;
-    }
-
-    /// <summary>
-    /// Установить результат проверки.
-    /// </summary>
-    public void SetResult(bool isCorrect, int pointsAwarded)
-    {
-        IsCorrect = isCorrect;
-        PointsAwarded = pointsAwarded;
     }
 }

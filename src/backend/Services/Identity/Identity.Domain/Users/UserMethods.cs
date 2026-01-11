@@ -90,4 +90,9 @@ public partial class User
 
     private static bool StringEqualsIgnoreCase(string? a, string? b) =>
         string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+    
+    public void SetGroupId(Guid? groupId)       // +
+    {
+        GroupId = groupId;
+    }
 }

@@ -1,4 +1,7 @@
-﻿namespace Assessment.Domain.Attempts;
+﻿using Contracts.Assessment;
+using Contracts.Assessment.Enums;
+
+namespace Assessment.Domain.Attempts;
 
 public partial class Attempt
 {
@@ -47,5 +50,17 @@ public partial class Attempt
         var answer = new AttemptAnswer(Id, questionId, payload);
         Answers.Add(answer);
         return answer;
+    }
+    
+    /// <summary>
+    /// Обновить балл (используется при ручной проверке).
+    /// </summary>
+    public void UpdateScore(int score, int passScore)
+    {
+        if (Status != AttemptStatus.Submitted)
+            throw new InvalidOperationException("Можно обновлять балл только для завершённых попыток");
+
+        Score = score;
+        IsPassed = score >= passScore;
     }
 }

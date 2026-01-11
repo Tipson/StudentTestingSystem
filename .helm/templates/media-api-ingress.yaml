@@ -3,16 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Values.mediaApi.service.name }}-ingress
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 spec:
-  tls:
-    - hosts:
-        - {{ .Values.mediaApi.ingress.host | quote }}
-      secretName: {{ .Values.mediaApi.service.name }}-tls
   rules:
     - host: {{ .Values.mediaApi.ingress.host | quote }}
       http:
