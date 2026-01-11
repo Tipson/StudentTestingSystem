@@ -13,6 +13,17 @@
     <PackageReference Include="MediatR" Version="14.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Interfaces\IKeycloakRoleSync.cs" />
+    <Compile Remove="Users\Commands\DeactivateUser.cs" />
+    <Compile Remove="Users\Queries\GetUserByEmail.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Users\Mapping\" />
+    <Folder Include="Users\Queries\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
