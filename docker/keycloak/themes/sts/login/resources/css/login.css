@@ -1,0 +1,38 @@
+.kc-profile-summary {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--pf-v5-global--BorderColor--100);
+    border-radius: 8px;
+    background: var(--pf-v5-global--BackgroundColor--100);
+}
+
+.kc-profile-summary__title {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.kc-profile-summary__list {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.25rem 0.75rem;
+}
+
+.kc-profile-summary__label {
+    margin: 0;
+    font-weight: 600;
+    color: var(--pf-v5-global--Color--200);
+}
+
+.kc-profile-summary__value {
+    margin: 0;
+    color: var(--pf-v5-global--Color--100);
+    word-break: break-word;
+}
+
+@media (max-width: 640px) {
+    .kc-profile-summary__list {
+        grid-template-columns: 1fr;
+    }
+}
