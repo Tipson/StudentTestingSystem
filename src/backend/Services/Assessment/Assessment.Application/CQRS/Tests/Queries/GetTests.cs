@@ -58,7 +58,6 @@ public sealed class GetTestsHandler(
 
         // Убираем дубликаты и фильтруем по доступности
         var uniqueTests = availableTests
-            .ToList()
             .Distinct()
             .Where(t => t.Status == TestStatus.Published && t.IsAvailable())
             .ToList();

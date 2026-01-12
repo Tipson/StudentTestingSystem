@@ -22,18 +22,28 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
             .Where(a => a.TestId == testId)
             .ToListAsync(ct);
 
-    public Task<List<TestAccess>> GetByUserIdAsync(string userId, CancellationToken ct) =>
-        db.TestAccesses
+    public Task<List<TestAccess>> GetByUserIdAsync(string userId, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+    
+        return db.TestAccesses
             .Include(a => a.Test)
-            .Where(a => a.UserId == userId && !a.IsExpired())
+            .Where(a => a.UserId == userId && 
+                        (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);
+    }
 
-    public Task<List<TestAccess>> GetByGroupIdAsync(Guid groupId, CancellationToken ct) =>
-        db.TestAccesses
+    public Task<List<TestAccess>> GetByGroupIdAsync(Guid groupId, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+    
+        return db.TestAccesses
             .Include(a => a.Test)
-            .Where(a => a.GroupId == groupId && !a.IsExpired())
+            .Where(a => a.GroupId == groupId && 
+                        (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);
-
+    }
+    
     public Task<TestAccess?> GetByTestAndUserAsync(Guid testId, string userId, CancellationToken ct) =>
         db.TestAccesses
             .FirstOrDefaultAsync(a => a.TestId == testId && a.UserId == userId, ct);
