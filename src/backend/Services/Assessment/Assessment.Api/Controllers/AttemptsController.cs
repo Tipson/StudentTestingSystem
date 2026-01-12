@@ -23,7 +23,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Получить все попытки по тесту (для преподавателя).
     /// </summary>
     [HttpGet("tests/{testId:guid}/attempts")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GetByTest(Guid testId, CancellationToken ct) =>
         Ok(await mediator.Send(new GetTestAttempts(testId), ct));
 
@@ -31,7 +31,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Получить результаты теста
     /// </summary>
     [HttpGet("tests/{testId:guid}/results")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GetResults(Guid testId, CancellationToken ct) =>
         Ok(await mediator.Send(new GetTestResults(testId), ct));
 
@@ -80,7 +80,7 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
     /// Оценить ответ вручную (только для преподавателя).
     /// </summary>
     [HttpPut("attempts/{attemptId:guid}/answers/{questionId:guid}/grade")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GradeAnswer(
         Guid attemptId,
         Guid questionId,

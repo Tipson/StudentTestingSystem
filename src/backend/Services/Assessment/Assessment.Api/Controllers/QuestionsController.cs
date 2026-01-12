@@ -12,7 +12,7 @@ namespace Assessment.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api")]
-[Authorize(Roles = "Teacher,Admin")]
+[Authorize(Roles = "teacher,admin")]
 public sealed class QuestionsController(IMediator mediator) : ControllerBase
 {
     /// <summary>
