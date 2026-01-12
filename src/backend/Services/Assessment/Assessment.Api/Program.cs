@@ -14,15 +14,9 @@ builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = builder.Configuration["Redis:ConnectionString"] 
-                            ?? "localhost:6379";
-    options.InstanceName = "Idempotency:";
-});
+builder.Services.AddRedisCache(builder.Configuration, instanceName: "Idempotency:");
 
 builder.Services.AddScoped<IUserContext, UserContext>();
-
 
 builder.Services.AddAssessmentApplication();
 builder.Services.AddAssessmentInfrastructure(builder.Configuration);
