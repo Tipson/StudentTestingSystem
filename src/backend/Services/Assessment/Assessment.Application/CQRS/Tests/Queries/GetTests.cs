@@ -23,7 +23,7 @@ public sealed class GetTestsHandler(
     public async Task<List<TestDto>> Handle(GetTests request, CancellationToken ct)
     {
         var userId = userContext.UserId;
-        var userGroupId = userContext.GroupId; // ⭐ Нужно добавить в IUserContext
+        var userGroupId = userContext.GroupId;
 
         var availableTests = new List<Test>();
 
@@ -58,6 +58,7 @@ public sealed class GetTestsHandler(
 
         // Убираем дубликаты и фильтруем по доступности
         var uniqueTests = availableTests
+            .ToList()
             .Distinct()
             .Where(t => t.Status == TestStatus.Published && t.IsAvailable())
             .ToList();
