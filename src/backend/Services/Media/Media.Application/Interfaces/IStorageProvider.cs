@@ -6,6 +6,15 @@
 public interface IStorageProvider
 {
     /// <summary>
+    ///     Генерирует временную подписанную ссылку для прямого доступа к файлу.
+    /// </summary>
+    /// <param name="path">Путь к объекту внутри bucket'а, например: <c>general/1/image.png</c>.</param>
+    /// <param name="expiry">Время жизни ссылки.</param>
+    /// <param name="bucket">Имя bucket'а (если <c>null</c>, используется значение по умолчанию из конфигурации).</param>
+    /// <returns>Подписанный URL для прямого доступа к файлу.</returns>
+    Task<string> GetPresignedUrlAsync(string path, TimeSpan expiry, string? bucket = null);
+    
+    /// <summary>
     ///     Получает файл из хранилища как поток по его абсолютному пути.
     /// </summary>
     /// <param name="absolutePath">Полный путь к объекту внутри bucket'а, например: <c>raids/1/screenshots/image.png</c>.</param>

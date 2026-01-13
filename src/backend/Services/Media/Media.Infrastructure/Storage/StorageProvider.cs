@@ -15,6 +15,19 @@ public sealed class StorageProvider(
     private readonly StorageOptions _options = options.Value;
     private bool _bucketEnsured;
 
+    /// <inheritdoc />
+    public async Task<string> GetPresignedUrlAsync(string path, TimeSpan expiry, string? bucket = null)
+    {
+        bucket ??= _options.DefaultBucketName;
+    
+        var args = new PresignedGetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(path)
+            .WithExpiry((int)expiry.TotalSeconds);
+    
+        return await client.PresignedGetObjectAsync(args);
+    }
+    
     public async Task<Stream> GetAsync(string path, string? bucket = null)
     {
         bucket ??= _options.DefaultBucketName;

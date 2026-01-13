@@ -12,7 +12,7 @@ public sealed record QuestionDto(
     bool IsRequired,
     int Points,
     List<QuestionOptionDto> Options,
-    List<MediaFileDto>? Media
+    List<QuestionMediaDto>? Media
 );
 
 public sealed record QuestionOptionDto(
@@ -26,13 +26,10 @@ public sealed record QuestionOptionDto(
 public sealed record QuestionMediaDto(
     Guid Id,
     Guid MediaId,
-    int Order,
-    string? DownloadUrl
+    int Order
 );
 
 public sealed record QuestionOptionMediaDto(
     Guid Id,
     Guid MediaId,
-    int Order,
-    string? DownloadUrl
-);
+    int Order);

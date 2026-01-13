@@ -1,3 +1,5 @@
+using Media.Domain;
+
 namespace Media.Application.DTOs;
 
 public sealed record MediaFileDto(
@@ -7,5 +9,6 @@ public sealed record MediaFileDto(
     long SizeBytes,
     string OwnerUserId,
     DateTimeOffset UploadedAt,
-    string DownloadUrl
+    string? DownloadUrl,
+    MediaType MediaType
 );
