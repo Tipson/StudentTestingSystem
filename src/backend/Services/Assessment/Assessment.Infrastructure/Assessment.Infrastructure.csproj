@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Identity\Identity.Domain\Identity.Domain.csproj" />
     <ProjectReference Include="..\Assessment.Application\Assessment.Application.csproj" />
   </ItemGroup>
 
