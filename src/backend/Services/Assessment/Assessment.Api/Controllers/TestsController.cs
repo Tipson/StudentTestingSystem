@@ -1,6 +1,7 @@
 ﻿using Assessment.Application.CQRS.Tests.Commands;
 using Assessment.Application.CQRS.Tests.Queries;
 using Assessment.Application.DTOs.Test;
+using Assessment.Domain.Tests.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -57,6 +58,35 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> UpdateSettings(Guid id, [FromBody] UpdateTestSettingsDto dto, CancellationToken ct) =>
         Ok(await mediator.Send(new UpdateTestSettings(id, dto), ct));
+    
+    /// <summary>
+    /// Установить тип доступа к тесту (Public/Private).
+    /// </summary>
+    [HttpPut("{id:guid}/access-type/{accessType}")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> SetAccessType(
+        Guid id, 
+        TestAccessType accessType, 
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetTestAccessType(id, accessType), ct);
+        return NoContent();
+    }
+    
+    /// <summary>
+    /// Установить временные рамки доступности теста.
+    /// </summary>
+    [HttpPut("{id:guid}/availability")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> SetAvailability(
+        Guid id, 
+        [FromQuery] DateTimeOffset? availableFrom,
+        [FromQuery] DateTimeOffset? availableUntil,
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetTestAvailability(id, availableFrom, availableUntil), ct);
+        return NoContent();
+    }
 
     [HttpPut("{id:guid}/publish")]
     [Authorize(Roles = "teacher,admin")]

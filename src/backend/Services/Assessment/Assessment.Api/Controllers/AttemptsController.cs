@@ -77,6 +77,14 @@ public sealed class AttemptsController(IMediator mediator) : ControllerBase
         Ok(await mediator.Send(new GetMyAttempts(), ct));
     
     /// <summary>
+    /// Получить список попыток, требующих ручной проверки (для преподавателей).
+    /// </summary>
+    [HttpGet("attempts/pending-review")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> GetPendingReview(CancellationToken ct) =>
+        Ok(await mediator.Send(new GetPendingReview(), ct));
+    
+    /// <summary>
     /// Оценить ответ вручную (только для преподавателя).
     /// </summary>
     [HttpPut("attempts/{attemptId:guid}/answers/{questionId:guid}/grade")]

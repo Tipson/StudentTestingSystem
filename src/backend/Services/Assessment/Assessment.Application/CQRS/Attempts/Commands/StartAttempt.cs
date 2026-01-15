@@ -30,6 +30,16 @@ public sealed class StartAttemptHandler(
 
         if (test.Status != TestStatus.Published)
             throw new BadRequestApiException("Тест ещё не опубликован.");
+        
+        // Проверка временного окна доступности
+        if (!test.IsAvailable())
+        {
+            if (test.AvailableFrom.HasValue && DateTimeOffset.UtcNow < test.AvailableFrom.Value)
+                throw new BadRequestApiException($"Тест будет доступен с {test.AvailableFrom.Value:dd.MM.yyyy HH:mm}");
+    
+            if (test.AvailableUntil.HasValue && DateTimeOffset.UtcNow > test.AvailableUntil.Value)
+                throw new BadRequestApiException("Срок прохождения теста истек");
+        }
 
         // Проверка доступа (по владельцу / public / персональный / групповой)
         var hasAccess = await CheckAccess(test, userId, userContext.GroupId, ct);
@@ -82,10 +92,13 @@ public sealed class StartAttemptHandler(
             return true;
 
         // Доступ через группу
-        if (userGroupId is null)
-            return false;
+        if (userGroupId.HasValue)
+        {
+            var groupAccess = await testAccesses.GetByTestAndGroupAsync(test.Id, userGroupId.Value, ct);
+            if (groupAccess is not null && groupAccess.CanBeUsed())
+                return true;
+        }
 
-        var groupAccess = await testAccesses.GetByTestAndGroupAsync(test.Id, userGroupId.Value, ct);
-        return groupAccess is not null && groupAccess.CanBeUsed();
+        return false;
     }
 }
