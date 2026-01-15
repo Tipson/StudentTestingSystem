@@ -8,13 +8,8 @@ using Microsoft.Extensions.Caching.Distributed;
 namespace Identity.Api.Middleware;
 
 public sealed class UserSyncMiddleware(
-    RequestDelegate next,
-    IDistributedCache cache,
-    IKeycloakService keycloakService)
+    RequestDelegate next)
 {
-    // Кешируем только факт "пользователь уже создан"
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
-
     public async Task InvokeAsync(HttpContext context, IUserRepository users)
     {
         if (context.User.Identity?.IsAuthenticated != true)
@@ -52,18 +47,7 @@ public sealed class UserSyncMiddleware(
         
         if (user is null)
         {
-            // если кеш говорит "known", но в БД null — значит была гонка/удаление/ошибка.
-            // просто создаём заново.
-            user = await CreateUserFromClaimsAsync(context, users, userId);
-
-            if (user is not null)
-            {
-                await cache.SetStringAsync(
-                    cacheKey,
-                    "1",
-                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = CacheDuration },
-                    context.RequestAborted);
-            }
+            user = await CreateOrGetUserFromClaimsAsync(context, users, userId, context.RequestAborted);
         }
         else
         {
@@ -81,7 +65,7 @@ public sealed class UserSyncMiddleware(
             }
         }
 
-        if (user is not null)
+        if (true)
         {
             var identity = new ClaimsIdentity();
 
@@ -105,29 +89,30 @@ public sealed class UserSyncMiddleware(
         await next(context);
     }
 
-    private async Task<User?> CreateUserFromClaimsAsync(HttpContext context, IUserRepository users, string userId)
+    private async Task<User> CreateOrGetUserFromClaimsAsync(
+        HttpContext context,
+        IUserRepository users,
+        string userId,
+        CancellationToken ct)
     {
         var email = context.User.FindFirstValue(ClaimTypes.Email)
                     ?? context.User.FindFirstValue("email");
-
+    
         var fullName = context.User.FindFirstValue(ClaimTypes.Name)
                        ?? context.User.FindFirstValue("name")
                        ?? context.User.FindFirstValue("preferred_username");
-
-        // Роль читаем из токена (Keycloak истина).
-        // Если роли нет — ставим Student как дефолт в БД.
-        var assignedRole = GetRoleFromClaims(context.User) ?? UserRole.Student;
-
-        var newUser = new User(userId, email);
-
+    
+        var role = GetRoleFromClaims(context.User) ?? UserRole.Student;
+    
+        var candidate = new User(userId, email);
+    
         if (!string.IsNullOrWhiteSpace(fullName))
-            newUser.SetFullName(fullName);
-
-        newUser.SetRole(assignedRole);
-
-        await users.AddAsync(newUser, context.RequestAborted);
-
-        return newUser;
+            candidate.SetFullName(fullName);
+    
+        candidate.SetRole(role);
+    
+        // Решает race condition
+        return await users.GetOrCreateAsync(candidate, ct);
     }
 
     private static UserRole? GetRoleFromClaims(ClaimsPrincipal principal)
