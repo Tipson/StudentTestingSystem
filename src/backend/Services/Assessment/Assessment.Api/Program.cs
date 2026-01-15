@@ -17,8 +17,8 @@ builder.Services.AddHttpContextAccessor();
 var redisHost = builder.Configuration["RedisOptions:Host"];
 var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-if (string.IsNullOrWhiteSpace(redisHost))
-    throw new Exception("RedisOptions:Host не задан.");
+/*if (string.IsNullOrWhiteSpace(redisHost))
+    throw new Exception("RedisOptions:Host не задан.");*/
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -69,3 +69,5 @@ app.MapGet("/healthz", () => Results.Ok(new
 
 
 app.Run();
+
+
