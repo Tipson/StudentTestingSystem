@@ -185,17 +185,15 @@ public sealed class FileService(
 
                 foreach (var file in files)
                 {
-                    if (ct.IsCancellationRequested)
-                        break;
+                    ct.ThrowIfCancellationRequested();
 
                     try
                     {
-                        await using var fileStream = await storage.GetAsync(file.StoragePath);
                         var entryName = GetUniqueFileName(file.FileName, fileNameCounts);
-
                         var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
-                        await using var entryStream = entry.Open();
-                        await fileStream.CopyToAsync(entryStream, ct);
+
+                        await using var entryStream = await entry.OpenAsync(ct);
+                        await storage.CopyToAsync(file.StoragePath, entryStream, ct: ct);
                     }
                     catch
                     {

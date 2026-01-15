@@ -42,6 +42,25 @@ public sealed class StorageProvider(
         ms.Position = 0;
         return ms;
     }
+    
+    public async Task CopyToAsync(
+        string path,
+        Stream destination,
+        string? bucket = null,
+        CancellationToken ct = default)
+    {
+        bucket ??= _options.DefaultBucketName;
+
+        var args = new GetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(path)
+            .WithCallbackStream(s =>
+            {
+                s.CopyTo(destination); // без MemoryStream
+            });
+
+        await client.GetObjectAsync(args, ct);
+    }
 
     public async Task UploadAsync(Stream fileStream, string objectKey, string contentType, long sizeBytes, string? bucket = null)
     {

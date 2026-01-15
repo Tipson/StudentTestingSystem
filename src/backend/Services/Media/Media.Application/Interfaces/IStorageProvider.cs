@@ -23,10 +23,25 @@ public interface IStorageProvider
     Task<Stream> GetAsync(string absolutePath, string? bucket = null);
 
     /// <summary>
-    ///     Загружает файл в хранилище по указанному пути и имени.
+    ///     Скопировать файл из хранилища в указанный поток назначения.
     /// </summary>
-    /// <param name="contentType">MIME-тип содержимого (например, <c>image/png</c>).</param>
+    /// <param name="path">Полный путь к объекту внутри bucket'а, например: <c>raids/1/screenshots/image.png</c>.</param>
+    /// <param name="destination">Поток назначения, в который будет записано содержимое файла.</param>
     /// <param name="bucket">Имя bucket'а (если <c>null</c>, используется значение по умолчанию из конфигурации).</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>Задача, завершающаяся после полной передачи файла в поток назначения.</returns>
+    Task CopyToAsync(string path, Stream destination, string? bucket = null, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Загружает содержимое потока в хранилище по заданному ключу объекта.
+    /// </summary>
+    /// <param name="stream">Поток с данными для загрузки (должен быть открыт для чтения).</param>
+    /// <param name="objectKey">Ключ (путь) объекта внутри bucket'а.</param>
+    /// <param name="contentType">MIME-тип содержимого (например, <c>image/png</c>).</param>
+    /// <param name="sizeBytes">Размер загружаемого содержимого в байтах.</param>
+    /// <param name="bucket">Имя bucket'а (если <c>null</c>, используется значение по умолчанию).</param>
+    /// <returns>Задача, завершающаяся после успешной загрузки файла.</returns>
+    /// <remarks>Метод не закрывает поток <paramref name="stream"/>.</remarks>
     Task UploadAsync(Stream stream, string objectKey, string contentType, long sizeBytes, string? bucket = null);
 
     /// <summary>
