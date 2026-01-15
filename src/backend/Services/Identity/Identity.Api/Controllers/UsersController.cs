@@ -1,6 +1,7 @@
 ﻿using Contracts.Identity;
 using Identity.Application.CQRS.Users.Commands;
 using Identity.Application.CQRS.Users.Queries;
+using Identity.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -61,6 +62,19 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> Deactivate(string id, CancellationToken ct)
     {
         await mediator.Send(new DeactivateUser(id), ct);
+        return NoContent();
+    }
+    
+    /// <summary>
+    /// Массово изменить группу у студентов (только админ).
+    /// </summary>
+    [HttpPut("batch/group")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> SetGroupForUsers(
+        [FromBody] SetGroupForUsersDto dto,
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetGroupForUsers(dto.UserIds, dto.GroupId), ct);
         return NoContent();
     }
 }

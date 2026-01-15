@@ -58,4 +58,29 @@ public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(query, ct);
         return Ok(result);
     }
+    
+    /// <summary>
+    /// Получить список студентов группы
+    /// </summary>
+    [HttpGet("{groupId:guid}/students")]
+    [Authorize(Roles = "admin,teacher")]
+    public async Task<IActionResult> GetStudents(Guid groupId, CancellationToken ct)
+    {
+        var members = await mediator.Send(new GetGroupMembers(groupId), ct);
+        return Ok(members);
+    }
+    
+    /// <summary>
+    /// Массово добавить студентов в группу
+    /// </summary>
+    [HttpPost("{groupId:guid}/students")]
+    [Authorize(Roles = "admin,teacher")]
+    public async Task<IActionResult> AddStudents(
+        Guid groupId,
+        [FromBody] List<string> userIds,
+        CancellationToken ct)
+    {
+        await mediator.Send(new AddStudentsToGroup(groupId, userIds), ct);
+        return NoContent();
+    }
 }
