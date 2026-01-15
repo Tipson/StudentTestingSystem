@@ -43,16 +43,15 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
 
     public Task<List<User>> SearchAsync(string query, CancellationToken ct)
     {
-        var q = (query ?? string.Empty).Trim();
+        var q = query.Trim();
         if (q.Length == 0)
             return db.Users.AsNoTracking().ToListAsync(ct);
 
-        var ql = q.ToLower();
         return db.Users
             .AsNoTracking()
-            .Where(u => (u.Email ?? "").ToLower().Contains(ql)
-                        || (u.FullName ?? "").ToLower().Contains(ql))
+            .Where(u =>
+                EF.Functions.ILike(u.Email ?? "", $"%{q}%") ||
+                EF.Functions.ILike(u.FullName ?? "", $"%{q}%"))
             .ToListAsync(ct);
     }
-
 }
