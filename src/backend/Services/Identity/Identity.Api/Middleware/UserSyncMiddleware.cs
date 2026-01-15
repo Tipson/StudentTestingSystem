@@ -38,6 +38,18 @@ public sealed class UserSyncMiddleware(
         // Всегда читаем из БД, чтобы GroupId и Role были актуальными
         var user = await users.GetById(userId, context.RequestAborted);
 
+        // UserSyncMiddleware.cs — добавить после получения user
+        if (user is not null && !user.IsActive)
+        {
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsJsonAsync(new 
+            { 
+                Message = "Аккаунт деактивирован", 
+                ErrorCode = "USER_DEACTIVATED" 
+            });
+            return;
+        }
+        
         if (user is null)
         {
             // если кеш говорит "known", но в БД null — значит была гонка/удаление/ошибка.
