@@ -1,7 +1,7 @@
 using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
-using BuildingBlocks.Api.Exceptions.Base;
+using BuildingBlocks.Api.Exceptions;
 using Contracts.Assessment.Enums;
 using Mapster;
 using MediatR;
