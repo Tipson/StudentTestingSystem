@@ -16,8 +16,8 @@ public partial class Test
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Название теста обязательно", nameof(title));
 
-        if (passScore < 0 || passScore > 100)
-            throw new ArgumentException("Проходной балл должен быть от 0 до 100", nameof(passScore));
+        if (passScore < 0)
+            throw new ArgumentException("Проходной балл должен быть больше 0", nameof(passScore));
 
         if (attemptsLimit <= 0)
             throw new ArgumentException("Лимит попыток должен быть больше 0", nameof(attemptsLimit));

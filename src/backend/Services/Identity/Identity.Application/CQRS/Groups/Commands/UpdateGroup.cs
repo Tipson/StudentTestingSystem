@@ -1,3 +1,4 @@
+using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
 
@@ -17,7 +18,7 @@ public sealed class UpdateGroupHandler(IGroupRepository groups)
     public async Task Handle(UpdateGroup request, CancellationToken ct)
     {
         var group = await groups.GetById(request.GroupId, ct)
-                    ?? throw new InvalidOperationException("Группа не найдена.");
+                    ?? throw new EntityNotFoundException("Группа не найдена.");
 
         group.Update(request.Institution, request.Specialization, request.Course, request.GroupNumber);
 

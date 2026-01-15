@@ -1,3 +1,4 @@
+using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
 using Keycloak.AuthServices.Sdk.Kiota;
@@ -44,7 +45,7 @@ public sealed class KeycloakService(
             .ToList();
 
         if (toAdd.Count == 0)
-            throw new InvalidOperationException($"Keycloak: роль realm '{roleName}' не найдена.");
+            throw new EntityNotFoundException($"Keycloak: роль realm '{roleName}' не найдена.");
 
         await kc.Admin.Realms[_realm]
             .Users[userId]
