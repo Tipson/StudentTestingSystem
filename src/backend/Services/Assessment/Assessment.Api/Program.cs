@@ -34,7 +34,7 @@ builder.Services.AddAssessmentInfrastructure(builder.Configuration);
 
 builder.Services.AddAIServices(builder.Configuration);
 
-builder.Services.AddGradingService();
+builder.Services.AddGradingApplication();
 
 builder.Services.AddKeycloakAuth(builder.Configuration);
 builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");

@@ -4,6 +4,8 @@ using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Security;
 using BuildingBlocks.Integrations.Gemini;
 using Grading.Application;
+using Grading.Application.Consumers;
+using MassTransit;
 using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,11 +18,47 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, UserContext>();
 
 // Application Layer
-builder.Services.AddGradingService();
+builder.Services.AddGradingApplication();
 
 // AI Integration
 builder.Services.AddGeminiIntegration(builder.Configuration);
 builder.Services.AddAIServices(builder.Configuration);
+
+// MassTransit + RabbitMQ
+builder.Services.AddMassTransit(x =>
+{
+    // Регистрируем Consumer
+    x.AddConsumer<GradeAttemptConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        var rabbitMqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+        var rabbitMqUser = builder.Configuration["RabbitMQ:Username"] ?? "admin";
+        var rabbitMqPass = builder.Configuration["RabbitMQ:Password"] ?? "admin123";
+
+        cfg.Host(rabbitMqHost, "/", h =>
+        {
+            h.Username(rabbitMqUser);
+            h.Password(rabbitMqPass);
+        });
+
+        // Настройка очереди для GradeAttemptConsumer
+        cfg.ReceiveEndpoint("grade-attempt-queue", e =>
+        {
+            // Retry политика: 3 попытки с интервалом 5 секунд
+            e.UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)));
+            
+            // Prefetch: сколько сообщений брать одновременно
+            e.PrefetchCount = 10;
+            
+            // Timeout для обработки сообщения
+            e.UseTimeout(t => t.Timeout = TimeSpan.FromMinutes(2));
+
+            // Регистрируем Consumer
+            e.ConfigureConsumer<GradeAttemptConsumer>(context);
+        });
+    });
+});
 
 // Authentication & Authorization
 builder.Services.AddKeycloakBearerAuth(builder.Configuration);

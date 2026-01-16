@@ -1,11 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using Assessment.Application.Interfaces;
+using Assessment.Infrastructure.Grading.Options;
 using Contracts.Grading.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Assessment.Infrastructure.Grading;
+namespace Assessment.Infrastructure.Grading.Clients;
 
 /// <summary>
 /// HTTP клиент для взаимодействия с Grading Service.

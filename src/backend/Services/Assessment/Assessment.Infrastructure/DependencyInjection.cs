@@ -1,7 +1,9 @@
 using Assessment.Application.Interfaces;
 using Assessment.Infrastructure.Data;
-using Assessment.Infrastructure.Grading;
+using Assessment.Infrastructure.Grading.Clients;
+using Assessment.Infrastructure.Grading.Options;
 using Assessment.Infrastructure.Repositories;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,20 +28,52 @@ public static class DependencyInjection
         services.AddScoped<IHintUsageRepository, HintUsageRepository>();
         
         // Grading Service Client
-        services.Configure<GradingServiceOptions>(
-            cfg.GetSection(GradingServiceOptions.SectionName));
+        var useMessageBus = cfg.GetValue<bool>("GradingService:UseMessageBus");
 
-        services.AddHttpClient<IGradingClient, HttpGradingClient>((serviceProvider, client) =>
+        if (useMessageBus)
         {
-            var options = serviceProvider
-                .GetRequiredService<IOptions<GradingServiceOptions>>()
-                .Value;
-    
-            client.BaseAddress = new Uri(options.Url);
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-        });
-        
+            // Message Bus (RabbitMQ)
+            services.AddMassTransit(x =>
+            {
+                x.UsingRabbitMq((context, rabbitCfg) =>
+                {
+                    // Получаем конфигурацию из контекста
+                    var configuration = context.GetService<IConfiguration>()!;
+                    
+                    var rabbitMqHost = configuration["RabbitMQ:Host"] ?? "localhost";
+                    var rabbitMqUser = configuration["RabbitMQ:Username"] ?? "admin";
+                    var rabbitMqPass = configuration["RabbitMQ:Password"] ?? "admin123";
+
+                    rabbitCfg.Host(rabbitMqHost, "/", h =>
+                    {
+                        h.Username(rabbitMqUser);
+                        h.Password(rabbitMqPass);
+                    });
+
+                    // настройка endpoints для Request-Response
+                    rabbitCfg.ConfigureEndpoints(context);
+                });
+            });
+
+            services.AddScoped<IGradingClient, MessageBusGradingClient>();
+        }
+        else
+        {
+            // HTTP
+            services.Configure<GradingServiceOptions>(
+                cfg.GetSection(GradingServiceOptions.SectionName));
+
+            services.AddHttpClient<IGradingClient, HttpGradingClient>((serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<GradingServiceOptions>>()
+                    .Value;
+
+                client.BaseAddress = new Uri(options.Url);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            });
+        }
+
         return services;
     }
 }
-

@@ -82,6 +82,9 @@ RUN dotnet publish Services/Assessment/Assessment.Migrator/Assessment.Migrator.c
 RUN dotnet publish Services/Media/Media.Api/Media.Api.csproj -c Release -o /app/media-api --no-restore -p:PublishTrimmed=false
 RUN dotnet publish Services/Media/Media.Migrator/Media.Migrator.csproj -c Release -o /app/media-migrator --no-restore -p:PublishTrimmed=false
 
+# Grading
+RUN dotnet restore Services/Grading/Grading.Api/Grading.Api.csproj --disable-parallel
+RUN dotnet publish Services/Grading/Grading.Api/Grading.Api.csproj -c Release -o /app/grading-api --no-restore -p:PublishTrimmed=false
 
 # ==========================================================
 # Final artifacts image (runnable to avoid "no command specified")

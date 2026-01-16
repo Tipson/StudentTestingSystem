@@ -1,4 +1,4 @@
-namespace Assessment.Infrastructure.Grading;
+namespace Assessment.Infrastructure.Grading.Options;
 
 public sealed class GradingServiceOptions
 {
