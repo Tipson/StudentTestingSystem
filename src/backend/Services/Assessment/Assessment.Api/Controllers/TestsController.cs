@@ -96,6 +96,14 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
         return NoContent();
     }
     
+    [HttpPut("{id:guid}/unpublish")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
+    {
+        await mediator.Send(new UnpublishTest(id), ct);
+        return NoContent();
+    }
+    
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)

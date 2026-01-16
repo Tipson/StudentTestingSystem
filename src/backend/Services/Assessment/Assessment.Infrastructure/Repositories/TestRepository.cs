@@ -12,6 +12,11 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
     public Task<Test?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Tests.FirstOrDefaultAsync(x => x.Id == id, ct);
     
+    public Task<Test?> GetWithQuestionsAsync(Guid id, CancellationToken ct) =>
+        db.Tests
+            .Include(t => t.Questions)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+    
     public Task<List<Test>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
         db.Tests
             .Where(x => x.OwnerUserId == ownerId)

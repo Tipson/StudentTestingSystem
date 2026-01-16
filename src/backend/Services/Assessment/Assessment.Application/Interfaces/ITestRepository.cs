@@ -11,6 +11,12 @@ public interface ITestRepository
     /// Возвращает тест по идентификатору.
     /// </summary>
     Task<Test?> GetByIdAsync(Guid id, CancellationToken ct);
+    
+    /// <summary>
+    /// Возвращает вопросы по идентификатору теста.
+    /// </summary>
+    Task<Test?> GetWithQuestionsAsync(Guid id, CancellationToken ct = default);
+
 
     /// <summary>
     /// Возвращает список тестов, принадлежащих пользователю.
