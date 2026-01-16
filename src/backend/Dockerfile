@@ -11,6 +11,8 @@ COPY *.sln .
 COPY BuildingBlocks/Api/*.csproj BuildingBlocks/Api/
 COPY BuildingBlocks/Shared/Contracts/*.csproj BuildingBlocks/Shared/Contracts/
 COPY BuildingBlocks/Shared/Application/*.csproj BuildingBlocks/Shared/Application/
+COPY BuildingBlocks/Integrations/Gemini/*.csproj BuildingBlocks/Integrations/Gemini/
+COPY BuildingBlocks/AI/*.csproj BuildingBlocks/AI/
 
 # Identity
 COPY Services/Identity/Identity.Domain/*.csproj Services/Identity/Identity.Domain/

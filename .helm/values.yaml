@@ -23,6 +23,10 @@ assessmentApi:
     memoryLimits: "512Mi"
     cpuRequests: "100m"
     cpuLimits: "500m"
+  gemini:
+    model: "gemini-2.5-flash"
+    temperature: "0.3"
+    maxOutputTokens: "2048"
 
 # Media API
 mediaApi:

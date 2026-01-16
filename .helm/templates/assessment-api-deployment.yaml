@@ -45,15 +45,18 @@ spec:
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: {{ .Values.assessmentApi.environment | quote }}
+
             - name: ConnectionStrings__Default
               valueFrom:
                 secretKeyRef:
                   name: lms-db
                   key: assessmentConnectionString
+
             - name: Keycloak__Authority
               value: {{ .Values.assessmentApi.auth.issuer | quote }}
             - name: Keycloak__RequireHttpsMetadata
               value: "false"
+
             - name: RedisOptions__Host
               value: {{ .Values.assessmentApi.redis.host | quote }}
             - name: RedisOptions__Port
@@ -63,3 +66,15 @@ spec:
                 secretKeyRef:
                   name: redis
                   key: redis-password
+
+            - name: Gemini__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-secrets
+                  key: Gemini__ApiKey
+            - name: Gemini__Model
+              value: {{ .Values.assessmentApi.gemini.model | quote }}
+            - name: Gemini__Temperature
+              value: {{ .Values.assessmentApi.gemini.temperature | quote }}
+            - name: Gemini__MaxOutputTokens
+              value: {{ .Values.assessmentApi.gemini.maxOutputTokens | quote }}
