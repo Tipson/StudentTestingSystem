@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Integrations\Gemini\Gemini.csproj" />
+        <ProjectReference Include="..\Shared\Contracts\Contracts.csproj" />
     </ItemGroup>
 
     <ItemGroup>

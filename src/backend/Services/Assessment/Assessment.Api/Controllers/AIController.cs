@@ -11,17 +11,6 @@ namespace Assessment.Api.Controllers;
 public sealed class AIController(IMediator mediator) : ControllerBase
 {
     /// <summary>
-    /// Получить AI-оценку для развернутого ответа (только преподаватель).
-    /// </summary>
-    [HttpPost("attempts/{attemptId:guid}/answers/{answerId:guid}/suggest-grade")]
-    [Authorize(Roles = "teacher,admin")]
-    public async Task<IActionResult> SuggestGrade(
-        Guid attemptId,
-        Guid answerId,
-        CancellationToken ct) =>
-        Ok(await mediator.Send(new SuggestAIGrade(attemptId, answerId), ct));
-
-    /// <summary>
     /// Получить AI-подсказку для вопроса (студент).
     /// </summary>
     [HttpPost("attempts/{attemptId:guid}/questions/{questionId:guid}/hint")]

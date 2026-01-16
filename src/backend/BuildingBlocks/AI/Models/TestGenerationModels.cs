@@ -1,3 +1,5 @@
+using Contracts.Assessment.Enums;  // ← ДОБАВИТЬ: используем общий QuestionType
+
 namespace BuildingBlocks.AI.Models;
 
 /// <summary>
@@ -25,10 +27,3 @@ public sealed record GeneratedQuestion(
     List<string>? Options,
     string? CorrectAnswer,
     int Points);
-
-public enum QuestionType
-{
-    SingleChoice,
-    MultipleChoice,
-    LongText
-}

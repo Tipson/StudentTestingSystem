@@ -44,7 +44,7 @@ public sealed class AttemptMapsterConfig : IRegister
                 PointsAwarded = src.PointsAwarded ?? 0,
                 Type = src.ManualGradingRequired ? GradingType.Manual : GradingType.Automatic,
                 RequiresManualReview = src.ManualGradingRequired,
-                Feedback = src.TeacherComment
+                Feedback = src.Feedback
             });
         
         // Маппинг Question -> QuestionData (для CalculateScore)

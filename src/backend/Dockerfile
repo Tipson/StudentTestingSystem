@@ -49,7 +49,7 @@ COPY Services/Proctoring/Proctoring.Infrastructure/*.csproj Services/Proctoring/
 
 # Grading
 COPY Services/Grading/Grading.Application/*.csproj Services/Grading/Grading.Application/
-
+COPY Services/Grading/Grading.Api/*.csproj Services/Grading/Grading.Api/
 
 # Общий restore (кешируется)
 RUN dotnet restore StudentTestingSystem.sln --disable-parallel

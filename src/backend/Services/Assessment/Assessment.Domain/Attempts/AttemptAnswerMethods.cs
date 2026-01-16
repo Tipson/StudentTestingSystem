@@ -32,7 +32,7 @@ public partial class AttemptAnswer
 
         PointsAwarded = points;
         IsCorrect = points > 0;
-        TeacherComment = comment;
+        Feedback = comment;
         ManualGradingRequired = false;
     }
 }

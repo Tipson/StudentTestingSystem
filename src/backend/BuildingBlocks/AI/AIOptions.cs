@@ -2,7 +2,6 @@ namespace BuildingBlocks.AI;
 
 /// <summary>
 /// Настройки AI функционала.
-/// Позволяет включать/отключать AI функции через конфигурацию.
 /// </summary>
 public sealed class AIOptions
 {
@@ -25,4 +24,10 @@ public sealed class AIOptions
     /// Включена ли AI генерация тестов из документов.
     /// </summary>
     public bool TestGenerationEnabled { get; set; } = true;
+    
+    /// <summary>
+    /// Минимальная уверенность AI для автоматической оценки (0.0 - 1.0).
+    /// Если AI менее уверен, требуется ручная проверка.
+    /// </summary>
+    public double MinimumConfidenceThreshold { get; set; } = 0.7;
 }

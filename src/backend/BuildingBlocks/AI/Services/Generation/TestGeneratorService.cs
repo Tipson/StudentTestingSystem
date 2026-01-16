@@ -2,6 +2,7 @@ using System.Text.Json;
 using BuildingBlocks.AI.Models;
 using BuildingBlocks.AI.Prompts;
 using BuildingBlocks.Integrations.Gemini;
+using Contracts.Assessment.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

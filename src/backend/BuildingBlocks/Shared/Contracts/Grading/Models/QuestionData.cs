@@ -9,6 +9,7 @@ public sealed record QuestionData
 {
     public Guid Id { get; init; }
     public QuestionType Type { get; init; }
+    public string? Text { get; init; } 
     public int MaxPoints { get; init; }
-    public List<CorrectOptionData> CorrectOptions { get; init; }
+    public List<CorrectOptionData> CorrectOptions { get; init; } = [];
 }
