@@ -1,4 +1,5 @@
-﻿using Assessment.Domain.Attempts;
+﻿using Assessment.Domain.AI;
+using Assessment.Domain.Attempts;
 using Assessment.Domain.Questions;
 using Assessment.Domain.Tests;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public sealed class AssessmentDbContext(DbContextOptions<AssessmentDbContext> op
     public DbSet<AttemptAnswer> AttemptAnswers => Set<AttemptAnswer>();
     public DbSet<TestAccess> TestAccesses => Set<TestAccess>();
 
+    public DbSet<HintUsage> HintUsages => Set<HintUsage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

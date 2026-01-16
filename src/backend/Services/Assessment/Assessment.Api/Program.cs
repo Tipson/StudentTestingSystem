@@ -2,6 +2,7 @@ using Application;
 using Assessment.Application;
 using Assessment.Infrastructure;
 using Assessment.Api.Security;
+using BuildingBlocks.AI;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
@@ -17,8 +18,8 @@ builder.Services.AddHttpContextAccessor();
 var redisHost = builder.Configuration["RedisOptions:Host"];
 var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-/*if (string.IsNullOrWhiteSpace(redisHost))
-    throw new Exception("RedisOptions:Host не задан.");*/
+if (string.IsNullOrWhiteSpace(redisHost))
+    throw new Exception("RedisOptions:Host не задан.");
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -30,6 +31,9 @@ builder.Services.AddScoped<IUserContext, UserContext>();
 
 builder.Services.AddAssessmentApplication();
 builder.Services.AddAssessmentInfrastructure(builder.Configuration);
+
+builder.Services.AddAIServices(builder.Configuration);
+
 builder.Services.AddGradingService();
 
 builder.Services.AddKeycloakAuth(builder.Configuration);

@@ -15,21 +15,13 @@ public interface IGeminiClient
     Task<string> SendPromptAsync(string prompt, CancellationToken ct = default);
 }
 
-public sealed class GeminiClient : IGeminiClient
+public sealed class GeminiClient(
+    HttpClient httpClient,
+    IOptions<GeminiOptions> options,
+    ILogger<GeminiClient> logger)
+    : IGeminiClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly GeminiOptions _options;
-    private readonly ILogger<GeminiClient> _logger;
-
-    public GeminiClient(
-        HttpClient httpClient,
-        IOptions<GeminiOptions> options,
-        ILogger<GeminiClient> logger)
-    {
-        _httpClient = httpClient;
-        _options = options.Value;
-        _logger = logger;
-    }
+    private readonly GeminiOptions _options = options.Value;
 
     public async Task<string> SendPromptAsync(string prompt, CancellationToken ct = default)
     {
@@ -46,9 +38,11 @@ public sealed class GeminiClient : IGeminiClient
                 )
             );
 
-            _logger.LogDebug("Отправка запроса в Gemini API");
+            logger.LogDebug("Отправка запроса в Gemini API");
 
-            var response = await _httpClient.PostAsJsonAsync(
+            logger.LogInformation("Gemini request: model={Model}, base={Base}", _options.Model, httpClient.BaseAddress);
+
+            var response = await httpClient.PostAsJsonAsync(
                 $"v1beta/models/{_options.Model}:generateContent?key={_options.ApiKey}",
                 request,
                 ct);
@@ -58,18 +52,18 @@ public sealed class GeminiClient : IGeminiClient
             var result = await response.Content.ReadFromJsonAsync<GeminiResponse>(ct);
             var text = result?.Candidates?[0]?.Content?.Parts?[0]?.Text ?? string.Empty;
 
-            _logger.LogDebug("Получен ответ от Gemini API: {Length} символов", text.Length);
+            logger.LogDebug("Получен ответ от Gemini API: {Length} символов", text.Length);
 
             return text;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Ошибка HTTP при вызове Gemini API");
+            logger.LogError(ex, "Ошибка HTTP при вызове Gemini API");
             throw new GeminiApiException("Не удалось подключиться к Gemini API", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Неожиданная ошибка при вызове Gemini API");
+            logger.LogError(ex, "Неожиданная ошибка при вызове Gemini API");
             throw new GeminiApiException("Ошибка при работе с Gemini API", ex);
         }
     }
