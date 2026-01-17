@@ -62,3 +62,14 @@ spec:
               value: {{ .Values.mediaApi.s3.defaultBucketName | quote }}
             - name: StorageOptions__WithSsl
               value: {{ .Values.mediaApi.s3.withSsl | quote }}
+
+            # Redis Configuration
+            - name: RedisOptions__Host
+              value: {{ .Values.mediaApi.redis.host | quote }}
+            - name: RedisOptions__Port
+              value: {{ .Values.mediaApi.redis.port | quote }}
+            - name: RedisOptions__Password
+              valueFrom:
+                secretKeyRef:
+                  name: redis
+                  key: redis-password
