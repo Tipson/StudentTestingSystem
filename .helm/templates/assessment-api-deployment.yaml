@@ -78,3 +78,20 @@ spec:
               value: {{ .Values.assessmentApi.gemini.temperature | quote }}
             - name: Gemini__MaxOutputTokens
               value: {{ .Values.assessmentApi.gemini.maxOutputTokens | quote }}
+            
+            # RabbitMQ Configuration
+            - name: RabbitMQ__Host
+              value: "rabbitmq.lms.svc.cluster.local"
+            - name: RabbitMQ__Username
+              value: "admin"
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: password
+
+            # Grading Service Configuration
+            - name: GradingService__UseMessageBus
+              value: "true"
+            - name: GradingService__Url
+              value: "http://grading-api:8080"

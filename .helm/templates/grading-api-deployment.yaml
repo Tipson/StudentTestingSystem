@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grading-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grading-api
+  template:
+    metadata:
+      labels:
+        app: grading-api
+    spec:
+      containers:
+      - name: grading-api
+        image: {{ index .Values.werf.image "grading-api" }}
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 3
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        
+        - name: Keycloak__Authority
+          value: "http://keycloak.oleg.agentik007.ru/realms/lms"
+        - name: Keycloak__RequireHttpsMetadata
+          value: "false"
+        
+        - name: RabbitMQ__Host
+          value: "rabbitmq.lms.svc.cluster.local"
+        - name: RabbitMQ__Username
+          value: "admin"
+        - name: RabbitMQ__Password
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: password
+        
+        - name: Gemini__ApiKey
+          valueFrom:
+            secretKeyRef:
+              name: gemini-secrets
+              key: Gemini__ApiKey
+        - name: Gemini__Model
+          value: "gemini-2.0-flash-exp"
+        
+        - name: AI__Enabled
+          value: "true"
+        - name: AI__GradingEnabled
+          value: "true"
+        - name: AI__MinimumConfidenceThreshold
+          value: "0.7"
