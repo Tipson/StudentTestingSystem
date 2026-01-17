@@ -49,6 +49,9 @@ mediaApi:
     serviceUrl: "minio.lms.svc.cluster.local"
     defaultBucketName: "assessment"
     withSsl: false
+  redis:
+    host: "redis-master.lms.svc.cluster.local"
+    port: "6379"
   limits:
     memoryRequests: "256Mi"
     memoryLimits: "512Mi"
