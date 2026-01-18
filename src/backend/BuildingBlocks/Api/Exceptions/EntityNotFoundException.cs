@@ -9,7 +9,7 @@ public class EntityNotFoundException : BadRequestApiException
     public override HttpStatusCode StatusCode => HttpStatusCode.NotFound;
     public override string ErrorCode => "ENTITY_NOT_FOUND";
 
-    public EntityNotFoundException(string? message = "Entity not found", Exception? innerException = null)
+    public EntityNotFoundException(string? message = "Объект не найден", Exception? innerException = null)
         : base(message, innerException)
     {
     }

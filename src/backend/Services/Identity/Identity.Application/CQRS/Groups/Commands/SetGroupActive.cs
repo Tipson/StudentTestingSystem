@@ -1,3 +1,4 @@
+using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
 
@@ -11,7 +12,7 @@ public sealed class SetGroupActiveHandler(IGroupRepository groups)
     public async Task Handle(SetGroupActive request, CancellationToken ct)
     {
         var group = await groups.GetById(request.GroupId, ct)
-                    ?? throw new InvalidOperationException("Группа не найдена.");
+                    ?? throw new EntityNotFoundException("Группа не найдена.");
 
         if (request.IsActive) group.Activate();
         else group.Deactivate();

@@ -2,6 +2,7 @@ using Application;
 using Assessment.Application;
 using Assessment.Infrastructure;
 using Assessment.Api.Security;
+using BuildingBlocks.AI;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
@@ -14,19 +15,26 @@ builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
 
+var redisHost = builder.Configuration["RedisOptions:Host"];
+var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
+
+if (string.IsNullOrWhiteSpace(redisHost))
+    throw new Exception("RedisOptions:Host не задан.");
+
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = builder.Configuration["Redis:ConnectionString"] 
-                            ?? "localhost:6379";
+    options.Configuration = $"{redisHost}:{redisPort}";
     options.InstanceName = "Idempotency:";
 });
 
 builder.Services.AddScoped<IUserContext, UserContext>();
 
-
 builder.Services.AddAssessmentApplication();
 builder.Services.AddAssessmentInfrastructure(builder.Configuration);
-builder.Services.AddGradingService();
+
+builder.Services.AddAIServices(builder.Configuration);
+
+builder.Services.AddGradingApplication();
 
 builder.Services.AddKeycloakAuth(builder.Configuration);
 builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");
@@ -65,3 +73,5 @@ app.MapGet("/healthz", () => Results.Ok(new
 
 
 app.Run();
+
+

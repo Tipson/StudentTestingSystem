@@ -86,3 +86,16 @@ dependencies:
     imports:
       - type: ImageName
         targetBuildArg: SOLUTION_IMAGE_NAME
+
+---
+# Grading WebAPI
+image: grading-api
+dockerfile: Dockerfile
+context: ./docker/dotnet/Grading
+args:
+  ASPNET_VERSION: "10.0-alpine3.22"
+dependencies:
+  - image: solution-build-artifacts
+    imports:
+      - type: ImageName
+        targetBuildArg: SOLUTION_IMAGE_NAME

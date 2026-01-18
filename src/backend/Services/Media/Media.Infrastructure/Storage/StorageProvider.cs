@@ -15,6 +15,19 @@ public sealed class StorageProvider(
     private readonly StorageOptions _options = options.Value;
     private bool _bucketEnsured;
 
+    /// <inheritdoc />
+    public async Task<string> GetPresignedUrlAsync(string path, TimeSpan expiry, string? bucket = null)
+    {
+        bucket ??= _options.DefaultBucketName;
+    
+        var args = new PresignedGetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(path)
+            .WithExpiry((int)expiry.TotalSeconds);
+    
+        return await client.PresignedGetObjectAsync(args);
+    }
+    
     public async Task<Stream> GetAsync(string path, string? bucket = null)
     {
         bucket ??= _options.DefaultBucketName;
@@ -28,6 +41,25 @@ public sealed class StorageProvider(
         await client.GetObjectAsync(args);
         ms.Position = 0;
         return ms;
+    }
+    
+    public async Task CopyToAsync(
+        string path,
+        Stream destination,
+        string? bucket = null,
+        CancellationToken ct = default)
+    {
+        bucket ??= _options.DefaultBucketName;
+
+        var args = new GetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(path)
+            .WithCallbackStream(s =>
+            {
+                s.CopyTo(destination); // без MemoryStream
+            });
+
+        await client.GetObjectAsync(args, ct);
     }
 
     public async Task UploadAsync(Stream fileStream, string objectKey, string contentType, long sizeBytes, string? bucket = null)

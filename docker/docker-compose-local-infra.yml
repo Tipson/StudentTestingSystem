@@ -86,10 +86,33 @@ services:
     networks:
       - lms-network
 
+  # ============ Message Broker ============
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: lms-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin123}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - lms-network
+
+
 volumes:
   postgres_data:
   minio_data:
   redis_data:
+  rabbitmq_data:
 
 networks:
   lms-network:

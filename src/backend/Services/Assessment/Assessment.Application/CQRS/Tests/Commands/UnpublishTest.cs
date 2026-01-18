@@ -19,7 +19,7 @@ public sealed class UnpublishTestHander(ITestRepository testRepository, IUserCon
             throw new ForbiddenException("Недостаточно прав");
         
         if (test.Status != TestStatus.Published)
-            throw new InvalidOperationException("Тест не опубликован");
+            throw new EntityNotFoundException("Тест не опубликован");
 
         test.Unpublish();
 

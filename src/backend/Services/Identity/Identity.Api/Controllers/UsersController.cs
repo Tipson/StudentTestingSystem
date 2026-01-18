@@ -1,6 +1,7 @@
 ﻿using Contracts.Identity;
 using Identity.Application.CQRS.Users.Commands;
 using Identity.Application.CQRS.Users.Queries;
+using Identity.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,7 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     /// Получить пользователя по ID (только админ).
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Get(string id, CancellationToken ct) =>
         Ok(await mediator.Send(new GetUser(id), ct));
 
@@ -27,7 +28,7 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     /// Получить всех пользователей (только админ).
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await mediator.Send(new GetUsers(), ct));
 
@@ -35,7 +36,7 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     /// Установить роль пользователя (только админ).
     /// </summary>
     [HttpPut("{id}/role")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> SetRole(string id, [FromBody] UserRole role, CancellationToken ct)
     {
         await mediator.Send(new SetUserRole(id, role), ct);
@@ -46,7 +47,7 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     /// Активировать пользователя (только админ).
     /// </summary>
     [HttpPut("{id}/activate")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Activate(string id, CancellationToken ct)
     {
         await mediator.Send(new ActivateUser(id), ct);
@@ -57,10 +58,23 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     /// Деактивировать пользователя (только админ).
     /// </summary>
     [HttpPut("{id}/deactivate")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Deactivate(string id, CancellationToken ct)
     {
         await mediator.Send(new DeactivateUser(id), ct);
+        return NoContent();
+    }
+    
+    /// <summary>
+    /// Массово изменить группу у студентов (только админ).
+    /// </summary>
+    [HttpPut("batch/group")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> SetGroupForUsers(
+        [FromBody] SetGroupForUsersDto dto,
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetGroupForUsers(dto.UserIds, dto.GroupId), ct);
         return NoContent();
     }
 }

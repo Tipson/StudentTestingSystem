@@ -7,11 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="MassTransit.Abstractions" Version="8.5.7" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Application\Application.csproj" />
+        <ProjectReference Include="..\..\..\BuildingBlocks\AI\AI.csproj" />
+        <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Application\Application.csproj" />
       <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
     </ItemGroup>
 

@@ -23,6 +23,33 @@ namespace Assessment.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Assessment.Domain.AI.HintUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HintLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HintText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("HintUsages", "assessment");
+                });
+
             modelBuilder.Entity("Assessment.Domain.Attempts.Attempt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -77,6 +104,10 @@ namespace Assessment.Infrastructure.Data.Migrations
                     b.Property<Guid>("AttemptId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Feedback")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<bool?>("IsCorrect")
                         .HasColumnType("boolean");
 
@@ -88,10 +119,6 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("TeacherComment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

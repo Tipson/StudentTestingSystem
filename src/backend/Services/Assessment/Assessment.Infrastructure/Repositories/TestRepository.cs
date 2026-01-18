@@ -12,6 +12,11 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
     public Task<Test?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Tests.FirstOrDefaultAsync(x => x.Id == id, ct);
     
+    public Task<Test?> GetWithQuestionsAsync(Guid id, CancellationToken ct) =>
+        db.Tests
+            .Include(t => t.Questions)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+    
     public Task<List<Test>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
         db.Tests
             .Where(x => x.OwnerUserId == ownerId)
@@ -30,10 +35,17 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
             .OrderByDescending(t => t.UpdatedAt)
             .ToListAsync(ct);
 
-    public Task<List<Test>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct) =>
-        db.Tests
-            .Where(t => ids.Contains(t.Id))
+    public Task<List<Test>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        var idsList = ids.ToList();
+    
+        if (!idsList.Any())
+            return Task.FromResult(new List<Test>());
+    
+        return db.Tests
+            .Where(t => idsList.Contains(t.Id))
             .ToListAsync(ct);
+    }
     
     public async Task AddAsync(Test test, CancellationToken ct)
     {

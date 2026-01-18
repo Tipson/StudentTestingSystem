@@ -2,8 +2,6 @@ using Application;
 using Assessment.Application.DTOs.Test;
 using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
-using BuildingBlocks.Api.Exceptions.Base;
-using Contracts.Identity;
 using Mapster;
 using MediatR;
 

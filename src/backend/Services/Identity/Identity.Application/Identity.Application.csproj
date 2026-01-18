@@ -19,11 +19,6 @@
     <Compile Remove="Users\Queries\GetUserByEmail.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Users\Mapping\" />
-    <Folder Include="Users\Queries\" />
-  </ItemGroup>
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

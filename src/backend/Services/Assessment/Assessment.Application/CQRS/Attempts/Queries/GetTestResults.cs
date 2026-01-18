@@ -1,4 +1,3 @@
-using System.Linq;
 using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;

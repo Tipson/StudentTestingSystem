@@ -24,6 +24,12 @@ services:
       - ConnectionStrings__Default=Host=postgres;Port=5432;Database=assessment;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
       - Keycloak__Authority=http://keycloak:8080/realms/lms
       - Keycloak__RequireHttpsMetadata=false
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - GradingService__UseMessageBus=true
+      - GradingService__Url=http://grading-api:8080
+      - Gemini__ApiKey=${GEMINI_API_KEY}
     depends_on:
       - solution-build-artifacts
     networks:
@@ -68,6 +74,33 @@ services:
       - DB_CONNECTION=Host=postgres;Port=5432;Database=assessment;Username=${POSTGRES_ADMIN};Password=${POSTGRES_ADMIN_PASSWORD}
     depends_on:
       - solution-build-artifacts
+    networks:
+      - lms-network
+
+  # ============ Grading Service ============
+  grading-api:
+    image: ${DOCKER_REGISTRY}/grading-api:${APP_VERSION}
+    build:
+      context: "./dotnet/Grading"
+      dockerfile: "./Dockerfile"
+      args:
+        - SOLUTION_IMAGE_NAME=${DOCKER_REGISTRY}/solution-build-artifacts:${APP_VERSION}
+        - ASPNET_VERSION=${ASPNET_VERSION}
+    ports:
+      - "5003:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Compose
+      - Keycloak__Authority=http://keycloak:8080/realms/lms
+      - Keycloak__RequireHttpsMetadata=false
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - Gemini__ApiKey=${GEMINI_API_KEY}
+      - AI__Enabled=true
+      - AI__GradingEnabled=true
+    depends_on:
+      - solution-build-artifacts
+      - rabbitmq
     networks:
       - lms-network
 

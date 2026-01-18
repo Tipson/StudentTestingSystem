@@ -14,4 +14,5 @@ public interface IUserRepository
     Task<List<User>> GetListAsync(CancellationToken ct);
     Task<List<User>> GetByRoleAsync(UserRole role, CancellationToken ct);
     Task<List<User>> SearchAsync(string query, CancellationToken ct);
+    Task<User> GetOrCreateAsync(User candidate, CancellationToken ct);
 }

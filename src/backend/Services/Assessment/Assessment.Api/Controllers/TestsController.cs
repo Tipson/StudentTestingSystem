@@ -1,6 +1,7 @@
 ﻿using Assessment.Application.CQRS.Tests.Commands;
 using Assessment.Application.CQRS.Tests.Queries;
 using Assessment.Application.DTOs.Test;
+using Assessment.Domain.Tests.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Создать тест (преподаватель/админ).
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> Create([FromBody] CreateTestDto dto, CancellationToken ct) =>
         Ok(await mediator.Send(new CreateTest(dto), ct));
 
@@ -38,7 +39,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Получить свои тесты (преподаватель).
     /// </summary>
     [HttpGet("my")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GetMy(CancellationToken ct) =>
         Ok(await mediator.Send(new GetMyTests(), ct));
 
@@ -46,7 +47,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Обновить тест (владелец или админ).
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTestDto dto, CancellationToken ct)
     {
         await mediator.Send(new UpdateTest(id, dto), ct);
@@ -54,20 +55,57 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     }
 
     [HttpPut("{id:guid}/settings")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> UpdateSettings(Guid id, [FromBody] UpdateTestSettingsDto dto, CancellationToken ct) =>
         Ok(await mediator.Send(new UpdateTestSettings(id, dto), ct));
+    
+    /// <summary>
+    /// Установить тип доступа к тесту (Public/Private).
+    /// </summary>
+    [HttpPut("{id:guid}/access-type/{accessType}")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> SetAccessType(
+        Guid id, 
+        TestAccessType accessType, 
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetTestAccessType(id, accessType), ct);
+        return NoContent();
+    }
+    
+    /// <summary>
+    /// Установить временные рамки доступности теста.
+    /// </summary>
+    [HttpPut("{id:guid}/availability")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> SetAvailability(
+        Guid id, 
+        [FromQuery] DateTimeOffset? availableFrom,
+        [FromQuery] DateTimeOffset? availableUntil,
+        CancellationToken ct)
+    {
+        await mediator.Send(new SetTestAvailability(id, availableFrom, availableUntil), ct);
+        return NoContent();
+    }
 
     [HttpPut("{id:guid}/publish")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> Publish(Guid id, CancellationToken ct)
     {
         await mediator.Send(new PublishTest(id), ct);
         return NoContent();
     }
     
+    [HttpPut("{id:guid}/unpublish")]
+    [Authorize(Roles = "teacher,admin")]
+    public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
+    {
+        await mediator.Send(new UnpublishTest(id), ct);
+        return NoContent();
+    }
+    
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await mediator.Send(new DeleteTest(id), ct);
@@ -80,7 +118,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Выдать доступ к тесту конкретному пользователю.
     /// </summary>
     [HttpPost("{id:guid}/access/users")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GrantAccessToUser(
         Guid id,
         [FromBody] GrantAccessToUserDto dto,
@@ -97,7 +135,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Выдать доступ к тесту группе.
     /// </summary>
     [HttpPost("{id:guid}/access/groups")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GrantAccessToGroup(
         Guid id,
         [FromBody] GrantAccessToGroupDto dto,
@@ -114,7 +152,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Создать ссылку-приглашение для теста.
     /// </summary>
     [HttpPost("{id:guid}/access/invite-links")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> CreateInviteLink(
         Guid id,
         [FromBody] CreateInviteLinkDto dto,
@@ -131,7 +169,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Получить список доступов к тесту.
     /// </summary>
     [HttpGet("{id:guid}/access")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> GetAccesses(Guid id, CancellationToken ct)
     {
         var accesses = await mediator.Send(new GetTestAccesses(id), ct);
@@ -142,7 +180,7 @@ public sealed class TestsController(IMediator mediator) : ControllerBase
     /// Отозвать доступ к тесту.
     /// </summary>
     [HttpDelete("access/{accessId:guid}")]
-    [Authorize(Roles = "Teacher,Admin")]
+    [Authorize(Roles = "teacher,admin")]
     public async Task<IActionResult> RevokeAccess(Guid accessId, CancellationToken ct)
     {
         await mediator.Send(new RevokeAccess(accessId), ct);

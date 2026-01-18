@@ -16,6 +16,9 @@ public class AttemptConfiguration : IEntityTypeConfiguration<Attempt>
             .HasFilter("\"Status\" = 0") // 0 = InProgress
             .IsUnique();
         
+        // Композитный индекс для GetActiveAsync
+        builder.HasIndex(x => new { x.UserId, x.TestId, x.Status });
+        
         // Индекс для поиска попыток пользователя
         builder.HasIndex(x => x.UserId);
 

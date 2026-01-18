@@ -1,4 +1,5 @@
 using Application;
+using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
 using MediatR;
@@ -18,10 +19,10 @@ public sealed class SelectGroupHandler(
         var userId = userContext.UserId;
 
         var user = await users.GetById(userId, ct)
-                   ?? throw new InvalidOperationException("Пользователь не найден");
+                   ?? throw new EntityNotFoundException("Пользователь не найден");
 
         var group = await groups.GetById(request.GroupId, ct)
-                    ?? throw new InvalidOperationException("Группа не найдена");
+                    ?? throw new EntityNotFoundException("Группа не найдена");
 
         if (!group.IsActive)
             throw new InvalidOperationException("Группа неактивна");

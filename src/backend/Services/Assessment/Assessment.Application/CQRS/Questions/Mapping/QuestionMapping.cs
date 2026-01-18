@@ -14,11 +14,5 @@ public sealed class QuestionMapping : IRegister
 
         config.NewConfig<QuestionOption, QuestionOptionDto>()
             .Map(dest => dest.Media, src => src.Media.OrderBy(m => m.Order));
-
-        config.NewConfig<QuestionMedia, QuestionMediaDto>()
-            .Map(dest => dest.DownloadUrl, src => $"/api/files/{src.MediaId}/download");
-
-        config.NewConfig<QuestionOptionMedia, QuestionOptionMediaDto>()
-            .Map(dest => dest.DownloadUrl, src => $"/api/files/{src.MediaId}/download");
     }
 }

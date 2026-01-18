@@ -13,7 +13,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddIdentityInfrastructure(this IServiceCollection services, IConfiguration cfg)
     {
-        var cs = cfg.GetConnectionString("IdentityDb") ?? cfg["DB_CONNECTION"];
+        var cs = cfg.GetConnectionString("Default") ?? cfg["DB_CONNECTION"];
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Identity не задана.");
 

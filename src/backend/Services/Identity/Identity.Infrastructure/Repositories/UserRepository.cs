@@ -3,13 +3,14 @@ using Identity.Application.Interfaces;
 using Identity.Domain.Users;
 using Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Identity.Infrastructure.Repositories;
 
 public sealed class UserRepository(IdentityDbContext db) : IUserRepository
 {
     public Task<User?> GetById(string id, CancellationToken ct) =>
-        db.Users.FirstOrDefaultAsync(x => x.Id == id, ct);
+        db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<bool> Exists(string id, CancellationToken ct) =>
         db.Users.AnyAsync(x => x.Id == id, ct);
@@ -43,16 +44,40 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
 
     public Task<List<User>> SearchAsync(string query, CancellationToken ct)
     {
-        var q = (query ?? string.Empty).Trim();
+        var q = query.Trim();
         if (q.Length == 0)
             return db.Users.AsNoTracking().ToListAsync(ct);
 
-        var ql = q.ToLower();
         return db.Users
             .AsNoTracking()
-            .Where(u => (u.Email ?? "").ToLower().Contains(ql)
-                        || (u.FullName ?? "").ToLower().Contains(ql))
+            .Where(u =>
+                EF.Functions.ILike(u.Email ?? "", $"%{q}%") ||
+                EF.Functions.ILike(u.FullName ?? "", $"%{q}%"))
             .ToListAsync(ct);
     }
+    
+    public async Task<User> GetOrCreateAsync(User candidate, CancellationToken ct)
+    {
+        var existing = await db.Users.FindAsync([candidate.Id], ct);
+        if (existing is not null)
+            return existing;
 
+        db.Users.Add(candidate);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return candidate;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // кто-то создал параллельно
+            db.ChangeTracker.Clear();
+
+            var createdByOther = await db.Users.FindAsync([candidate.Id], ct);
+            if (createdByOther is null) throw;
+
+            return createdByOther;
+        }
+    }
 }

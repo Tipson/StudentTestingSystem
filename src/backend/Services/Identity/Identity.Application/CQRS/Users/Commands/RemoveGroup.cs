@@ -1,4 +1,5 @@
 using Application;
+using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
 
@@ -16,7 +17,7 @@ public sealed class RemoveGroupHandler(
         var userId = userContext.UserId;
 
         var user = await users.GetById(userId, ct)
-                   ?? throw new InvalidOperationException("Пользователь не найден");
+                   ?? throw new EntityNotFoundException("Пользователь не найден");
 
         if (user.GroupId is null)
             return;

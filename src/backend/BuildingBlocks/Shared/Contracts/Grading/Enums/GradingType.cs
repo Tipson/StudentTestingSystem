@@ -13,5 +13,10 @@ public enum GradingType
     /// <summary>
     /// Ручная проверка преподавателем (LongText).
     /// </summary>
-    Manual
+    Manual,
+    
+    /// <summary>
+    /// AI проверка (LongText через AI).
+    /// </summary>
+    AI
 }

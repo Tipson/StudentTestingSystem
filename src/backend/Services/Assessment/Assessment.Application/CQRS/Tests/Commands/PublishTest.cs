@@ -18,13 +18,13 @@ public sealed class PublishTestHandler(
 {
     public async Task Handle(PublishTest request, CancellationToken ct)
     {
-        var test = await tests.GetByIdAsync(request.TestId, ct)
+        var test = await tests.GetWithQuestionsAsync(request.TestId, ct)
                    ?? throw new EntityNotFoundException("Тест не найден");
 
         if (test.OwnerUserId != userContext.UserId)
             throw new ForbiddenException("Нет прав на публикацию теста");
 
-        test.Publish(); // Используем метод из Domain
+        test.Publish();
 
         await tests.UpdateAsync(test, ct);
     }

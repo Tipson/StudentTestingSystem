@@ -47,7 +47,7 @@ public partial class AttemptAnswer
     /// Комментарий преподавателя при ручной проверке.
     /// </summary>
     [MaxLength(2000)]
-    public string? TeacherComment { get; set; }
+    public string? Feedback { get; set; }
 
     public AttemptAnswer(Guid attemptId, Guid questionId, AnswerPayload answer)
     {

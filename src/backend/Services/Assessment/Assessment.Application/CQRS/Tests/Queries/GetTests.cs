@@ -3,7 +3,6 @@ using Assessment.Application.DTOs.Test;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
 using Contracts.Assessment.Enums;
-using Contracts.Identity;
 using Mapster;
 using MediatR;
 
@@ -23,7 +22,7 @@ public sealed class GetTestsHandler(
     public async Task<List<TestDto>> Handle(GetTests request, CancellationToken ct)
     {
         var userId = userContext.UserId;
-        var userGroupId = userContext.GroupId; // ⭐ Нужно добавить в IUserContext
+        var userGroupId = userContext.GroupId;
 
         var availableTests = new List<Test>();
 

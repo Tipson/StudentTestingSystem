@@ -7,8 +7,6 @@ using Keycloak.AuthServices.Common;
 using Keycloak.AuthServices.Sdk.Kiota;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Identity.Api.Security;
 
@@ -22,8 +20,8 @@ public static class DependencyInjection
 
         services.AddAuthorization(options =>
         {
-            options.AddPolicy("Admin", p => p.Requirements.Add(new RoleRequirement(UserRole.Admin)));
-            options.AddPolicy("Teacher", p => p.Requirements.Add(new RoleRequirement(UserRole.Teacher)));
+            options.AddPolicy("admin", p => p.Requirements.Add(new RoleRequirement(UserRole.Admin)));
+            options.AddPolicy("teacher", p => p.Requirements.Add(new RoleRequirement(UserRole.Teacher)));
         });
         services.AddScoped<IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddScoped<IClaimsTransformation, RealmRolesClaimsTransformation>();

@@ -11,7 +11,7 @@ namespace Identity.Api.Controllers;
 public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<ActionResult<Guid>> Create([FromBody] CreateGroup command, CancellationToken ct)
     {
         var id = await mediator.Send(command, ct);
@@ -19,7 +19,7 @@ public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
     }
 
     [HttpPut("{groupId:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
 
     public async Task<IActionResult> Update(Guid groupId, [FromBody] string institution, string specialization, int course, int groupNumber, CancellationToken ct)
     {
@@ -28,7 +28,7 @@ public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{groupId:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Delete(Guid groupId, CancellationToken ct)
     {
         await mediator.Send(new DeleteGroup(groupId), ct);
@@ -36,7 +36,7 @@ public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
     }
 
     [HttpPut("{groupId:guid}/active")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> SetActive(Guid groupId, [FromBody] bool isActive, CancellationToken ct)
     {
         await mediator.Send(new SetGroupActive(groupId, isActive), ct);
@@ -57,5 +57,30 @@ public sealed class GroupsAdminController(IMediator mediator) : ControllerBase
         var query = new GetActiveGroups(institution, specialization, course);
         var result = await mediator.Send(query, ct);
         return Ok(result);
+    }
+    
+    /// <summary>
+    /// Получить список студентов группы
+    /// </summary>
+    [HttpGet("{groupId:guid}/students")]
+    [Authorize(Roles = "admin,teacher")]
+    public async Task<IActionResult> GetStudents(Guid groupId, CancellationToken ct)
+    {
+        var members = await mediator.Send(new GetGroupMembers(groupId), ct);
+        return Ok(members);
+    }
+    
+    /// <summary>
+    /// Массово добавить студентов в группу
+    /// </summary>
+    [HttpPost("{groupId:guid}/students")]
+    [Authorize(Roles = "admin,teacher")]
+    public async Task<IActionResult> AddStudents(
+        Guid groupId,
+        [FromBody] List<string> userIds,
+        CancellationToken ct)
+    {
+        await mediator.Send(new AddStudentsToGroup(groupId, userIds), ct);
+        return NoContent();
     }
 }

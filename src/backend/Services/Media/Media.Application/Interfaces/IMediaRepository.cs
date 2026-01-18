@@ -9,4 +9,5 @@ public interface IMediaRepository
     Task<List<MediaFile>> GetByOwnerAsync(string ownerUserId, CancellationToken ct);
     Task AddAsync(MediaFile file, CancellationToken ct);
     Task DeleteAsync(MediaFile file, CancellationToken ct);
+    Task DeleteManyAsync(IEnumerable<MediaFile> files, CancellationToken ct);
 }

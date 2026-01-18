@@ -1,12 +1,36 @@
 ﻿using Media.Application.DTOs;
+using Microsoft.AspNetCore.Http;
 
 namespace Media.Application.Interfaces;
 
 public interface IFileService
 {
-    Task<MediaFileDto> UploadAsync(Stream stream, string fileName, string contentType, long sizeBytes, string category, Guid? entityId, CancellationToken ct);
-    Task<Stream> DownloadAsync(Guid id, CancellationToken ct);
-    Task<MediaFileDto?> GetAsync(Guid id, CancellationToken ct);
+    /// <summary>
+    /// Загрузить файл.
+    /// </summary>
+    Task<UploadResultDto> UploadAsync(
+        List<IFormFile> files,
+        string category,
+        Guid? entityId,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Получить метаданные файлов по ID.
+    /// </summary>
+    Task<List<MediaFileDto>> GetAsync(IEnumerable<Guid> ids, CancellationToken ct);
+
+    /// <summary>
+    /// Скачать файлы. Если один файл — возвращает его напрямую, если несколько — ZIP-архив.
+    /// </summary>
+    Task<FileDownloadResultDto> DownloadAsync(IEnumerable<Guid> ids, CancellationToken ct);
+
+    /// <summary>
+    /// Получить файлы текущего пользователя.
+    /// </summary>
     Task<List<MediaFileDto>> GetMyFilesAsync(CancellationToken ct);
-    Task DeleteAsync(Guid id, CancellationToken ct);
+
+    /// <summary>
+    /// Удалить файлы.
+    /// </summary>
+    Task<DeleteResultDto> DeleteAsync(IEnumerable<Guid> ids, CancellationToken ct);
 }
