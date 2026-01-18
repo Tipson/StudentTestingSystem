@@ -5,14 +5,14 @@ using MediatR;
 
 namespace Identity.Application.CQRS.Users.Commands;
 
-public sealed record RemoveGroup : IRequest;
+public sealed record LeaveGroup : IRequest;
 
-public sealed class RemoveGroupHandler(
+public sealed class LeaveGroupHandler(
     IUserRepository users,
     IUserContext userContext
-) : IRequestHandler<RemoveGroup>
+) : IRequestHandler<LeaveGroup>
 {
-    public async Task Handle(RemoveGroup request, CancellationToken ct)
+    public async Task Handle(LeaveGroup request, CancellationToken ct)
     {
         var userId = userContext.UserId;
 

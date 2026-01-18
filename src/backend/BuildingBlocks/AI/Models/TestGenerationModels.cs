@@ -1,4 +1,4 @@
-using Contracts.Assessment.Enums;  // ← ДОБАВИТЬ: используем общий QuestionType
+using Contracts.Assessment.Enums;
 
 namespace BuildingBlocks.AI.Models;
 
