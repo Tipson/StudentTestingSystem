@@ -1,11 +1,11 @@
-// Auth flags passed to requests: OPTIONAL, TRUE (required), or FALSE (skip).
+// Флаги авторизации для запросов: OPTIONAL, TRUE (обязательно) или FALSE (пропустить).
 export const AUTH = Object.freeze({
     OPTIONAL: 'optional',
     TRUE: 'true',
     FALSE: 'false',
 });
 
-// Temporary token getter until a dedicated auth module appears.
+// Временный getter токена, пока нет отдельного auth-модуля.
 export const getAccessToken = () => {
     if (typeof window === 'undefined') {
         return null;

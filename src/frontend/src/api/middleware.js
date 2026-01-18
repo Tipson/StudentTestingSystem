@@ -1,12 +1,12 @@
 import {AUTH, getAccessToken} from './auth.js';
 
-// Axios middleware that injects Authorization based on the custom auth flag.
+// Axios-мидлвар, который добавляет Authorization в зависимости от флага auth.
 export const applyAuthMiddleware = (client) => {
     client.interceptors.request.use((config) => {
         const authMode = config.auth ?? AUTH.TRUE;
         const token = getAccessToken();
 
-        // Strip custom flag so it does not leak into axios internals.
+        // Удаляем пользовательский флаг, чтобы он не попадал внутрь axios.
         if ('auth' in config) {
             delete config.auth;
         }
@@ -25,7 +25,7 @@ export const applyAuthMiddleware = (client) => {
 
         if (!token) {
             if (authMode === AUTH.TRUE) {
-                return Promise.reject(new Error('Auth token is required for this request.'));
+                return Promise.reject(new Error('Авторизация обязательна для этого запроса'));
             }
             return config;
         }
