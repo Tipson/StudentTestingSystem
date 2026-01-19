@@ -48,6 +48,8 @@ spec:
               value: "false"
             - name: StorageOptions__Host
               value: {{ .Values.mediaApi.s3.serviceUrl | quote }}
+            - name: StorageOptions__Port
+              value: {{ .Values.mediaApi.s3.port | default "80" | quote }}
             - name: StorageOptions__AccessKey
               valueFrom:
                 secretKeyRef:

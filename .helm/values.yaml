@@ -46,7 +46,8 @@ mediaApi:
     port: "5432"
     name: "media"
   s3:
-    serviceUrl: "minio.lms.svc.cluster.local"
+    serviceUrl: "s3.oleg.agentik007.ru"
+    port: "80"
     defaultBucketName: "assessment"
     withSsl: false
   redis:
