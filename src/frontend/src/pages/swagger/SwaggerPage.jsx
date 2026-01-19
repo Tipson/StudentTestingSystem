@@ -227,6 +227,44 @@ const formatResponse = (payload) => {
     }
 };
 
+const isBinaryPayload = (value) => {
+    if (!value) return false;
+    if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
+    if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) return true;
+    if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView?.(value)) return true;
+    return false;
+};
+
+const normalizeAutoTestResponseData = (value) => {
+    if (value == null) return null;
+    if (!isBinaryPayload(value)) return value;
+
+    const size = value.size ?? value.byteLength ?? value.buffer?.byteLength ?? null;
+    return {
+        message: 'Бинарные данные',
+        size,
+        type: value.type ?? null,
+    };
+};
+
+const formatAutoTestResponse = (value) => {
+    if (value == null) return '';
+    if (typeof value === 'string') {
+        try {
+            return JSON.stringify(JSON.parse(value), null, 2);
+        } catch (error) {
+            return value;
+        }
+    }
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch (error) {
+        return String(value);
+    }
+};
+
+const makeResultRowKey = (item, index) => `${item.id}-${index}`;
+
 const normalizeBaseUrl = (value) => {
     if (!value) return '';
     return value.replace(/\/$/, '');
@@ -265,7 +303,150 @@ const limitAutoTestMessage = (value) => {
     return `${text.slice(0, MAX_AUTOTEST_MESSAGE_LENGTH)}...`;
 };
 
+const calcPercent = (value, total) => (total > 0 ? Math.round((value / total) * 100) : 0);
+
+// Собирает conic-gradient для круговой диаграммы.
+const buildConicGradient = (segments, total) => {
+    if (!total) {
+        return 'conic-gradient(from 120deg, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0.05))';
+    }
+
+    let current = 0;
+    const stops = segments.map((segment) => {
+        const value = Math.max(0, segment.value || 0);
+        const slice = (value / total) * 360;
+        const start = current;
+        const end = current + slice;
+        current = end;
+        return `${segment.color} ${start}deg ${end}deg`;
+    });
+
+    if (current < 360) {
+        stops.push(`rgba(148, 163, 184, 0.2) ${current}deg 360deg`);
+    }
+
+    return `conic-gradient(${stops.join(', ')})`;
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const normalizeExpectedStatuses = (value) => {
+    if (value === null || value === undefined) return [];
+    return Array.isArray(value) ? value : [value];
+};
+
+// Универсальный исполнитель шага с повтором и поддержкой ожидаемого статуса.
+const runStepWithRetries = async (step, ctx, pushResult) => {
+    const skipReason = step.skip ? step.skip(ctx) : '';
+    if (skipReason) {
+        pushResult({
+            id: step.id,
+            title: step.title,
+            service: step.service,
+            method: step.method,
+            path: step.path,
+            status: 'skipped',
+            durationMs: 0,
+            message: skipReason,
+        });
+        return null;
+    }
+
+    const startedAt = Date.now();
+    const retryLimit = Math.max(0, step.retries ?? AUTO_TEST_RETRY_LIMIT);
+    const expectedStatuses = normalizeExpectedStatuses(step.expectStatus);
+    const hasExpected = expectedStatuses.length > 0;
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt <= retryLimit) {
+        attempt += 1;
+        try {
+            const response = await step.run(ctx);
+
+            if (hasExpected && !expectedStatuses.includes(response?.status)) {
+                pushResult({
+                    id: step.id,
+                    title: step.title,
+                    service: step.service,
+                    method: step.method,
+                    path: step.path,
+                    status: 'failed',
+                    httpStatus: response?.status ?? null,
+                    durationMs: Date.now() - startedAt,
+                    message: `Ожидался HTTP ${expectedStatuses.join(', ')}, но пришёл ${response?.status ?? '-'}.`,
+                    responseData: normalizeAutoTestResponseData(response?.data),
+                });
+                return null;
+            }
+
+            if (step.onSuccess) {
+                step.onSuccess(response, ctx);
+            }
+
+            const baseMessage = step.getMessage ? step.getMessage(response, ctx) : '';
+            const retryNote = attempt > 1 ? ` (попытка ${attempt}/${retryLimit + 1})` : '';
+            const message = baseMessage
+                ? `${baseMessage}${retryNote}`
+                : retryNote.trim();
+
+            pushResult({
+                id: step.id,
+                title: step.title,
+                service: step.service,
+                method: step.method,
+                path: step.path,
+                status: 'success',
+                httpStatus: response?.status ?? null,
+                durationMs: Date.now() - startedAt,
+                message,
+                responseData: normalizeAutoTestResponseData(response?.data),
+            });
+            return response;
+        } catch (error) {
+            const status = error?.response?.status ?? null;
+
+            if (hasExpected && status != null && expectedStatuses.includes(status)) {
+                pushResult({
+                    id: step.id,
+                    title: step.title,
+                    service: step.service,
+                    method: step.method,
+                    path: step.path,
+                    status: 'success',
+                    httpStatus: status,
+                    durationMs: Date.now() - startedAt,
+                    message: step.expectMessage || `Ожидаемый HTTP ${status}.`,
+                    responseData: normalizeAutoTestResponseData(error?.response?.data ?? error?.message ?? error),
+                });
+                return null;
+            }
+
+            lastError = error;
+            if (attempt <= retryLimit) {
+                await sleep(AUTO_TEST_RETRY_DELAY_MS);
+            }
+        }
+    }
+
+    const status = lastError?.response?.status ?? null;
+    const data = lastError?.response?.data ?? lastError?.message ?? lastError;
+    const retryNote = retryLimit > 0 ? ` (попыток: ${retryLimit + 1})` : '';
+    pushResult({
+        id: step.id,
+        title: step.title,
+        service: step.service,
+        method: step.method,
+        path: step.path,
+        status: 'failed',
+        httpStatus: status,
+        durationMs: Date.now() - startedAt,
+        message: `${limitAutoTestMessage(data)}${retryNote}`,
+        responseData: normalizeAutoTestResponseData(data),
+    });
+
+    return null;
+};
 
 const createSampleImageFile = async () => {
     const fallbackBase64 =
@@ -349,6 +530,51 @@ const buildAutoTestQuestions = (label) => ([
         ],
     },
 ]);
+
+// Собирает корректный payload ответа для SaveAnswer.
+const buildAnswerPayload = (question) => {
+    if (!question) {
+        return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
+    }
+
+    const type = question.type;
+    const options = Array.isArray(question.options) ? question.options : [];
+    const optionMap = new Map(options.map((option) => [option.id, option.text]));
+    const getOptionText = (id) => optionMap.get(id) || '';
+
+    if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
+        const optionId = question.correctOptionIds?.[0] || options[0]?.id || null;
+        const optionIds = optionId ? [optionId] : [];
+        const optionText = optionId ? getOptionText(optionId) : '';
+        return {
+            optionId,
+            optionIds,
+            text: optionText ? `Выбран вариант: ${optionText}` : 'Выбран вариант',
+        };
+    }
+
+    if (type === QUESTION_TYPES.MultiChoice) {
+        const fallbackIds = options.map((option) => option.id).filter(Boolean).slice(0, 2);
+        const optionIds = (question.correctOptionIds?.length ? question.correctOptionIds : fallbackIds)
+            .filter(Boolean);
+        const optionId = optionIds[0] || null;
+        const optionText = optionIds.map(getOptionText).filter(Boolean).join(', ');
+        return {
+            optionId,
+            optionIds,
+            text: optionText ? `Выбраны варианты: ${optionText}` : 'Выбраны варианты',
+        };
+    }
+
+    if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
+        const text = question.answerText || question.correctText || 'Автотестовый ответ';
+        return {optionId: null, optionIds: [], text};
+    }
+
+    return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
+};
+
+const getQuestionId = (question) => question?.id ?? question?.Id ?? null;
 
 const getAutoTestStatusLabel = (status) => {
     if (status === 'success') return 'Успешно';
@@ -740,6 +966,8 @@ export default function SwaggerPage() {
         service: serviceEntries[0]?.key || DEFAULT_REQUEST.service,
     }));
     const [response, setResponse] = useState(null);
+    // Управляем показом ответа вручную, чтобы он был скрыт по умолчанию.
+    const [showResponse, setShowResponse] = useState(false);
     const [pending, setPending] = useState(false);
     const [swaggerGroups, setSwaggerGroups] = useState([]);
     const [swaggerLoading, setSwaggerLoading] = useState(false);
@@ -747,6 +975,16 @@ export default function SwaggerPage() {
     const [activeTab, setActiveTab] = useState('console');
     const [autoTestRunning, setAutoTestRunning] = useState(false);
     const [autoTestResults, setAutoTestResults] = useState([]);
+    const [autoTestView, setAutoTestView] = useState('grouped');
+    const [expandedAutoTestRows, setExpandedAutoTestRows] = useState({});
+    // Если включено, ответы в автотестах открываются по умолчанию.
+    const [autoTestAutoExpand, setAutoTestAutoExpand] = useState(false);
+    const [scenarioRunning, setScenarioRunning] = useState(false);
+    const [scenarioResults, setScenarioResults] = useState([]);
+    const [activeScenarioId, setActiveScenarioId] = useState('full-cycle');
+    const [expandedScenarioRows, setExpandedScenarioRows] = useState({});
+    // Если включено, ответы в сценариях открываются по умолчанию.
+    const [scenarioAutoExpand, setScenarioAutoExpand] = useState(false);
     const [endpointMeta, setEndpointMeta] = useState(DEFAULT_ENDPOINT_META);
     const [uploadFiles, setUploadFiles] = useState([]);
     const lastAppliedKeyRef = useRef('');
@@ -826,6 +1064,137 @@ export default function SwaggerPage() {
 
         return summary;
     }, [autoTestResults]);
+    const autoTestByStatus = useMemo(() => ({
+        success: autoTestResults.filter((item) => item.status === 'success'),
+        failed: autoTestResults.filter((item) => item.status === 'failed'),
+        skipped: autoTestResults.filter((item) => item.status === 'skipped'),
+    }), [autoTestResults]);
+    const endpointGroupLookup = useMemo(() => {
+        const map = new Map();
+
+        serviceGroups.forEach((service) => {
+            service.groups.forEach((group) => {
+                const groupTitle = group.title || 'Общее';
+                group.items.forEach((item) => {
+                    const key = makeEndpointKey(service.serviceKey, item.method, item.path);
+                    map.set(key, {
+                        serviceTitle: service.serviceTitle,
+                        groupTitle,
+                    });
+                });
+            });
+        });
+
+        return map;
+    }, [serviceGroups]);
+    const groupedAutoTests = useMemo(() => {
+        const serviceMap = new Map();
+
+        autoTestResults.forEach((item) => {
+            const key = makeEndpointKey(item.service, item.method, item.path);
+            const meta = endpointGroupLookup.get(key);
+            const serviceTitle = meta?.serviceTitle || item.service || 'Общее';
+            const groupTitle = meta?.groupTitle || 'Общее';
+
+            if (!serviceMap.has(serviceTitle)) {
+                serviceMap.set(serviceTitle, new Map());
+            }
+
+            const groups = serviceMap.get(serviceTitle);
+            if (!groups.has(groupTitle)) {
+                groups.set(groupTitle, []);
+            }
+
+            groups.get(groupTitle).push(item);
+        });
+
+        return Array.from(serviceMap.entries())
+            .map(([serviceTitle, groups]) => ({
+                serviceTitle,
+                groups: Array.from(groups.entries())
+                    .map(([groupTitle, items]) => ({
+                        groupTitle,
+                        items: items.slice().sort((a, b) => {
+                            if (a.path === b.path) {
+                                return a.method.localeCompare(b.method);
+                            }
+                            return a.path.localeCompare(b.path);
+                        }),
+                    }))
+                    .sort((a, b) => a.groupTitle.localeCompare(b.groupTitle)),
+            }))
+            .sort((a, b) => a.serviceTitle.localeCompare(b.serviceTitle));
+    }, [autoTestResults, endpointGroupLookup]);
+    const autoTestViews = useMemo(() => ([
+        {key: 'grouped', label: 'По сервисам и группам'},
+        {key: 'success', label: 'Пройденные'},
+        {key: 'skipped', label: 'Пропущенные'},
+        {key: 'failed', label: 'Проваленные'},
+    ]), []);
+    const scenarioSummary = useMemo(() => {
+        const summary = {total: scenarioResults.length, success: 0, failed: 0, skipped: 0};
+
+        scenarioResults.forEach((item) => {
+            if (item.status === 'success') summary.success += 1;
+            else if (item.status === 'failed') summary.failed += 1;
+            else if (item.status === 'skipped') summary.skipped += 1;
+        });
+
+        return summary;
+    }, [scenarioResults]);
+    const scenarioDefinitions = useMemo(() => ([
+        {
+            id: 'full-cycle',
+            title: 'Полный цикл теста',
+            tag: 'E2E',
+            description: 'Создание теста, вопросы, публикация, прохождение, результат и очистка.',
+        },
+        {
+            id: 'publish-without-questions',
+            title: 'Публикация без вопросов',
+            tag: 'Негативный',
+            description: 'Проверяем отказ публикации, затем корректную публикацию после добавления вопроса.',
+        },
+        {
+            id: 'draft-flow',
+            title: 'Черновик и правки',
+            tag: 'Редактирование',
+            description: 'Работа с черновиком: обновления, порядок вопросов и удаление.',
+        },
+    ]), []);
+    const activeScenario = useMemo(
+        () => scenarioDefinitions.find((scenario) => scenario.id === activeScenarioId),
+        [scenarioDefinitions, activeScenarioId],
+    );
+    const statusSegments = useMemo(() => ([
+        {key: 'success', label: 'Успешно', value: autoTestSummary.success, color: '#22c55e'},
+        {key: 'failed', label: 'Ошибка', value: autoTestSummary.failed, color: '#ef4444'},
+        {key: 'skipped', label: 'Пропущено', value: autoTestSummary.skipped, color: '#94a3b8'},
+    ]), [autoTestSummary]);
+    const executedTotal = autoTestSummary.success + autoTestSummary.failed;
+    const qualitySegments = useMemo(() => ([
+        {key: 'success', label: 'Успех', value: autoTestSummary.success, color: '#16a34a'},
+        {key: 'failed', label: 'Сбой', value: autoTestSummary.failed, color: '#f97316'},
+    ]), [autoTestSummary]);
+    const coverageSegments = useMemo(() => ([
+        {key: 'executed', label: 'Выполнено', value: executedTotal, color: '#0ea5e9'},
+        {key: 'skipped', label: 'Пропущено', value: autoTestSummary.skipped, color: '#cbd5e1'},
+    ]), [autoTestSummary, executedTotal]);
+    const statusGradient = useMemo(
+        () => buildConicGradient(statusSegments, autoTestSummary.total),
+        [statusSegments, autoTestSummary.total],
+    );
+    const qualityGradient = useMemo(
+        () => buildConicGradient(qualitySegments, executedTotal),
+        [qualitySegments, executedTotal],
+    );
+    const coverageGradient = useMemo(
+        () => buildConicGradient(coverageSegments, autoTestSummary.total),
+        [coverageSegments, autoTestSummary.total],
+    );
+    const statusSuccessRate = calcPercent(autoTestSummary.success, autoTestSummary.total);
+    const qualitySuccessRate = calcPercent(autoTestSummary.success, executedTotal);
+    const coverageRate = calcPercent(executedTotal, autoTestSummary.total);
 
     const applyEndpoint = useCallback((item, serviceKey) => {
         const nextBody = item.example != null
@@ -1024,6 +1393,7 @@ export default function SwaggerPage() {
 
         setAutoTestRunning(true);
         setAutoTestResults([]);
+        setExpandedAutoTestRows({});
 
         const runLabel = new Date().toLocaleString('ru-RU');
         const ctx = {
@@ -1049,120 +1419,7 @@ export default function SwaggerPage() {
             setAutoTestResults((prev) => [...prev, result]);
         };
 
-        const runStep = async (step) => {
-            const skipReason = step.skip ? step.skip(ctx) : '';
-            if (skipReason) {
-                pushResult({
-                    id: step.id,
-                    title: step.title,
-                    service: step.service,
-                    method: step.method,
-                    path: step.path,
-                    status: 'skipped',
-                    durationMs: 0,
-                    message: skipReason,
-                });
-                return;
-            }
-
-            const startedAt = Date.now();
-            const retryLimit = Math.max(0, step.retries ?? AUTO_TEST_RETRY_LIMIT);
-            let attempt = 0;
-            let lastError = null;
-
-            while (attempt <= retryLimit) {
-                attempt += 1;
-                try {
-                    const response = await step.run(ctx);
-                    if (step.onSuccess) {
-                        step.onSuccess(response, ctx);
-                    }
-
-                    const baseMessage = step.getMessage ? step.getMessage(response, ctx) : '';
-                    const retryNote = attempt > 1 ? ` (попытка ${attempt}/${retryLimit + 1})` : '';
-                    const message = baseMessage
-                        ? `${baseMessage}${retryNote}`
-                        : retryNote.trim();
-
-                    pushResult({
-                        id: step.id,
-                        title: step.title,
-                        service: step.service,
-                        method: step.method,
-                        path: step.path,
-                        status: 'success',
-                        httpStatus: response?.status ?? null,
-                        durationMs: Date.now() - startedAt,
-                        message,
-                    });
-                    return;
-                } catch (error) {
-                    lastError = error;
-                    if (attempt <= retryLimit) {
-                        await sleep(AUTO_TEST_RETRY_DELAY_MS);
-                    }
-                }
-            }
-
-            const status = lastError?.response?.status ?? null;
-            const data = lastError?.response?.data ?? lastError?.message ?? lastError;
-            const retryNote = retryLimit > 0 ? ` (попыток: ${retryLimit + 1})` : '';
-            pushResult({
-                id: step.id,
-                title: step.title,
-                service: step.service,
-                method: step.method,
-                path: step.path,
-                status: 'failed',
-                httpStatus: status,
-                durationMs: Date.now() - startedAt,
-                message: `${limitAutoTestMessage(data)}${retryNote}`,
-            });
-        };
-
-        const getQuestionId = (question) => question?.id ?? question?.Id ?? null;
-
-        const buildAnswerPayload = (question) => {
-            if (!question) {
-                return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
-            }
-
-            const type = question.type;
-            const options = Array.isArray(question.options) ? question.options : [];
-            const optionMap = new Map(options.map((option) => [option.id, option.text]));
-            const getOptionText = (id) => optionMap.get(id) || '';
-
-            if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
-                const optionId = question.correctOptionIds?.[0] || options[0]?.id || null;
-                const optionIds = optionId ? [optionId] : [];
-                const optionText = optionId ? getOptionText(optionId) : '';
-                return {
-                    optionId,
-                    optionIds,
-                    text: optionText ? `Выбран вариант: ${optionText}` : 'Выбран вариант',
-                };
-            }
-
-            if (type === QUESTION_TYPES.MultiChoice) {
-                const fallbackIds = options.map((option) => option.id).filter(Boolean).slice(0, 2);
-                const optionIds = (question.correctOptionIds?.length ? question.correctOptionIds : fallbackIds)
-                    .filter(Boolean);
-                const optionId = optionIds[0] || null;
-                const optionText = optionIds.map(getOptionText).filter(Boolean).join(', ');
-                return {
-                    optionId,
-                    optionIds,
-                    text: optionText ? `Выбраны варианты: ${optionText}` : 'Выбраны варианты',
-                };
-            }
-
-            if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
-                const text = question.answerText || question.correctText || 'Автотестовый ответ';
-                return {optionId: null, optionIds: [], text};
-            }
-
-            return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
-        };
+        const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
 
         try {
             await runStep({
@@ -1982,6 +2239,478 @@ export default function SwaggerPage() {
         }
     };
 
+    // Сценарии проверок: запускаются отдельными наборами шагов.
+    const runScenario = async (scenarioId) => {
+        if (scenarioRunning || autoTestRunning) return;
+
+        setScenarioRunning(true);
+        setScenarioResults([]);
+        setActiveScenarioId(scenarioId);
+        setExpandedScenarioRows({});
+
+        const runLabel = new Date().toLocaleString('ru-RU');
+        const ctx = {
+            assessment: apiClients.assessment,
+            media: apiClients.media,
+            identify: apiClients.identify,
+            ai: apiClients.ai,
+            values: {
+                runLabel,
+                testId: null,
+                attemptId: null,
+                questions: [],
+                isPublished: false,
+            },
+        };
+
+        const pushResult = (result) => {
+            setScenarioResults((prev) => [...prev, result]);
+        };
+
+        const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
+
+        try {
+            switch (scenarioId) {
+                case 'publish-without-questions': {
+                    await runStep({
+                        id: 'scenario-publish-create',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: публикация без вопросов (${runLabel})`,
+                                description: 'Проверяем отказ публикации без созданных вопросов.',
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-publish-without-questions',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        expectStatus: 400,
+                        expectMessage: 'Ожидаемый отказ публикации без вопросов.',
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                    });
+
+                    const templates = buildAutoTestQuestions(runLabel).slice(0, 1);
+                    for (const [index, template] of templates.entries()) {
+                        await runStep({
+                            id: `scenario-publish-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопроса.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                {
+                                    text: template.title,
+                                    type: template.type,
+                                    isRequired: template.isRequired ?? true,
+                                    points: template.points ?? 1,
+                                    options: template.options,
+                                },
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                const question = response?.data ?? {};
+                                const options = question.options || [];
+                                const optionMap = new Map(options.map((option) => [option.text, option.id]));
+                                const correctOptionIds = (template.options || [])
+                                    .filter((option) => option.isCorrect)
+                                    .map((option) => optionMap.get(option.text))
+                                    .filter(Boolean);
+                                const correctText = (template.options || [])
+                                    .find((option) => option.isCorrect)?.text || '';
+
+                                ctx.values.questions.push({
+                                    id: question.id ?? question.Id ?? null,
+                                    type: question.type ?? template.type,
+                                    options,
+                                    correctOptionIds,
+                                    correctText,
+                                    answerText: template.answerText || correctText || '',
+                                });
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-publish-success',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-publish-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-publish-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-publish-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
+
+                case 'draft-flow': {
+                    await runStep({
+                        id: 'scenario-draft-create',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: черновик (${runLabel})`,
+                                description: 'Проверка обновления теста и редактирования вопросов.',
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-draft-update',
+                        title: 'PUT /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для обновления.' : ''),
+                        run: () => ctx.assessment.put(
+                            `/api/tests/${ctx.values.testId}`,
+                            {
+                                title: `Сценарий: черновик (обновлён) ${runLabel}`,
+                                description: 'Уточнение описания и параметров.',
+                                passScore: 5,
+                                attemptsLimit: 2,
+                                timeLimitSeconds: 600,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                    });
+
+                    const templates = buildAutoTestQuestions(runLabel).slice(0, 2);
+                    for (const [index, template] of templates.entries()) {
+                        await runStep({
+                            id: `scenario-draft-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопроса.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                {
+                                    text: template.title,
+                                    type: template.type,
+                                    isRequired: template.isRequired ?? true,
+                                    points: template.points ?? 1,
+                                    options: template.options,
+                                },
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                const question = response?.data ?? {};
+                                const options = question.options || [];
+                                const optionMap = new Map(options.map((option) => [option.text, option.id]));
+                                const correctOptionIds = (template.options || [])
+                                    .filter((option) => option.isCorrect)
+                                    .map((option) => optionMap.get(option.text))
+                                    .filter(Boolean);
+                                const correctText = (template.options || [])
+                                    .find((option) => option.isCorrect)?.text || '';
+
+                                ctx.values.questions.push({
+                                    id: question.id ?? question.Id ?? null,
+                                    type: question.type ?? template.type,
+                                    options,
+                                    correctOptionIds,
+                                    correctText,
+                                    answerText: template.answerText || correctText || '',
+                                });
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-draft-reorder',
+                        title: 'PUT /api/tests/{testId}/questions/reorder',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{testId}/questions/reorder',
+                        skip: () => (!ctx.values.testId || ctx.values.questions.length < 2
+                            ? 'Недостаточно вопросов для перестановки.'
+                            : ''),
+                        run: () => {
+                            const ids = ctx.values.questions.map((question) => getQuestionId(question)).filter(Boolean);
+                            return ctx.assessment.put(
+                                `/api/tests/${ctx.values.testId}/questions/reorder`,
+                                ids.reverse(),
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-draft-update-question',
+                        title: 'PUT /api/questions/{id}',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/questions/{id}',
+                        skip: () => (!ctx.values.questions.length ? 'Нет вопросов для обновления.' : ''),
+                        run: () => ctx.assessment.put(
+                            `/api/questions/${getQuestionId(ctx.values.questions[0])}`,
+                            {
+                                text: `HTTP: какой заголовок отвечает за тип контента? (${runLabel})`,
+                                points: 2,
+                                options: [
+                                    {text: 'Content-Type', isCorrect: true, order: 1},
+                                    {text: 'Accept-Language', isCorrect: false, order: 2},
+                                    {text: 'Cache-Control', isCorrect: false, order: 3},
+                                ],
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                    });
+
+                    if (ctx.values.questions.length > 1) {
+                        await runStep({
+                            id: 'scenario-draft-delete-question',
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(
+                                `/api/questions/${getQuestionId(ctx.values.questions[1])}`,
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-draft-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
+
+                case 'full-cycle':
+                default: {
+                    await runStep({
+                        id: 'scenario-full-create',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: полный цикл (${runLabel})`,
+                                description: 'Полный путь от создания до результата прохождения.',
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    const templates = buildAutoTestQuestions(runLabel).slice(0, 2);
+                    for (const [index, template] of templates.entries()) {
+                        await runStep({
+                            id: `scenario-full-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопроса.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                {
+                                    text: template.title,
+                                    type: template.type,
+                                    isRequired: template.isRequired ?? true,
+                                    points: template.points ?? 1,
+                                    options: template.options,
+                                },
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                const question = response?.data ?? {};
+                                const options = question.options || [];
+                                const optionMap = new Map(options.map((option) => [option.text, option.id]));
+                                const correctOptionIds = (template.options || [])
+                                    .filter((option) => option.isCorrect)
+                                    .map((option) => optionMap.get(option.text))
+                                    .filter(Boolean);
+                                const correctText = (template.options || [])
+                                    .find((option) => option.isCorrect)?.text || '';
+
+                                ctx.values.questions.push({
+                                    id: question.id ?? question.Id ?? null,
+                                    type: question.type ?? template.type,
+                                    options,
+                                    correctOptionIds,
+                                    correctText,
+                                    answerText: template.answerText || correctText || '',
+                                });
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-full-publish',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-full-attempt',
+                        title: 'POST /api/tests/{testId}/attempts',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests/{testId}/attempts',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.post(`/api/tests/${ctx.values.testId}/attempts`, null, {auth: AUTH.TRUE}),
+                        onSuccess: (response) => {
+                            ctx.values.attemptId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-full-answer-${index}`,
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId}',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(question)}`,
+                                buildAnswerPayload(question),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-full-submit',
+                        title: 'POST /api/attempts/{id}/submit',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/attempts/{id}/submit',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для отправки.' : ''),
+                        run: () => ctx.assessment.post(`/api/attempts/${ctx.values.attemptId}/submit`, null, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-full-result',
+                        title: 'GET /api/attempts/{id}/result',
+                        service: 'assessment',
+                        method: 'GET',
+                        path: '/api/attempts/{id}/result',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для результата.' : ''),
+                        run: () => ctx.assessment.get(`/api/attempts/${ctx.values.attemptId}/result`, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-full-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-full-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-full-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                }
+            }
+        } finally {
+            setScenarioRunning(false);
+        }
+    };
+
     // Отправка запроса через выбранный клиент.
     const handleSend = async () => {
         const trimmedBody = request.body.trim();
@@ -2012,6 +2741,8 @@ export default function SwaggerPage() {
             }
         }
 
+        // При новом запросе скрываем ответ до явного показа пользователем.
+        setShowResponse(false);
         setPending(true);
         try {
             const client = apiClients[request.service] ?? apiClients.assessment;
@@ -2096,11 +2827,36 @@ export default function SwaggerPage() {
         <main className="swagger-shell">
             <header className="swagger-hero">
                 <div className="swagger-title">
-                    <div className="swagger-eyebrow">Swagger-панель</div>
-                    <h1>API-консоль</h1>
-                    <p className="swagger-subtitle">
-                        Базовая страница для тестирования API.
-                    </p>
+                    <div className="swagger-description">
+                        <div className="swagger-eyebrow">Swagger-панель</div>
+                        <h1>API-консоль</h1>
+                        <p className="swagger-subtitle">
+                            Базовая страница для тестирования API.
+                        </p>
+                    </div>
+            <div className="swagger-tabs">
+                <button
+                    className={`swagger-tab ${activeTab === 'console' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveTab('console')}
+                >
+                    Консоль
+                </button>
+                <button
+                    className={`swagger-tab ${activeTab === 'tests' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveTab('tests')}
+                >
+                    Автотесты
+                </button>
+                <button
+                    className={`swagger-tab ${activeTab === 'scenarios' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveTab('scenarios')}
+                >
+                    Сценарии
+                </button>
+            </div>
                 </div>
                 <div className="swagger-card">
                     <h3>Авторизация</h3>
@@ -2136,22 +2892,6 @@ export default function SwaggerPage() {
                 </div>
             </header>
 
-            <div className="swagger-tabs">
-                <button
-                    className={`swagger-tab ${activeTab === 'console' ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => setActiveTab('console')}
-                >
-                    Консоль
-                </button>
-                <button
-                    className={`swagger-tab ${activeTab === 'tests' ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => setActiveTab('tests')}
-                >
-                    Автотесты
-                </button>
-            </div>
 
             {activeTab === 'console' && (
                 <>
@@ -2288,9 +3028,25 @@ export default function SwaggerPage() {
             <section className="swagger-grid">
                 <div className="swagger-panel">
                     <h2>Ответ</h2>
+                    <div className="swagger-response-toggle">
+                        <label className="swagger-checkbox">
+                            <input
+                                type="checkbox"
+                                checked={showResponse}
+                                onChange={(event) => setShowResponse(event.target.checked)}
+                                disabled={!response}
+                            />
+                            <span>Показывать ответ</span>
+                        </label>
+                        {response && !showResponse && (
+                            <span className="swagger-hint">Ответ скрыт, включите показ.</span>
+                        )}
+                    </div>
                     <div className="swagger-response">
                         {response ? (
-                            `HTTP ${response.status ?? '-'}\n${formatResponse(response)}`
+                            showResponse
+                                ? `HTTP ${response.status ?? '-'}\n${formatResponse(response)}`
+                                : `HTTP ${response.status ?? '-'}\nОтвет скрыт.`
                         ) : (
                             'Нет данных'
                         )}
@@ -2385,46 +3141,409 @@ export default function SwaggerPage() {
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
-                            <h2>Результаты</h2>
-                            {autoTestRunning && (
-                                <span className="swagger-loading">Выполняется...</span>
-                            )}
+                            <h2>Диаграммы качества тестирования</h2>
+                            <span className="swagger-hint">Сводка качества и покрытия</span>
                         </div>
-                        {autoTestResults.length ? (
-                            <div className="swagger-tests-list">
-                                {autoTestResults.map((item, index) => (
-                                    <div
-                                        key={`${item.id}-${index}`}
-                                        className={`swagger-test-row ${item.status}`}
-                                    >
-                                        <div className="swagger-test-main">
-                                            <span className={`method-badge ${item.method.toLowerCase()}`}>
-                                                {item.method}
+                        <div className="swagger-charts">
+                            <div className="swagger-chart-card">
+                                <div className="swagger-chart-header">
+                                    <h3>Статусы</h3>
+                                    <span className="swagger-chart-total">{autoTestSummary.total} шагов</span>
+                                </div>
+                                <div
+                                    className="swagger-donut"
+                                    style={{'--chart-gradient': statusGradient}}
+                                >
+                                    <div className="swagger-donut-center">
+                                        <div className="swagger-donut-value">{statusSuccessRate}%</div>
+                                        <div className="swagger-donut-label">успех</div>
+                                    </div>
+                                </div>
+                                <div className="swagger-chart-legend">
+                                    {statusSegments.map((segment) => (
+                                        <div key={segment.key} className="swagger-chart-legend-row">
+                                            <span
+                                                className="swagger-chart-dot"
+                                                style={{'--dot-color': segment.color}}
+                                            />
+                                            <span className="swagger-chart-label">{segment.label}</span>
+                                            <span className="swagger-chart-value">{segment.value}</span>
+                                            <span className="swagger-chart-percent">
+                                                {calcPercent(segment.value, autoTestSummary.total)}%
                                             </span>
-                                            <div className="swagger-test-meta">
-                                                <div className="swagger-test-path">{item.path}</div>
-                                                {item.title && (
-                                                    <div className="swagger-test-title">{item.title}</div>
-                                                )}
-                                            </div>
                                         </div>
-                                        <div className="swagger-test-metrics">
-                                            <span className="swagger-test-status">
-                                                {getAutoTestStatusLabel(item.status)}
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="swagger-chart-card">
+                                <div className="swagger-chart-header">
+                                    <h3>Качество выполнения</h3>
+                                    <span className="swagger-chart-total">{executedTotal} проверок</span>
+                                </div>
+                                <div
+                                    className="swagger-donut"
+                                    style={{'--chart-gradient': qualityGradient}}
+                                >
+                                    <div className="swagger-donut-center">
+                                        <div className="swagger-donut-value">{qualitySuccessRate}%</div>
+                                        <div className="swagger-donut-label">точность</div>
+                                    </div>
+                                </div>
+                                <div className="swagger-chart-legend">
+                                    {qualitySegments.map((segment) => (
+                                        <div key={segment.key} className="swagger-chart-legend-row">
+                                            <span
+                                                className="swagger-chart-dot"
+                                                style={{'--dot-color': segment.color}}
+                                            />
+                                            <span className="swagger-chart-label">{segment.label}</span>
+                                            <span className="swagger-chart-value">{segment.value}</span>
+                                            <span className="swagger-chart-percent">
+                                                {calcPercent(segment.value, executedTotal)}%
                                             </span>
-                                            {item.httpStatus != null && (
-                                                <span className="swagger-test-code">HTTP {item.httpStatus}</span>
-                                            )}
-                                            <span className="swagger-test-time">{item.durationMs} мс</span>
                                         </div>
-                                        {item.message && (
-                                            <div className="swagger-test-message">{item.message}</div>
-                                        )}
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="swagger-chart-card">
+                                <div className="swagger-chart-header">
+                                    <h3>Покрытие</h3>
+                                    <span className="swagger-chart-total">{coverageRate}% сценариев</span>
+                                </div>
+                                <div
+                                    className="swagger-donut"
+                                    style={{'--chart-gradient': coverageGradient}}
+                                >
+                                    <div className="swagger-donut-center">
+                                        <div className="swagger-donut-value">{coverageRate}%</div>
+                                        <div className="swagger-donut-label">выполнено</div>
+                                    </div>
+                                </div>
+                                <div className="swagger-chart-legend">
+                                    {coverageSegments.map((segment) => (
+                                        <div key={segment.key} className="swagger-chart-legend-row">
+                                            <span
+                                                className="swagger-chart-dot"
+                                                style={{'--dot-color': segment.color}}
+                                            />
+                                            <span className="swagger-chart-label">{segment.label}</span>
+                                            <span className="swagger-chart-value">{segment.value}</span>
+                                            <span className="swagger-chart-percent">
+                                                {calcPercent(segment.value, autoTestSummary.total)}%
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Выборка автотестов</h2>
+                            <div className="swagger-selection-tabs">
+                                {autoTestViews.map((view) => {
+                                    const count = view.key === 'grouped'
+                                        ? autoTestSummary.total
+                                        : autoTestSummary[view.key] ?? 0;
+                                    return (
+                                        <button
+                                            key={view.key}
+                                            type="button"
+                                            className={`swagger-selection-tab ${autoTestView === view.key ? 'active' : ''}`}
+                                            onClick={() => setAutoTestView(view.key)}
+                                        >
+                                            {view.label} ({count})
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        {!autoTestResults.length && (
+                            <p className="swagger-subtitle">Нет данных. Запустите автотесты.</p>
+                        )}
+                        {autoTestResults.length > 0 && autoTestView === 'grouped' && (
+                            <div className="swagger-selection">
+                                {groupedAutoTests.map((service) => (
+                                    <div key={service.serviceTitle} className="swagger-selection-service">
+                                        <div className="swagger-selection-service-title">{service.serviceTitle}</div>
+                                        <div className="swagger-selection-group-list">
+                                            {service.groups.map((group) => (
+                                                <div key={group.groupTitle} className="swagger-selection-group">
+                                                    <div className="swagger-selection-group-title">{group.groupTitle}</div>
+                                                    <div className="swagger-selection-items">
+                                                        {group.items.map((item, index) => (
+                                                            <div
+                                                                key={`${item.id}-${index}`}
+                                                                className={`swagger-selection-item ${item.status}`}
+                                                            >
+                                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                                                    {item.method}
+                                                                </span>
+                                                                <div className="swagger-selection-item-main">
+                                                                    <div className="swagger-selection-item-path">{item.path}</div>
+                                                                    {item.title && (
+                                                                        <div className="swagger-selection-item-title">{item.title}</div>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`swagger-status-pill ${item.status}`}>
+                                                                    {getAutoTestStatusLabel(item.status)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
+                        )}
+                        {autoTestResults.length > 0 && autoTestView !== 'grouped' && (
+                            <div className="swagger-selection-list">
+                                {(autoTestByStatus[autoTestView] || []).map((item, index) => (
+                                    <div
+                                        key={`${item.id}-${index}`}
+                                        className={`swagger-selection-item ${item.status}`}
+                                    >
+                                        <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                            {item.method}
+                                        </span>
+                                        <div className="swagger-selection-item-main">
+                                            <div className="swagger-selection-item-path">{item.path}</div>
+                                            {item.title && (
+                                                <div className="swagger-selection-item-title">{item.title}</div>
+                                            )}
+                                        </div>
+                                        <span className={`swagger-status-pill ${item.status}`}>
+                                            {getAutoTestStatusLabel(item.status)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Результаты</h2>
+                            <div className="swagger-tests-controls">
+                                <label className="swagger-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTestAutoExpand}
+                                        onChange={(event) => {
+                                            setAutoTestAutoExpand(event.target.checked);
+                                            setExpandedAutoTestRows({});
+                                        }}
+                                    />
+                                    <span>Открывать ответы заранее</span>
+                                </label>
+                                {autoTestRunning && (
+                                    <span className="swagger-loading">Выполняется...</span>
+                                )}
+                            </div>
+                        </div>
+                        {autoTestResults.length ? (
+                            <div className="swagger-tests-list">
+                                {autoTestResults.map((item, index) => {
+                                    const rowKey = makeResultRowKey(item, index);
+                                    const responseText = formatAutoTestResponse(item.responseData);
+                                    const canToggle = Boolean(responseText);
+                                    const hasOverride = Object.prototype.hasOwnProperty.call(
+                                        expandedAutoTestRows,
+                                        rowKey,
+                                    );
+                                    const isExpanded = hasOverride
+                                        ? expandedAutoTestRows[rowKey]
+                                        : autoTestAutoExpand;
+
+                                    return (
+                                        <div
+                                            key={rowKey}
+                                            className={`swagger-test-row ${item.status}`}
+                                        >
+                                            <div className="swagger-test-main">
+                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                                    {item.method}
+                                                </span>
+                                                <div className="swagger-test-meta">
+                                                    <div className="swagger-test-path">{item.path}</div>
+                                                    {item.title && (
+                                                        <div className="swagger-test-title">{item.title}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="swagger-test-metrics">
+                                                <span className="swagger-test-status">
+                                                    {getAutoTestStatusLabel(item.status)}
+                                                </span>
+                                                {item.httpStatus != null && (
+                                                    <span className="swagger-test-code">HTTP {item.httpStatus}</span>
+                                                )}
+                                                <span className="swagger-test-time">{item.durationMs} мс</span>
+                                                {canToggle && (
+                                                    <button
+                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                        type="button"
+                                                        onClick={() => setExpandedAutoTestRows((prev) => ({
+                                                            ...prev,
+                                                            [rowKey]: !isExpanded,
+                                                        }))}
+                                                        aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                        title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                    >
+                                                        <span className="swagger-chevron" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {item.message && (
+                                                <div className="swagger-test-message">{item.message}</div>
+                                            )}
+                                            {canToggle && isExpanded && (
+                                                <pre className="swagger-test-response">{responseText}</pre>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         ) : (
                             <p className="swagger-subtitle">Нет результатов. Запустите тесты.</p>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {activeTab === 'scenarios' && (
+                <section className="swagger-tests">
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Сценарии тестов</h2>
+                            {scenarioRunning && (
+                                <span className="swagger-loading">Выполняется...</span>
+                            )}
+                        </div>
+                        <p className="swagger-hint">
+                            Запускайте разные сценарии, чтобы быстро проверить ключевые ветки поведения тестов.
+                        </p>
+                        <div className="swagger-scenario-grid">
+                            {scenarioDefinitions.map((scenario) => (
+                                <div
+                                    key={scenario.id}
+                                    className={`swagger-scenario-card ${activeScenarioId === scenario.id ? 'active' : ''}`}
+                                >
+                                    <div className="swagger-scenario-header">
+                                        <div>
+                                            <h3>{scenario.title}</h3>
+                                            <p className="swagger-scenario-desc">{scenario.description}</p>
+                                        </div>
+                                        {scenario.tag && (
+                                            <span className="swagger-scenario-tag">{scenario.tag}</span>
+                                        )}
+                                    </div>
+                                    <div className="swagger-scenario-actions">
+                                        <button
+                                            className="swagger-button"
+                                            type="button"
+                                            onClick={() => runScenario(scenario.id)}
+                                            disabled={scenarioRunning || autoTestRunning}
+                                        >
+                                            {scenarioRunning && activeScenarioId === scenario.id ? '...' : 'Запустить сценарий'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Результаты сценария</h2>
+                            <div className="swagger-tests-controls">
+                                <label className="swagger-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={scenarioAutoExpand}
+                                        onChange={(event) => {
+                                            setScenarioAutoExpand(event.target.checked);
+                                            setExpandedScenarioRows({});
+                                        }}
+                                    />
+                                    <span>Открывать ответы заранее</span>
+                                </label>
+                                {activeScenario?.title && (
+                                    <span className="swagger-hint">{activeScenario.title}</span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="swagger-tests-summary">
+                            <span>Всего: {scenarioSummary.total}</span>
+                            <span>Успешно: {scenarioSummary.success}</span>
+                            <span>Ошибки: {scenarioSummary.failed}</span>
+                            <span>Пропущено: {scenarioSummary.skipped}</span>
+                        </div>
+                        {scenarioResults.length ? (
+                            <div className="swagger-tests-list">
+                                {scenarioResults.map((item, index) => {
+                                    const rowKey = makeResultRowKey(item, index);
+                                    const responseText = formatAutoTestResponse(item.responseData);
+                                    const canToggle = Boolean(responseText);
+                                    const hasOverride = Object.prototype.hasOwnProperty.call(
+                                        expandedScenarioRows,
+                                        rowKey,
+                                    );
+                                    const isExpanded = hasOverride
+                                        ? expandedScenarioRows[rowKey]
+                                        : scenarioAutoExpand;
+
+                                    return (
+                                        <div
+                                            key={rowKey}
+                                            className={`swagger-test-row ${item.status}`}
+                                        >
+                                            <div className="swagger-test-main">
+                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                                    {item.method}
+                                                </span>
+                                                <div className="swagger-test-meta">
+                                                    <div className="swagger-test-path">{item.path}</div>
+                                                    {item.title && (
+                                                        <div className="swagger-test-title">{item.title}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="swagger-test-metrics">
+                                                <span className="swagger-test-status">
+                                                    {getAutoTestStatusLabel(item.status)}
+                                                </span>
+                                                {item.httpStatus != null && (
+                                                    <span className="swagger-test-code">HTTP {item.httpStatus}</span>
+                                                )}
+                                                <span className="swagger-test-time">{item.durationMs} мс</span>
+                                                {canToggle && (
+                                                    <button
+                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                        type="button"
+                                                        onClick={() => setExpandedScenarioRows((prev) => ({
+                                                            ...prev,
+                                                            [rowKey]: !isExpanded,
+                                                        }))}
+                                                        aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                        title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                    >
+                                                        <span className="swagger-chevron" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {item.message && (
+                                                <div className="swagger-test-message">{item.message}</div>
+                                            )}
+                                            {canToggle && isExpanded && (
+                                                <pre className="swagger-test-response">{responseText}</pre>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
                         )}
                     </div>
                 </section>
