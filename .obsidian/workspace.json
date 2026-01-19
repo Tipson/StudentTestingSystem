@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Без названия.md",
+                "file": "Список задач/Задачи.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Без названия"
+              "title": "Задачи"
             }
           }
         ]
@@ -184,9 +184,9 @@
   },
   "active": "8c0f98c683632841",
   "lastOpenFiles": [
+    "Без названия.md",
     "Фотки/Цифровые_подписи.md",
     "Список задач/Задачи.md",
-    "Без названия.md",
     "conflict-files-obsidian-git.md",
     "Дизайн_системы_ТЗ.md",
     "Список задач/Брокер сообщений.md",
