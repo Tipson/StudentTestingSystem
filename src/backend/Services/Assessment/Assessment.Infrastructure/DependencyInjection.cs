@@ -19,7 +19,13 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Assessment не задана.");
 
-        services.AddDbContext<AssessmentDbContext>(o => o.UseNpgsql(cs));
+        services.AddDbContext<AssessmentDbContext>(o => 
+        {
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs);
+            dataSourceBuilder.EnableDynamicJson();
+            var dataSource = dataSourceBuilder.Build();
+            o.UseNpgsql(dataSource);
+        });
         
         services.AddScoped<IQuestionRepository, QuestionRepository>();
         services.AddScoped<ITestRepository, TestRepository>();
