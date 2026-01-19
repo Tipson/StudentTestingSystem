@@ -83,11 +83,14 @@ spec:
             - name: RabbitMQ__Host
               value: "rabbitmq.lms.svc.cluster.local"
             - name: RabbitMQ__Username
-              value: "admin"
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
             - name: RabbitMQ__Password
               valueFrom:
                 secretKeyRef:
-                  name: rabbitmq-secret
+                  name: rabbitmq-default-user
                   key: password
 
             # Grading Service Configuration
