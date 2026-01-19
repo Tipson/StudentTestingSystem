@@ -42,3 +42,17 @@ export const identifyApi = {
     group,
     aboutMe,
 };
+
+// Описание эндпоинтов identity для UI.
+export const identifyApiDocs = Object.freeze([
+    {service: 'identify', group: 'Groups', method: 'POST', path: '/api/groups', description: 'Создать группу.'},
+    {service: 'identify', group: 'Groups', method: 'GET', path: '/api/groups', description: 'Получить список активных групп.'},
+    {service: 'identify', group: 'Groups', method: 'PUT', path: '/api/groups/{id}', description: 'Обновить группу.'},
+    {service: 'identify', group: 'Groups', method: 'DELETE', path: '/api/groups/{id}', description: 'Удалить группу.'},
+    {service: 'identify', group: 'Groups', method: 'PUT', path: '/api/groups/{id}/active', description: 'Изменить активность группы.'},
+    {service: 'identify', group: 'Groups', method: 'GET', path: '/api/groups/{id}/students', description: 'Получить студентов группы.'},
+    {service: 'identify', group: 'Groups', method: 'POST', path: '/api/groups/{id}/students', description: 'Добавить студентов в группу.'},
+    {service: 'identify', group: 'Me', method: 'GET', path: '/api/me/me', description: 'Получить информацию о текущем пользователе.'},
+    {service: 'identify', group: 'Me', method: 'PUT', path: '/api/me/group', description: 'Выбрать свою группу.'},
+    {service: 'identify', group: 'Me', method: 'DELETE', path: '/api/me/group', description: 'Удалить свою группу.'},
+]);

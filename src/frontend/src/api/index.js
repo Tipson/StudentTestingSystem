@@ -12,6 +12,9 @@ export const api = {
 export {assessmentApi} from './assessment.js';
 export {mediaApi} from './media.js';
 export {identifyApi} from './identity.js';
+export {assessmentApiDocs} from './assessment.js';
+export {mediaApiDocs} from './media.js';
+export {identifyApiDocs} from './identity.js';
 export {apiClients, assessmentClient, mediaClient, aiClient, identifyClient, createApiClient, apiClient} from './client.js';
 export {API_BASE_URLS, getApiBaseUrl} from './config.js';
 export {AUTH} from './auth.js';

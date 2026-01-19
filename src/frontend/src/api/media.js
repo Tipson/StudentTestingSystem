@@ -24,3 +24,12 @@ const files = {
 export const mediaApi = {
     files,
 };
+
+// Описание эндпоинтов media для UI.
+export const mediaApiDocs = Object.freeze([
+    {service: 'media', group: 'Files', method: 'POST', path: '/api/files/upload', description: 'Загрузить файлы.'},
+    {service: 'media', group: 'Files', method: 'POST', path: '/api/files/get', description: 'Получить метаданные файлов.'},
+    {service: 'media', group: 'Files', method: 'POST', path: '/api/files/download', description: 'Скачать файлы.'},
+    {service: 'media', group: 'Files', method: 'GET', path: '/api/files/my', description: 'Получить свои файлы.'},
+    {service: 'media', group: 'Files', method: 'POST', path: '/api/files/delete', description: 'Удалить файлы.'},
+]);

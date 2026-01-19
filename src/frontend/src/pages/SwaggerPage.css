@@ -194,6 +194,51 @@
     margin-top: 24px;
 }
 
+.swagger-service {
+    margin-bottom: 24px;
+}
+
+.swagger-service-title {
+    margin: 0 0 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.swagger-endpoints-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.swagger-endpoints-header h2 {
+    margin: 0;
+}
+
+.swagger-hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-file-actions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.swagger-loading {
+    color: #0f766e;
+}
+
+.swagger-error {
+    color: #b91c1c;
+}
+
 .swagger-group {
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.92);
@@ -216,6 +261,24 @@
     gap: 12px;
     padding: 10px 0;
     border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.swagger-endpoint-button {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.swagger-endpoint-button:hover {
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.swagger-endpoint-button:focus-visible {
+    outline: 2px solid rgba(15, 118, 110, 0.5);
+    outline-offset: 2px;
+    border-radius: 10px;
 }
 
 .swagger-endpoint:last-child {
@@ -303,5 +366,10 @@
 
     .swagger-hero {
         padding: 18px;
+    }
+
+    .swagger-endpoints-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
