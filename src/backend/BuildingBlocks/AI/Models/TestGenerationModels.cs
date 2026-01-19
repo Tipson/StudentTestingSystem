@@ -8,7 +8,17 @@ namespace BuildingBlocks.AI.Models;
 public sealed record TestGenerationRequest(
     string DocumentText,
     int QuestionsCount,
-    string? Topic);
+    string? Topic,
+    TestGenerationMode Mode = TestGenerationMode.Balanced,
+    Guid? DocumentMediaId = null);
+
+public enum TestGenerationMode
+{
+    Balanced = 0,
+    ClosedQuestions = 1,
+    OpenQuestions = 2,
+    FinalExam = 3
+}
 
 /// <summary>
 /// Результат генерации теста.

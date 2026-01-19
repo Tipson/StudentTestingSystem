@@ -12,7 +12,6 @@ namespace Media.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/files")]
-[Authorize]
 public sealed class FilesController(IFileService fileService) : ControllerBase
 {
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,8 +31,17 @@ public static class SwaggerExtensions
             c.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = serviceTitle,
-                Version = "v1"
+                Version = "v1",
+                Description = $"{serviceTitle} - автоматическая документация"
             });
+
+            // Подключаем XML комментарии
+            var xmlFile = $"{Assembly.GetEntryAssembly()?.GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            if (File.Exists(xmlPath))
+            {
+                c.IncludeXmlComments(xmlPath);
+            }
 
             const string schemeId = "Keycloak";
 
@@ -84,4 +94,3 @@ public static class SwaggerExtensions
         return app;
     }
 }
-
