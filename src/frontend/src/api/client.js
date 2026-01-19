@@ -21,5 +21,4 @@ export const mediaClient = apiClients.media;
 export const aiClient = apiClients.ai;
 export const identifyClient = apiClients.identify;
 
-// Для обратной совместимости: старое имя по умолчанию.
 export const apiClient = assessmentClient;

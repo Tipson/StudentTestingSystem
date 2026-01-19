@@ -3,32 +3,42 @@ import {AUTH} from './auth.js';
 import {withAuth} from '@/helpers/withAuth.js';
 
 const group = {
+    // Создать группу.
     create: (payload, config) =>
         identifyClient.post('/api/groups', payload, withAuth(config, AUTH.TRUE)),
-    get: (payload, config) =>
-        identifyClient.get('/api/groups', payload, withAuth(config, AUTH.TRUE)),
-    update: (payload, config, id) =>
-        identifyClient.put(`/api/groups/${id}`,payload, withAuth(config, AUTH.TRUE)),
-    delete: (payload, config, id) =>
-        identifyClient.delete(`/api/groups/${id}`,payload, withAuth(config, AUTH.TRUE)),
-    updateStatus: (payload, config, id) =>
-        identifyClient.put(`/api/groups/${id}/active`, payload, withAuth(config, AUTH.TRUE)),
-    getStudents: (config, id) =>
+    // Получить список активных групп.
+    get: (config) =>
+        identifyClient.get('/api/groups', withAuth(config, AUTH.OPTIONAL)),
+    // Обновить группу.
+    update: (id, payload, config) =>
+        identifyClient.put(`/api/groups/${id}`, payload, withAuth(config, AUTH.TRUE)),
+    // Удалить группу.
+    delete: (id, config) =>
+        identifyClient.delete(`/api/groups/${id}`, withAuth(config, AUTH.TRUE)),
+    // Изменить активность группы.
+    updateStatus: (id, isActive, config) =>
+        identifyClient.put(`/api/groups/${id}/active`, isActive, withAuth(config, AUTH.TRUE)),
+    // Получить студентов группы.
+    getStudents: (id, config) =>
         identifyClient.get(`/api/groups/${id}/students`, withAuth(config, AUTH.TRUE)),
-    addStudent: (payload, config, id) =>
-        identifyClient.post(`/api/groups/${id}/students`.payload, withAuth(config, AUTH.TRUE)),
-}
+    // Добавить студентов в группу.
+    addStudent: (id, payload, config) =>
+        identifyClient.post(`/api/groups/${id}/students`, payload, withAuth(config, AUTH.TRUE)),
+};
 
 const aboutMe = {
-    get: (payload, config) => // Получить информацию о пользователе
-        identifyClient.get('/api/me',withAuth(config, AUTH.TRUE)),
-    post: (payload, config) => // Вступить в группу
-        identifyClient.post('/api/me/group', payload, withAuth(config, AUTH.TRUE)),
-    delete: (payload, config) => // Выйти из группы
-        identifyClient.delete('/api/me/group', payload, withAuth(config, AUTH.TRUE)),
-}
+    // Получить информацию о текущем пользователе.
+    get: (config) =>
+        identifyClient.get('/api/me/me', withAuth(config, AUTH.TRUE)),
+    // Выбрать свою группу.
+    post: (groupId, config) =>
+        identifyClient.put('/api/me/group', groupId, withAuth(config, AUTH.TRUE)),
+    // Удалить свою группу.
+    delete: (config) =>
+        identifyClient.delete('/api/me/group', withAuth(config, AUTH.TRUE)),
+};
 
 export const identifyApi = {
     group,
     aboutMe,
-}
+};
