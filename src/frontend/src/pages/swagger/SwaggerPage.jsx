@@ -50,6 +50,19 @@ const MAX_AUTOTEST_MESSAGE_LENGTH = 600;
 // Сколько раз повторять автотест при ошибке.
 const AUTO_TEST_RETRY_LIMIT = 0;
 const AUTO_TEST_RETRY_DELAY_MS = 500;
+// Базовое количество шагов автотестов без учёта шагов на каждый вопрос.
+const AUTO_TEST_FIXED_STEP_COUNT = 47;
+// На каждый вопрос добавляем: создание, ответ, удаление.
+const AUTO_TEST_PER_QUESTION_STEP_COUNT = 3;
+
+// Ожидаемые шаги в сценариях (обновляйте при изменении сценариев).
+const SCENARIO_EXPECTED_TOTALS = {
+    'full-cycle': 13,
+    'publish-without-questions': 7,
+    'draft-flow': 8,
+};
+
+const getScenarioExpectedTotal = (scenarioId) => SCENARIO_EXPECTED_TOTALS[scenarioId] ?? 0;
 
 const normalizePathParams = (path) => (path ? path.replace(/\{[^}]+\}/g, '{}') : '');
 
@@ -1053,6 +1066,16 @@ export default function SwaggerPage() {
         return Array.from(unique.values()).sort((a, b) => a.value.localeCompare(b.value));
     }, [request.method, request.service, serviceGroups]);
     const selectedFilesLabel = useMemo(() => formatSelectedFiles(uploadFiles), [uploadFiles]);
+    const autoTestTemplateCount = useMemo(() => buildAutoTestQuestions('template').length, []);
+    const autoTestExpectedTotal = useMemo(
+        () => AUTO_TEST_FIXED_STEP_COUNT + autoTestTemplateCount * AUTO_TEST_PER_QUESTION_STEP_COUNT,
+        [autoTestTemplateCount],
+    );
+    const autoTestCompleted = autoTestResults.length;
+    const autoTestRemaining = useMemo(
+        () => Math.max(autoTestExpectedTotal - autoTestCompleted, 0),
+        [autoTestExpectedTotal, autoTestCompleted],
+    );
     const autoTestSummary = useMemo(() => {
         const summary = {total: autoTestResults.length, success: 0, failed: 0, skipped: 0};
 
@@ -1148,23 +1171,32 @@ export default function SwaggerPage() {
             title: 'Полный цикл теста',
             tag: 'E2E',
             description: 'Создание теста, вопросы, публикация, прохождение, результат и очистка.',
+            expectedTotal: getScenarioExpectedTotal('full-cycle'),
         },
         {
             id: 'publish-without-questions',
             title: 'Публикация без вопросов',
             tag: 'Негативный',
             description: 'Проверяем отказ публикации, затем корректную публикацию после добавления вопроса.',
+            expectedTotal: getScenarioExpectedTotal('publish-without-questions'),
         },
         {
             id: 'draft-flow',
             title: 'Черновик и правки',
             tag: 'Редактирование',
             description: 'Работа с черновиком: обновления, порядок вопросов и удаление.',
+            expectedTotal: getScenarioExpectedTotal('draft-flow'),
         },
     ]), []);
     const activeScenario = useMemo(
         () => scenarioDefinitions.find((scenario) => scenario.id === activeScenarioId),
         [scenarioDefinitions, activeScenarioId],
+    );
+    const scenarioExpectedTotal = activeScenario?.expectedTotal ?? 0;
+    const scenarioCompleted = scenarioResults.length;
+    const scenarioRemaining = useMemo(
+        () => Math.max(scenarioExpectedTotal - scenarioCompleted, 0),
+        [scenarioExpectedTotal, scenarioCompleted],
     );
     const statusSegments = useMemo(() => ([
         {key: 'success', label: 'Успешно', value: autoTestSummary.success, color: '#22c55e'},
@@ -3133,7 +3165,8 @@ export default function SwaggerPage() {
                             Скрипт последовательно проверяет основные эндпоинты и формирует тестовые данные.
                         </p>
                         <div className="swagger-tests-summary">
-                            <span>Всего: {autoTestSummary.total}</span>
+                            <span>Выполнено: {autoTestCompleted} из {autoTestExpectedTotal}</span>
+                            <span>В процессе: {autoTestRemaining}</span>
                             <span>Успешно: {autoTestSummary.success}</span>
                             <span>Ошибки: {autoTestSummary.failed}</span>
                             <span>Пропущено: {autoTestSummary.skipped}</span>
@@ -3417,9 +3450,12 @@ export default function SwaggerPage() {
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
                             <h2>Сценарии тестов</h2>
-                            {scenarioRunning && (
-                                <span className="swagger-loading">Выполняется...</span>
-                            )}
+                            <div className="swagger-tests-controls">
+                                <span className="swagger-hint">Всего сценариев: {scenarioDefinitions.length}</span>
+                                {scenarioRunning && (
+                                    <span className="swagger-loading">Выполняется...</span>
+                                )}
+                            </div>
                         </div>
                         <p className="swagger-hint">
                             Запускайте разные сценарии, чтобы быстро проверить ключевые ветки поведения тестов.
@@ -3435,9 +3471,14 @@ export default function SwaggerPage() {
                                             <h3>{scenario.title}</h3>
                                             <p className="swagger-scenario-desc">{scenario.description}</p>
                                         </div>
-                                        {scenario.tag && (
-                                            <span className="swagger-scenario-tag">{scenario.tag}</span>
-                                        )}
+                                        <div className="swagger-scenario-meta">
+                                            {scenario.tag && (
+                                                <span className="swagger-scenario-tag">{scenario.tag}</span>
+                                            )}
+                                            <span className="swagger-scenario-count">
+                                                Шагов: {scenario.expectedTotal}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="swagger-scenario-actions">
                                         <button
@@ -3474,7 +3515,8 @@ export default function SwaggerPage() {
                             </div>
                         </div>
                         <div className="swagger-tests-summary">
-                            <span>Всего: {scenarioSummary.total}</span>
+                            <span>Выполнено: {scenarioCompleted} из {scenarioExpectedTotal}</span>
+                            <span>В процессе: {scenarioRemaining}</span>
                             <span>Успешно: {scenarioSummary.success}</span>
                             <span>Ошибки: {scenarioSummary.failed}</span>
                             <span>Пропущено: {scenarioSummary.skipped}</span>

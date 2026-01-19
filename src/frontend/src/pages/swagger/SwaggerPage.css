@@ -208,6 +208,13 @@
     gap: 12px;
 }
 
+.swagger-scenario-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
 .swagger-scenario-header h3 {
     margin: 0;
     font-size: 16px;
@@ -231,6 +238,15 @@
     letter-spacing: 0.06em;
     background: #e2e8f0;
     color: #0f172a;
+}
+
+.swagger-scenario-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+    background: rgba(148, 163, 184, 0.15);
+    border-radius: 999px;
+    padding: 4px 8px;
 }
 
 .swagger-scenario-actions {
