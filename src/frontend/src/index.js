@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './app/App.jsx';
 import NotificationProvider from '@shared/notifications/NotificationProvider.jsx';
+import KeycloakTokenProvider from '@shared/auth/KeycloakTokenProvider.jsx';
 
 function supportsModernViewportUnits() {
   return typeof window !== 'undefined'
@@ -39,7 +40,9 @@ const root = createRoot(container);
 root.render(
     <StrictMode>
       <NotificationProvider>
-        <App />
+        <KeycloakTokenProvider>
+          <App />
+        </KeycloakTokenProvider>
       </NotificationProvider>
     </StrictMode>
 );

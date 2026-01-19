@@ -3,8 +3,8 @@ import {Navigate, Route, Routes} from 'react-router-dom';
 import ProtectedRoute from './routes/ProtectedRoute.jsx';
 import PublicRoute from './routes/PublicRoute.jsx';
 import NotFoundPage from '@pages/NotFoundPage.jsx';
-import SwaggerPage from '@pages/SwaggerPage.jsx';
-import SwaggerOAuthRedirect from '@pages/SwaggerOAuthRedirect.jsx';
+import SwaggerPage from '@pages/swagger/SwaggerPage.jsx';
+import SwaggerOAuthRedirect from '@pages/swagger/SwaggerOAuthRedirect.jsx';
 
 export default function AppRouter() {
     return (
