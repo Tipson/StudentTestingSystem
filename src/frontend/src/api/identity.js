@@ -2,6 +2,18 @@ import {identifyClient} from './client.js';
 import {AUTH} from './auth.js';
 import {withAuth} from '@/helpers/withAuth.js';
 
+// Хелпер для JSON-запросов с примитивным телом (bool/Guid).
+const withJsonAuth = (config, auth) => {
+    const next = withAuth(config, auth);
+    return {
+        ...next,
+        headers: {
+            ...(next.headers || {}),
+            'Content-Type': 'application/json',
+        },
+    };
+};
+
 const group = {
     // Создать группу.
     create: (payload, config) =>
@@ -17,7 +29,11 @@ const group = {
         identifyClient.delete(`/api/groups/${id}`, withAuth(config, AUTH.TRUE)),
     // Изменить активность группы.
     updateStatus: (id, isActive, config) =>
-        identifyClient.put(`/api/groups/${id}/active`, isActive, withAuth(config, AUTH.TRUE)),
+        identifyClient.put(
+            `/api/groups/${id}/active`,
+            JSON.stringify(isActive),
+            withJsonAuth(config, AUTH.TRUE),
+        ),
     // Получить студентов группы.
     getStudents: (id, config) =>
         identifyClient.get(`/api/groups/${id}/students`, withAuth(config, AUTH.TRUE)),
@@ -29,10 +45,14 @@ const group = {
 const aboutMe = {
     // Получить информацию о текущем пользователе.
     get: (config) =>
-        identifyClient.get('/api/me/me', withAuth(config, AUTH.TRUE)),
+        identifyClient.get('/api/me', withAuth(config, AUTH.TRUE)),
     // Выбрать свою группу.
     post: (groupId, config) =>
-        identifyClient.put('/api/me/group', groupId, withAuth(config, AUTH.TRUE)),
+        identifyClient.put(
+            '/api/me/group',
+            JSON.stringify(groupId),
+            withJsonAuth(config, AUTH.TRUE),
+        ),
     // Удалить свою группу.
     delete: (config) =>
         identifyClient.delete('/api/me/group', withAuth(config, AUTH.TRUE)),
@@ -52,7 +72,7 @@ export const identifyApiDocs = Object.freeze([
     {service: 'identify', group: 'Groups', method: 'PUT', path: '/api/groups/{id}/active', description: 'Изменить активность группы.'},
     {service: 'identify', group: 'Groups', method: 'GET', path: '/api/groups/{id}/students', description: 'Получить студентов группы.'},
     {service: 'identify', group: 'Groups', method: 'POST', path: '/api/groups/{id}/students', description: 'Добавить студентов в группу.'},
-    {service: 'identify', group: 'Me', method: 'GET', path: '/api/me/me', description: 'Получить информацию о текущем пользователе.'},
+    {service: 'identify', group: 'Me', method: 'GET', path: '/api/me', description: 'Получить информацию о текущем пользователе.'},
     {service: 'identify', group: 'Me', method: 'PUT', path: '/api/me/group', description: 'Выбрать свою группу.'},
     {service: 'identify', group: 'Me', method: 'DELETE', path: '/api/me/group', description: 'Удалить свою группу.'},
 ]);

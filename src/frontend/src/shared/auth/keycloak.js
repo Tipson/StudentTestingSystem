@@ -12,7 +12,19 @@ const DEFAULT_CONFIG = {
     redirectPath: '/swagger/oauth2-redirect.html',
 };
 
-// Настройки Keycloak по умолчанию.
+// ????????? ?????????? ??????? ?? ?????????.
+const DEFAULT_REFRESH_CONFIG = {
+    intervalMs: 60_000,
+    leewayMs: 120_000,
+};
+
+const parseEnvMs = (value, fallback) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return parsed;
+};
+
+// ????????? Keycloak ?? ?????????.
 export const getKeycloakConfig = () => {
     const env = process.env;
     return {
@@ -22,6 +34,15 @@ export const getKeycloakConfig = () => {
         scope: env.REACT_APP_KEYCLOAK_SCOPE || DEFAULT_CONFIG.scope,
         redirectUri: env.REACT_APP_KEYCLOAK_REDIRECT_URI || '',
         redirectPath: env.REACT_APP_KEYCLOAK_REDIRECT_PATH || DEFAULT_CONFIG.redirectPath,
+    };
+};
+
+// РџР°СЂР°РјРµС‚СЂС‹ РґР»СЏ СЂРµРіСѓР»СЏСЂРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ С‚РѕРєРµРЅРѕРІ.
+export const getKeycloakRefreshConfig = () => {
+    const env = process.env;
+    return {
+        intervalMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS, DEFAULT_REFRESH_CONFIG.intervalMs),
+        leewayMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS, DEFAULT_REFRESH_CONFIG.leewayMs),
     };
 };
 
@@ -77,6 +98,9 @@ export const persistTokens = (tokenResponse) => {
         refreshToken: tokenResponse.refresh_token || '',
         idToken: tokenResponse.id_token || '',
         expiresAt: tokenResponse.expires_in ? Date.now() + tokenResponse.expires_in * 1000 : null,
+        refreshExpiresAt: tokenResponse.refresh_expires_in
+            ? Date.now() + tokenResponse.refresh_expires_in * 1000
+            : null,
     };
 
     window.localStorage.setItem(STORAGE_KEYS.tokens, JSON.stringify(payload));
@@ -126,7 +150,47 @@ export const startKeycloakLogin = async () => {
     window.location.assign(authUrl);
 };
 
-// Обменивает код на токены.
+// РћР±РЅРѕРІР»СЏРµС‚ С‚РѕРєРµРЅС‹ РїРѕ refresh_token.
+export const refreshKeycloakTokens = async (refreshToken) => {
+    if (!refreshToken) {
+        throw new Error('РќРµ РЅР°Р№РґРµРЅ refresh_token.');
+    }
+
+    const config = getKeycloakConfig();
+    const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: config.clientId,
+        refresh_token: refreshToken,
+    });
+
+    const tokenUrl = `${config.baseUrl.replace(/\/$/, '')}/realms/${config.realm}/protocol/openid-connect/token`;
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+    });
+
+    if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json')
+            ? await response.json()
+            : await response.text();
+        const message = typeof payload === 'string'
+            ? payload
+            : payload?.error_description || payload?.error || payload?.message;
+
+        const error = new Error(message || 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅС‹.');
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+    }
+
+    return response.json();
+};
+
+// ?????????? ??? ?? ??????.
 export const exchangeCodeForTokens = async ({code, state}) => {
     if (!code) {
         throw new Error('Код авторизации не найден.');
