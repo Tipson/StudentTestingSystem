@@ -47,6 +47,9 @@ const QUESTION_TYPES = Object.freeze({
 });
 
 const MAX_AUTOTEST_MESSAGE_LENGTH = 600;
+// Сколько раз повторять автотест при ошибке.
+const AUTO_TEST_RETRY_LIMIT = 0;
+const AUTO_TEST_RETRY_DELAY_MS = 500;
 
 const normalizePathParams = (path) => (path ? path.replace(/\{[^}]+\}/g, '{}') : '');
 
@@ -135,7 +138,15 @@ const FALLBACK_ENDPOINT_GROUPS = applyDocsToFallback([
             {method: 'GET', path: '/api/tests/{testId}/attempts'},
             {method: 'GET', path: '/api/tests/{testId}/results'},
             {method: 'GET', path: '/api/attempts/{id}'},
-            {method: 'PUT', path: '/api/attempts/{attemptId}/answers/{questionId}'},
+            {
+                method: 'PUT',
+                path: '/api/attempts/{attemptId}/answers/{questionId}',
+                example: {
+                    optionId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+                    optionIds: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
+                    text: 'Пример ответа студента',
+                },
+            },
             {method: 'POST', path: '/api/attempts/{id}/submit'},
             {method: 'GET', path: '/api/attempts/{id}/result'},
             {method: 'GET', path: '/api/attempts/my'},
@@ -254,6 +265,8 @@ const limitAutoTestMessage = (value) => {
     return `${text.slice(0, MAX_AUTOTEST_MESSAGE_LENGTH)}...`;
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const createSampleImageFile = async () => {
     const fallbackBase64 =
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+AL6Vb0ZsQAAAABJRU5ErkJggg==';
@@ -274,42 +287,65 @@ const createSampleImageFile = async () => {
 
 const buildAutoTestQuestions = (label) => ([
     {
-        title: `Автотест: один вариант (${label})`,
+        title: `HTTP: какой статус возвращается при создании ресурса? (${label})`,
         type: QUESTION_TYPES.SingleChoice,
+        points: 2,
+        isRequired: true,
+        attachMediaToQuestion: true,
         options: [
-            {text: `Вариант A ${label}`, isCorrect: true, order: 1},
-            {text: `Вариант B ${label}`, isCorrect: false, order: 2},
+            {text: '201 Created', isCorrect: true, order: 1},
+            {text: '200 OK', isCorrect: false, order: 2},
+            {text: '204 No Content', isCorrect: false, order: 3},
+            {text: '404 Not Found', isCorrect: false, order: 4},
         ],
     },
     {
-        title: `Автотест: несколько вариантов (${label})`,
+        title: `Выберите компоненты многофакторной аутентификации (${label})`,
         type: QUESTION_TYPES.MultiChoice,
+        points: 3,
+        isRequired: true,
+        attachMediaToOptionIndex: 0,
         options: [
-            {text: `Опция 1 ${label}`, isCorrect: true, order: 1},
-            {text: `Опция 2 ${label}`, isCorrect: true, order: 2},
-            {text: `Опция 3 ${label}`, isCorrect: false, order: 3},
+            {text: 'Пароль пользователя', isCorrect: true, order: 1},
+            {text: 'Одноразовый код из приложения', isCorrect: true, order: 2},
+            {text: 'HTTP заголовок User-Agent', isCorrect: false, order: 3},
+            {text: 'Любимый цвет', isCorrect: false, order: 4},
         ],
     },
     {
-        title: `Автотест: да/нет (${label})`,
+        title: `JWT можно проверить без запроса к серверу авторизации (${label})`,
         type: QUESTION_TYPES.TrueFalse,
+        points: 1,
+        isRequired: true,
         options: [
             {text: 'Да', isCorrect: true, order: 1},
             {text: 'Нет', isCorrect: false, order: 2},
         ],
     },
     {
-        title: `Автотест: короткий текст (${label})`,
+        title: `Укажите пример ISO-8601 времени в UTC (${label})`,
         type: QUESTION_TYPES.ShortText,
+        points: 2,
+        isRequired: true,
+        answerText: '2026-01-19T12:30:00Z',
         options: [
-            {text: `Ответ ${label}`, isCorrect: true, order: 1},
+            {text: '2026-01-19T12:30:00Z', isCorrect: true, order: 1},
         ],
     },
     {
-        title: `Автотест: развернутый ответ (${label})`,
+        title: `Опишите шаги подготовки теста перед публикацией (${label})`,
         type: QUESTION_TYPES.LongText,
+        points: 4,
+        isRequired: true,
+        answerText: 'Сначала создаём тест и добавляем вопросы, затем настраиваем лимиты, ' +
+            'проверяем правильность ответов и только после этого публикуем.',
         options: [
-            {text: `Подробный ответ ${label}`, isCorrect: true, order: 1},
+            {
+                text: 'Сначала создаём тест и добавляем вопросы, затем настраиваем лимиты, ' +
+                    'проверяем правильность ответов и только после этого публикуем.',
+                isCorrect: true,
+                order: 1,
+            },
         ],
     },
 ]);
@@ -1030,62 +1066,102 @@ export default function SwaggerPage() {
             }
 
             const startedAt = Date.now();
-            try {
-                const response = await step.run(ctx);
-                if (step.onSuccess) {
-                    step.onSuccess(response, ctx);
-                }
+            const retryLimit = Math.max(0, step.retries ?? AUTO_TEST_RETRY_LIMIT);
+            let attempt = 0;
+            let lastError = null;
 
-                pushResult({
-                    id: step.id,
-                    title: step.title,
-                    service: step.service,
-                    method: step.method,
-                    path: step.path,
-                    status: 'success',
-                    httpStatus: response?.status ?? null,
-                    durationMs: Date.now() - startedAt,
-                    message: step.getMessage ? step.getMessage(response, ctx) : '',
-                });
-            } catch (error) {
-                const status = error?.response?.status ?? null;
-                const data = error?.response?.data ?? error?.message ?? error;
-                pushResult({
-                    id: step.id,
-                    title: step.title,
-                    service: step.service,
-                    method: step.method,
-                    path: step.path,
-                    status: 'failed',
-                    httpStatus: status,
-                    durationMs: Date.now() - startedAt,
-                    message: limitAutoTestMessage(data),
-                });
+            while (attempt <= retryLimit) {
+                attempt += 1;
+                try {
+                    const response = await step.run(ctx);
+                    if (step.onSuccess) {
+                        step.onSuccess(response, ctx);
+                    }
+
+                    const baseMessage = step.getMessage ? step.getMessage(response, ctx) : '';
+                    const retryNote = attempt > 1 ? ` (попытка ${attempt}/${retryLimit + 1})` : '';
+                    const message = baseMessage
+                        ? `${baseMessage}${retryNote}`
+                        : retryNote.trim();
+
+                    pushResult({
+                        id: step.id,
+                        title: step.title,
+                        service: step.service,
+                        method: step.method,
+                        path: step.path,
+                        status: 'success',
+                        httpStatus: response?.status ?? null,
+                        durationMs: Date.now() - startedAt,
+                        message,
+                    });
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    if (attempt <= retryLimit) {
+                        await sleep(AUTO_TEST_RETRY_DELAY_MS);
+                    }
+                }
             }
+
+            const status = lastError?.response?.status ?? null;
+            const data = lastError?.response?.data ?? lastError?.message ?? lastError;
+            const retryNote = retryLimit > 0 ? ` (попыток: ${retryLimit + 1})` : '';
+            pushResult({
+                id: step.id,
+                title: step.title,
+                service: step.service,
+                method: step.method,
+                path: step.path,
+                status: 'failed',
+                httpStatus: status,
+                durationMs: Date.now() - startedAt,
+                message: `${limitAutoTestMessage(data)}${retryNote}`,
+            });
         };
 
         const getQuestionId = (question) => question?.id ?? question?.Id ?? null;
 
         const buildAnswerPayload = (question) => {
-            if (!question) return {text: 'Автотест'};
+            if (!question) {
+                return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
+            }
+
             const type = question.type;
+            const options = Array.isArray(question.options) ? question.options : [];
+            const optionMap = new Map(options.map((option) => [option.id, option.text]));
+            const getOptionText = (id) => optionMap.get(id) || '';
 
             if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
-                return {optionId: question.correctOptionIds?.[0] || question.options?.[0]?.id || null};
+                const optionId = question.correctOptionIds?.[0] || options[0]?.id || null;
+                const optionIds = optionId ? [optionId] : [];
+                const optionText = optionId ? getOptionText(optionId) : '';
+                return {
+                    optionId,
+                    optionIds,
+                    text: optionText ? `Выбран вариант: ${optionText}` : 'Выбран вариант',
+                };
             }
 
             if (type === QUESTION_TYPES.MultiChoice) {
-                const ids = question.correctOptionIds?.length
-                    ? question.correctOptionIds
-                    : (question.options || []).map((option) => option.id).slice(0, 2);
-                return {optionIds: ids};
+                const fallbackIds = options.map((option) => option.id).filter(Boolean).slice(0, 2);
+                const optionIds = (question.correctOptionIds?.length ? question.correctOptionIds : fallbackIds)
+                    .filter(Boolean);
+                const optionId = optionIds[0] || null;
+                const optionText = optionIds.map(getOptionText).filter(Boolean).join(', ');
+                return {
+                    optionId,
+                    optionIds,
+                    text: optionText ? `Выбраны варианты: ${optionText}` : 'Выбраны варианты',
+                };
             }
 
             if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
-                return {text: question.correctText || 'Автотестовый ответ'};
+                const text = question.answerText || question.correctText || 'Автотестовый ответ';
+                return {optionId: null, optionIds: [], text};
             }
 
-            return {text: 'Автотест'};
+            return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
         };
 
         try {
@@ -1129,10 +1205,10 @@ export default function SwaggerPage() {
                 run: () => ctx.identify.post(
                     '/api/groups',
                     {
-                        institution: `Институт автотеста ${runLabel}`,
-                        specialization: 'QA',
-                        course: 1,
-                        groupNumber: 101,
+                        institution: `Институт информационных технологий ${runLabel}`,
+                        specialization: 'Программная инженерия',
+                        course: 2,
+                        groupNumber: 203,
                     },
                     {auth: AUTH.TRUE},
                 ),
@@ -1150,7 +1226,7 @@ export default function SwaggerPage() {
                 path: '/api/groups/{id}',
                 skip: () => (!ctx.values.groupId ? 'Нет groupId для обновления.' : ''),
                 run: () => {
-                    const body = JSON.stringify(`Институт автотеста ${runLabel}`);
+                    const body = JSON.stringify(`Институт прикладной математики ${runLabel}`);
                     return ctx.identify.put(
                         `/api/groups/${ctx.values.groupId}`,
                         body,
@@ -1158,9 +1234,9 @@ export default function SwaggerPage() {
                             auth: AUTH.TRUE,
                             headers: {'Content-Type': 'application/json'},
                             params: {
-                                specialization: 'Automation',
-                                course: 1,
-                                groupNumber: 202,
+                                specialization: 'Информационная безопасность',
+                                course: 3,
+                                groupNumber: 312,
                             },
                         },
                     );
@@ -1272,8 +1348,9 @@ export default function SwaggerPage() {
                 run: () => ctx.assessment.post(
                     '/api/tests',
                     {
-                        title: `Автотест ${runLabel}`,
-                        description: 'Тест создан для автопроверки API.',
+                        title: `Промежуточный тест: основы Web API (${runLabel})`,
+                        description: 'Проверка понимания HTTP, авторизации и базовых операций API. ' +
+                            'Используется для автотестов и демонстрации сценариев.',
                     },
                     {auth: AUTH.TRUE},
                 ),
@@ -1303,11 +1380,11 @@ export default function SwaggerPage() {
                 run: () => ctx.assessment.put(
                     `/api/tests/${ctx.values.testId}`,
                     {
-                        title: `Автотест (обновлено) ${runLabel}`,
-                        description: 'Обновлённый тест для автопроверки API.',
-                        passScore: 1,
+                        title: `Промежуточный тест (обновлён) ${runLabel}`,
+                        description: 'Уточнённые настройки и описание теста для стабильной автопроверки.',
+                        passScore: 8,
                         attemptsLimit: 2,
-                        timeLimitSeconds: 900,
+                        timeLimitSeconds: 1200,
                     },
                     {auth: AUTH.TRUE},
                 ),
@@ -1323,11 +1400,11 @@ export default function SwaggerPage() {
                 run: () => ctx.assessment.put(
                     `/api/tests/${ctx.values.testId}/settings`,
                     {
-                        title: `Автотест (настройки) ${runLabel}`,
-                        description: 'Обновление настроек теста.',
-                        timeLimitSeconds: 600,
-                        passScore: 1,
-                        attemptsLimit: 3,
+                        title: `Настройки теста: основы Web API ${runLabel}`,
+                        description: 'Финальные настройки перед публикацией.',
+                        timeLimitSeconds: 900,
+                        passScore: 8,
+                        attemptsLimit: 2,
                     },
                     {auth: AUTH.TRUE},
                 ),
@@ -1380,7 +1457,10 @@ export default function SwaggerPage() {
                 },
                 run: () => ctx.assessment.post(
                     `/api/tests/${ctx.values.testId}/access/users`,
-                    {userId: ctx.values.userId, expiresAt: null},
+                    {
+                        userId: ctx.values.userId,
+                        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    },
                     {auth: AUTH.TRUE},
                 ),
                 onSuccess: (response) => {
@@ -1401,7 +1481,10 @@ export default function SwaggerPage() {
                 },
                 run: () => ctx.assessment.post(
                     `/api/tests/${ctx.values.testId}/access/groups`,
-                    {groupId: ctx.values.groupId, expiresAt: null},
+                    {
+                        groupId: ctx.values.groupId,
+                        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    },
                     {auth: AUTH.TRUE},
                 ),
                 onSuccess: (response) => {
@@ -1418,7 +1501,10 @@ export default function SwaggerPage() {
                 skip: () => (!ctx.values.testId ? 'Нет testId для ссылки-приглашения.' : ''),
                 run: () => ctx.assessment.post(
                     `/api/tests/${ctx.values.testId}/access/invite-links`,
-                    {maxUses: 1, expiresAt: null},
+                    {
+                        maxUses: 3,
+                        expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+                    },
                     {auth: AUTH.TRUE},
                 ),
                 onSuccess: (response) => {
@@ -1466,6 +1552,26 @@ export default function SwaggerPage() {
                 ),
             });
 
+            await runStep({
+                id: 'media-upload',
+                title: 'POST /api/files/upload',
+                service: 'media',
+                method: 'POST',
+                path: '/api/files/upload',
+                run: async () => {
+                    const formData = new FormData();
+                    const file = await createSampleImageFile();
+                    formData.append('files', file);
+                    return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
+                },
+                onSuccess: (response) => {
+                    const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
+                    const ids = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
+                    ctx.values.mediaIds = ids;
+                },
+                getMessage: () => (ctx.values.mediaIds.length ? `mediaIds=${ctx.values.mediaIds.join(', ')}` : ''),
+            });
+
             const questionTemplates = buildAutoTestQuestions(runLabel);
             for (const [index, template] of questionTemplates.entries()) {
                 await runStep({
@@ -1475,17 +1581,33 @@ export default function SwaggerPage() {
                     method: 'POST',
                     path: '/api/tests/{testId}/questions',
                     skip: () => (!ctx.values.testId ? 'Нет testId для создания вопросов.' : ''),
-                    run: () => ctx.assessment.post(
-                        `/api/tests/${ctx.values.testId}/questions`,
-                        {
+                    run: () => {
+                        const hasMedia = ctx.values.mediaIds.length > 0;
+                        const questionMediaIds = template.attachMediaToQuestion && hasMedia
+                            ? ctx.values.mediaIds.slice(0, 1)
+                            : null;
+                        const options = (template.options || []).map((option, optionIndex) => {
+                            if (template.attachMediaToOptionIndex === optionIndex && hasMedia) {
+                                return {...option, mediaIds: ctx.values.mediaIds.slice(0, 1)};
+                            }
+                            return option;
+                        });
+
+                        const payload = {
                             text: template.title,
                             type: template.type,
-                            isRequired: true,
-                            points: 2,
-                            options: template.options,
-                        },
-                        {auth: AUTH.TRUE},
-                    ),
+                            isRequired: template.isRequired ?? true,
+                            points: template.points ?? 1,
+                            options,
+                            mediaIds: questionMediaIds && questionMediaIds.length ? questionMediaIds : null,
+                        };
+
+                        return ctx.assessment.post(
+                            `/api/tests/${ctx.values.testId}/questions`,
+                            payload,
+                            {auth: AUTH.TRUE},
+                        );
+                    },
                     onSuccess: (response) => {
                         const question = response?.data ?? {};
                         const options = question.options || [];
@@ -1503,6 +1625,7 @@ export default function SwaggerPage() {
                             options,
                             correctOptionIds,
                             correctText,
+                            answerText: template.answerText || correctText || '',
                         });
                     },
                     getMessage: (response) => {
@@ -1533,8 +1656,9 @@ export default function SwaggerPage() {
             });
 
             const updatedQuestionOptions = [
-                {text: 'Обновленный вариант', isCorrect: true, order: 1},
-                {text: 'Дополнительный вариант', isCorrect: false, order: 2},
+                {text: '202 Accepted', isCorrect: true, order: 1},
+                {text: '200 OK', isCorrect: false, order: 2},
+                {text: '409 Conflict', isCorrect: false, order: 3},
             ];
 
             await runStep({
@@ -1544,15 +1668,26 @@ export default function SwaggerPage() {
                 method: 'PUT',
                 path: '/api/questions/{id}',
                 skip: () => (!ctx.values.questions.length ? 'Нет вопросов для обновления.' : ''),
-                run: () => ctx.assessment.put(
-                    `/api/questions/${getQuestionId(ctx.values.questions[0])}`,
-                    {
-                        text: `Автотест: обновленный вопрос (${runLabel})`,
-                        points: 3,
-                        options: updatedQuestionOptions,
-                    },
-                    {auth: AUTH.TRUE},
-                ),
+                run: () => {
+                    const hasMedia = ctx.values.mediaIds.length > 0;
+                    const options = updatedQuestionOptions.map((option, optionIndex) => {
+                        if (optionIndex === 0 && hasMedia) {
+                            return {...option, mediaIds: ctx.values.mediaIds.slice(0, 1)};
+                        }
+                        return option;
+                    });
+
+                    return ctx.assessment.put(
+                        `/api/questions/${getQuestionId(ctx.values.questions[0])}`,
+                        {
+                            text: `HTTP: какой статус означает принятие запроса к обработке? (${runLabel})`,
+                            points: 3,
+                            options,
+                            mediaIds: hasMedia ? ctx.values.mediaIds.slice(0, 1) : null,
+                        },
+                        {auth: AUTH.TRUE},
+                    );
+                },
                 onSuccess: (response) => {
                     const question = response?.data ?? {};
                     const options = question.options || [];
@@ -1708,7 +1843,7 @@ export default function SwaggerPage() {
                     const longText = ctx.values.questions.find((question) => question.type === QUESTION_TYPES.LongText);
                     return ctx.assessment.put(
                         `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(longText)}/grade`,
-                        {points: 1, comment: 'Автотестовая проверка'},
+                        {points: 3, comment: 'Ручная проверка: ответ корректный и содержит ключевые шаги.'},
                         {auth: AUTH.TRUE},
                     );
                 },
@@ -1767,26 +1902,6 @@ export default function SwaggerPage() {
                 onSuccess: () => {
                     ctx.values.isPublished = false;
                 },
-            });
-
-            await runStep({
-                id: 'media-upload',
-                title: 'POST /api/files/upload',
-                service: 'media',
-                method: 'POST',
-                path: '/api/files/upload',
-                run: async () => {
-                    const formData = new FormData();
-                    const file = await createSampleImageFile();
-                    formData.append('files', file);
-                    return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
-                },
-                onSuccess: (response) => {
-                    const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
-                    const ids = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
-                    ctx.values.mediaIds = ids;
-                },
-                getMessage: () => (ctx.values.mediaIds.length ? `mediaIds=${ctx.values.mediaIds.join(', ')}` : ''),
             });
 
             await runStep({
