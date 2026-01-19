@@ -1,4 +1,5 @@
 import {AUTH, getAccessToken} from './auth.js';
+import {notifyError} from '@shared/notifications/notificationCenter.js';
 
 // Axios-мидлвар, который добавляет Authorization в зависимости от флага auth.
 export const applyAuthMiddleware = (client) => {
@@ -39,4 +40,18 @@ export const applyAuthMiddleware = (client) => {
         config.headers = headers;
         return config;
     });
+
+    client.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            const shouldNotify = !error?.config?.silentError;
+            const isCanceled = error?.code === 'ERR_CANCELED';
+
+            if (shouldNotify && !isCanceled) {
+                notifyError(error);
+            }
+
+            return Promise.reject(error);
+        },
+    );
 };
