@@ -9,16 +9,24 @@ internal sealed record GeminiRequest(
 
 internal sealed record Content(Part[] Parts);
 
-internal sealed record Part(string Text);
+internal sealed record Part
+{
+    public string? Text { get; init; }
+
+    // для изображений/PDF в base64
+    public InlineData? InlineData { get; init; }
+}
+
+internal sealed record InlineData(
+    string MimeType, // "image/jpeg", "application/pdf"
+    string Data // Base64 строка
+);
 
 internal sealed record GenerationConfig(
     double Temperature,
     int MaxOutputTokens);
 
 internal sealed record GeminiResponse(Candidate[]? Candidates);
-
 internal sealed record Candidate(ContentResponse? Content);
-
 internal sealed record ContentResponse(PartResponse[]? Parts);
-
 internal sealed record PartResponse(string? Text);

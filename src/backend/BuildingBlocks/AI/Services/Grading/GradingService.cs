@@ -1,42 +1,75 @@
-using System.Text.Json;
+using BuildingBlocks.AI.Helpers;
 using BuildingBlocks.AI.Models;
 using BuildingBlocks.AI.Prompts;
 using BuildingBlocks.Integrations.Gemini;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace BuildingBlocks.AI.Services.Grading;
 
-public sealed class GradingService(
-    IGeminiClient gemini,
-    IOptions<AIOptions> options,
-    ILogger<GradingService> logger)
-    : IAIGradingService
+public sealed class GradingService : IAIGradingService
 {
-    private readonly AIOptions _options = options.Value;
+    private readonly IGeminiClient _gemini;
+    private readonly IMediaHelper _mediaHelper;  // НОВОЕ
+    private readonly AIOptions _options;
+    private readonly ILogger<GradingService> _logger;
 
-    public async Task<GradingResponse?> SuggestGradeAsync(GradingRequest request, CancellationToken ct = default)
+    public GradingService(
+        IGeminiClient gemini,
+        IMediaHelper mediaHelper,  // НОВОЕ
+        IOptions<AIOptions> options,
+        ILogger<GradingService> logger)
+    {
+        _gemini = gemini;
+        _mediaHelper = mediaHelper;  // НОВОЕ
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    public async Task<GradingResponse?> SuggestGradeAsync(
+        GradingRequest request,
+        CancellationToken ct = default)
     {
         if (!_options.Enabled || !_options.GradingEnabled)
         {
-            logger.LogWarning("AI проверка ответов отключена в конфигурации");
+            _logger.LogWarning("AI проверка отключена");
             return null;
         }
 
         try
         {
+            // НОВОЕ: Собираем все MediaIds
+            var allMediaIds = new List<Guid>();
+            if (request.QuestionMediaIds?.Count > 0)
+                allMediaIds.AddRange(request.QuestionMediaIds);
+            if (request.AnswerMediaIds?.Count > 0)
+                allMediaIds.AddRange(request.AnswerMediaIds);
+
+            // НОВОЕ: Загружаем медиа-файлы параллельно
+            var mediaContents = await _mediaHelper.GetMediaContentsAsync(allMediaIds, ct);
+
+            _logger.LogInformation(
+                "Проверка ответа: {MediaCount} медиа-файлов загружено",
+                mediaContents.Count);
+
+            // Формируем промпт
             var prompt = GradingPrompts.BuildGradingPrompt(
                 request.QuestionText,
                 request.ExpectedAnswer,
                 request.StudentAnswer,
-                request.MaxPoints);
+                request.MaxPoints,
+                hasMedia: mediaContents.Count > 0 
+            );
 
-            var response = await gemini.SendPromptAsync(prompt, ct);
+            // НОВОЕ: Отправляем с медиа
+            var response = await _gemini.SendPromptAsync(prompt, mediaContents, ct);
+
             return ParseGradingResponse(response, request.MaxPoints);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Ошибка при AI проверке ответа");
+            _logger.LogError(ex, "Ошибка при AI проверке");
             return null;
         }
     }
@@ -44,10 +77,8 @@ public sealed class GradingService(
     private static GradingResponse ParseGradingResponse(string json, int maxPoints)
     {
         var cleaned = json.Replace("```json", "").Replace("```", "").Trim();
-        var data = JsonSerializer.Deserialize<GradingData>(cleaned, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        var data = JsonSerializer.Deserialize<GradingData>(cleaned, 
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         if (data is null)
             throw new InvalidOperationException("Не удалось распарсить ответ Gemini");

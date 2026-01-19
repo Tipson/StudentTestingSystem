@@ -4,6 +4,7 @@ using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
 using Media.Application;
 using Media.Infrastructure;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);

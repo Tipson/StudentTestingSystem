@@ -1,3 +1,4 @@
+using BuildingBlocks.AI.Helpers;
 using BuildingBlocks.AI.Services.Generation;
 using BuildingBlocks.AI.Services.Grading;
 using BuildingBlocks.AI.Services.Hints;
@@ -19,6 +20,23 @@ public static class DependencyInjection
         // Gemini Integration
         services.AddGeminiIntegration(configuration);
 
+        services.AddScoped<IMediaHelper, MediaHelper>();
+        services.AddHttpContextAccessor();
+        
+        services.AddHttpClient("MediaApiClient", client =>
+            {
+                var mediaServiceUrl = configuration["Services:MediaService:Url"] 
+                                      ?? "http://media-api:5003";
+                client.BaseAddress = new Uri(mediaServiceUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                UseProxy = false,
+                Proxy = null,
+                ConnectTimeout = TimeSpan.FromSeconds(10)
+            });
+        
         var aiOptions = configuration.GetSection("AI").Get<AIOptions>() ?? new AIOptions();
 
         // Регистрация сервисов в зависимости от конфигурации

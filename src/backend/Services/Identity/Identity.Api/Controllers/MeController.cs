@@ -14,7 +14,7 @@ public sealed class MeController(IMediator mediator) : ControllerBase
     /// <summary>
     /// Получить информацию о текущем пользователе.
     /// </summary>
-    [HttpGet("me")]
+    [HttpGet]
     public async Task<IActionResult> GetMe(CancellationToken ct) =>
         Ok(await mediator.Send(new GetMe(), ct));
     
@@ -32,9 +32,9 @@ public sealed class MeController(IMediator mediator) : ControllerBase
     /// Студент удаляет свою группу
     /// </summary>
     [HttpDelete("group")]
-    public async Task<IActionResult> RemoveMyGroup(CancellationToken ct)
+    public async Task<IActionResult> LeaveGroup(CancellationToken ct)
     {
-        await mediator.Send(new RemoveGroup(), ct);
+        await mediator.Send(new LeaveGroup(), ct);
         return NoContent();
     }
 }

@@ -7,26 +7,25 @@ namespace BuildingBlocks.Api.Security;
 
 public sealed class UserContext : IUserContext
 {
-    public string UserId { get; }
+    public string? UserId { get; }
     public string? Email { get; }
     public string? FullName { get; }
     public UserRole Role { get; }
     public Guid? GroupId { get; }
-
+    private bool IsAuthenticated { get; }
+    
     public UserContext(IHttpContextAccessor httpContextAccessor)
     {
-        var context = httpContextAccessor.HttpContext
-                      ?? throw new InvalidOperationException("HTTP context недоступен");
-
-        var principal = context.User;
-        if (principal.Identity?.IsAuthenticated != true)
-            throw new UnauthorizedAccessException("Пользователь не аутентифицирован");
+        var principal = httpContextAccessor.HttpContext?.User;
+        IsAuthenticated = principal?.Identity?.IsAuthenticated == true;
+        
+        if (!IsAuthenticated)
+            return;
 
         // Verified claims (из Identity service middleware)
         UserId = principal.FindFirstValue("user_id_verified")
                  ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                 ?? principal.FindFirstValue("sub")
-                 ?? throw new UnauthorizedAccessException("UserId не найден");
+                 ?? principal.FindFirstValue("sub");
 
         Email = principal.FindFirstValue("email_verified")
                 ?? principal.FindFirstValue(ClaimTypes.Email)

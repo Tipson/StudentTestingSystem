@@ -1,3 +1,5 @@
+using BuildingBlocks.AI.Models;
+
 namespace BuildingBlocks.AI.Prompts;
 
 /// <summary>
@@ -5,47 +7,79 @@ namespace BuildingBlocks.AI.Prompts;
 /// </summary>
 public static class TestGenerationPrompts
 {
-    public static string BuildTestGenerationPrompt(
-        string documentText,
-        int questionsCount,
-        string? topic)
+    // BuildingBlocks/AI/Prompts/TestGenerationPrompts.cs
+
+public static string BuildTestGenerationPrompt(
+    string? documentText,
+    int questionsCount,
+    string? topic,
+    TestGenerationMode mode = TestGenerationMode.Balanced)
     {
         var topicPart = string.IsNullOrWhiteSpace(topic)
             ? ""
             : $"Тема теста: {topic}";
 
+        var modeInstructions = GetModeInstructions(mode);
+        
+        var documentInstruction = string.IsNullOrWhiteSpace(documentText)
+            ? "Документ прикреплён как изображение/PDF. Изучи его содержимое."
+            : $"Текст документа:\n{documentText}";
+
         return $@"
-            Ты эксперт-методист, создающий тесты для студентов.
+    Ты эксперт-методист, создающий тесты для студентов.
 
-            Задача: На основе предоставленного текста создай тест из {questionsCount} вопросов.
-            {topicPart}
+    Задача: Создай тест из {questionsCount} вопросов на основе документа.
+    {topicPart}
 
-            Текст документа:
-            {documentText}
+    {documentInstruction}
 
-            Требования:
-            1. Создай разнообразные типы вопросов: SingleChoice, MultipleChoice, LongText
-            2. Вопросы должны проверять понимание ключевых концепций из текста
-            3. Для SingleChoice: 4 варианта ответа, один правильный
-            4. Для MultipleChoice: 4-6 вариантов, несколько правильных
-            5. Для LongText: открытый вопрос, требующий развернутого ответа
-            6. Распределяй баллы: простые вопросы 1-2 балла, сложные 3-5 баллов
-            7. Вопросы должны быть чёткими и однозначными
-            8. Избегай слишком очевидных или слишком сложных вопросов
+    Режим генерации: {mode}
+    {modeInstructions}
 
-            Верни ТОЛЬКО JSON (без markdown):
-            {{
-              ""testTitle"": ""название теста на основе темы документа"",
-              ""description"": ""краткое описание что проверяет этот тест"",
-              ""questions"": [
-                {{
-                  ""text"": ""текст вопроса"",
-                  ""type"": ""SingleChoice"" | ""MultipleChoice"" | ""LongText"",
-                  ""options"": [""вариант1"", ""вариант2"", ...] или null для LongText,
-                  ""correctAnswer"": ""правильный ответ или критерии оценки"",
-                  ""points"": число баллов
-                }}
-              ]
-            }}";
+    Требования:
+    1. Вопросы должны проверять понимание ключевых концепций
+    2. Для SingleChoice: 4 варианта ответа, один правильный
+    3. Для MultipleChoice: 4-6 вариантов, несколько правильных
+    4. Для LongText: открытый вопрос с развернутым ответом
+    5. Распределяй баллы: простые 1-2, средние 3-4, сложные 5 баллов
+    6. Вопросы должны быть чёткими и однозначными
+
+    Верни ТОЛЬКО JSON:
+    {{
+      ""testTitle"": ""название теста"",
+      ""description"": ""описание что проверяет тест"",
+      ""questions"": [
+        {{
+          ""text"": ""текст вопроса"",
+          ""type"": ""SingleChoice"" | ""MultipleChoice"" | ""LongText"",
+          ""options"": [""вариант1"", ...] или null,
+          ""correctAnswer"": ""правильный ответ"",
+          ""points"": число баллов
+        }}
+      ]
+    }}";
+    }
+
+    private static string GetModeInstructions(TestGenerationMode mode)
+    {
+        return mode switch
+        {
+            TestGenerationMode.Balanced => 
+                "Создай сбалансированный тест: 60% закрытых вопросов, 40% открытых.",
+            
+            TestGenerationMode.ClosedQuestions => 
+                "Создай ТОЛЬКО закрытые вопросы (SingleChoice и MultipleChoice).",
+            
+            TestGenerationMode.OpenQuestions => 
+                "Создай ТОЛЬКО открытые вопросы (LongText).",
+            
+            TestGenerationMode.FinalExam => 
+                @"Создай ИТОГОВЫЙ ТЕСТ:
+                - Охвати ВСЕ основные темы документа
+                - 20% простых, 50% средних, 30% сложных вопросов
+                - 50% закрытых, 50% открытых",
+            
+            _ => string.Empty
+        };
     }
 }

@@ -1,7 +1,8 @@
-using System.Text.Json;
+using BuildingBlocks.AI.Helpers;
 using BuildingBlocks.AI.Models;
 using BuildingBlocks.AI.Prompts;
 using BuildingBlocks.Integrations.Gemini;
+using BuildingBlocks.Integrations.Gemini.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,50 +10,49 @@ namespace BuildingBlocks.AI.Services.Hints;
 
 public sealed class HintService(
     IGeminiClient gemini,
+    IMediaHelper mediaHelper,
     IOptions<AIOptions> options,
     ILogger<HintService> logger)
     : IAIHintService
 {
     private readonly AIOptions _options = options.Value;
 
-    public async Task<HintResponse?> GenerateHintAsync(HintRequest request, CancellationToken ct = default)
+    public async Task<HintResponse?> GenerateHintAsync(
+        HintRequest request,
+        CancellationToken ct = default)
     {
         if (!_options.Enabled || !_options.HintsEnabled)
         {
-            logger.LogWarning("AI подсказки отключены в конфигурации");
+            logger.LogWarning("AI подсказки отключены");
             return null;
         }
 
         try
         {
+            // НОВОЕ: Загружаем медиа если есть
+            var mediaContents = request.QuestionMediaIds?.Count > 0
+                ? await mediaHelper.GetMediaContentsAsync(request.QuestionMediaIds, ct)
+                : new List<MediaContent>();
+
+            logger.LogInformation(
+                "Генерация подсказки уровня {Level}: {MediaCount} медиа",
+                request.HintLevel, mediaContents.Count);
+
             var prompt = HintPrompts.BuildHintPrompt(
                 request.QuestionText,
                 request.StudentPartialAnswer,
-                request.HintLevel);
+                request.HintLevel,
+                hasMedia: mediaContents.Count > 0
+            );
 
-            var response = await gemini.SendPromptAsync(prompt, ct);
-            return ParseHintResponse(response);
+            var response = await gemini.SendPromptAsync(prompt, mediaContents, ct);
+
+            return new HintResponse(response.Trim(), request.HintLevel);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Ошибка при генерации AI подсказки");
+            logger.LogError(ex, "Ошибка генерации подсказки");
             return null;
         }
     }
-
-    private static HintResponse ParseHintResponse(string json)
-    {
-        var cleaned = json.Replace("```json", "").Replace("```", "").Trim();
-        var data = JsonSerializer.Deserialize<HintData>(cleaned, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (data is null)
-            throw new InvalidOperationException("Не удалось распарсить ответ Gemini");
-
-        return new HintResponse(data.Hint, data.Level);
-    }
-
-    private sealed record HintData(string Hint, int Level);
 }

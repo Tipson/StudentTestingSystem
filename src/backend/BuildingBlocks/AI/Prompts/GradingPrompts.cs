@@ -9,31 +9,40 @@ public static class GradingPrompts
         string questionText,
         string? expectedAnswer,
         string? studentAnswer,
-        int maxPoints)
+        int maxPoints,
+        bool hasMedia = false)  // НОВОЕ
     {
-        var criteriaSection = string.IsNullOrWhiteSpace(expectedAnswer)
-            ? BuildCriteriaSectionWithoutExpectedAnswer()
-            : BuildCriteriaSectionWithExpectedAnswer(expectedAnswer);
+        var mediaInstruction = hasMedia
+            ? @"
+        ВАЖНО: В задании есть изображения/документы. Анализируй их при оценке:
+        - Проверь соответствие ответа визуальной информации
+        - Учитывай детали на изображениях
+        - Если студент ссылается на изображение, проверь корректность"
+                    : string.Empty;
 
-        var pointsScale = BuildPointsScale(maxPoints);
+                var criteriaSection = string.IsNullOrWhiteSpace(expectedAnswer)
+                    ? BuildCriteriaSectionWithoutExpectedAnswer()
+                    : BuildCriteriaSectionWithExpectedAnswer(expectedAnswer);
 
-        return $@"
-            Ты эксперт-преподаватель, проверяющий развернутые ответы студентов.
+                var pointsScale = BuildPointsScale(maxPoints);
 
-            Вопрос: {questionText}
-            Ответ студента: {studentAnswer}
-            Максимум баллов: {maxPoints}
+                return $@"
+        Ты эксперт-преподаватель, проверяющий развернутые ответы студентов.
+        {mediaInstruction}
 
-            {criteriaSection}
+        Вопрос: {questionText}
+        Ответ студента: {studentAnswer}
+        Максимум баллов: {maxPoints}
 
-            {pointsScale}
+        {criteriaSection}
+        {pointsScale}
 
-            Верни ТОЛЬКО JSON (без markdown):
-            {{
-              ""points"": число от 0 до {maxPoints},
-              ""comment"": ""развернутый комментарий для студента на русском, объясни почему такая оценка и что можно улучшить"",
-              ""confidence"": число от 0.0 до 1.0 (насколько уверен в оценке)
-            }}";
+        Верни ТОЛЬКО JSON:
+        {{
+          ""points"": число от 0 до {maxPoints},
+          ""comment"": ""развернутый комментарий на русском"",
+          ""confidence"": число от 0.0 до 1.0
+        }}";
     }
 
     private static string BuildCriteriaSectionWithoutExpectedAnswer()

@@ -6,7 +6,8 @@ namespace BuildingBlocks.AI.Models;
 public sealed record HintRequest(
     string QuestionText, 
     string? StudentPartialAnswer,
-    int HintLevel);
+    int HintLevel,
+    List<Guid>? QuestionMediaIds = null);
 
 /// <summary>
 /// Ответ с AI подсказкой.

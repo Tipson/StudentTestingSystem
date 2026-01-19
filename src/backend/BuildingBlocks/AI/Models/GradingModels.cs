@@ -7,7 +7,9 @@ public sealed record GradingRequest(
     string QuestionText,
     string? ExpectedAnswer,
     string? StudentAnswer,
-    int MaxPoints);
+    int MaxPoints,
+    List<Guid>? QuestionMediaIds = null,
+    List<Guid>? AnswerMediaIds = null);
 
 /// <summary>
 /// Результат AI проверки.
