@@ -58,6 +58,12 @@ public sealed class GeminiClient(
                 request,
                 ct);
 
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError("Gemini API error {StatusCode}: {ErrorBody}", 
+                    response.StatusCode, errorBody);
+            }
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<GeminiResponse>(ct);
