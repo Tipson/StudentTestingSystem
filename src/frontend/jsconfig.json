@@ -4,6 +4,7 @@
         "paths": {
             "@/*": ["*"],
             "@app/*": ["app/*"],
+            "@api": ["api/index.js"],
             "@api/*": ["api/*"],
             "@modules/*": ["modules/*"],
             "@pages/*": ["pages/*"],

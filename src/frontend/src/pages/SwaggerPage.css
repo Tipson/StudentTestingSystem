@@ -1,0 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+.swagger-shell {
+    min-height: 100vh;
+    padding: 32px 24px 48px;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(251, 146, 60, 0.2), transparent 50%),
+        linear-gradient(135deg, #f7f5f2 0%, #f1f0ec 45%, #eef2f1 100%);
+    color: #1e293b;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.swagger-shell * {
+    box-sizing: border-box;
+}
+
+.swagger-hero {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    padding: 24px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(14px);
+}
+
+.swagger-title h1 {
+    margin: 0 0 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(28px, 3vw, 40px);
+    font-weight: 700;
+}
+
+.swagger-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #0f766e;
+    font-weight: 600;
+}
+
+.swagger-subtitle {
+    margin: 0;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.swagger-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.swagger-card h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.swagger-auth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.swagger-button {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #0f766e;
+    color: #ffffff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.swagger-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(15, 118, 110, 0.2);
+}
+
+.swagger-button.secondary {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.swagger-button.ghost {
+    background: transparent;
+    color: #0f172a;
+    border: 1px dashed rgba(15, 23, 42, 0.2);
+}
+
+.swagger-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.swagger-panel {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.swagger-panel h2 {
+    margin: 0 0 16px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.swagger-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.swagger-field label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.swagger-input,
+.swagger-select,
+.swagger-textarea {
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #ffffff;
+    color: inherit;
+}
+
+.swagger-textarea {
+    min-height: 120px;
+    resize: vertical;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.swagger-response {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 140px;
+}
+
+.swagger-url-list {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.swagger-url-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.swagger-url-item span {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.swagger-url-item code {
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.swagger-endpoints {
+    margin-top: 24px;
+}
+
+.swagger-group {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.swagger-group summary {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+}
+
+.swagger-endpoint {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.swagger-endpoint:last-child {
+    border-bottom: none;
+}
+
+.method-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #e2e8f0;
+    min-width: 70px;
+    text-align: center;
+}
+
+.method-badge.get {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.method-badge.post {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.method-badge.put {
+    background: #fef9c3;
+    color: #a16207;
+}
+
+.method-badge.delete {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.method-badge.patch {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.endpoint-meta {
+    flex: 1;
+}
+
+.endpoint-path {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.endpoint-desc {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+.swagger-callback {
+    margin: 80px auto 0;
+    max-width: 520px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+    text-align: center;
+}
+
+.swagger-callback h2 {
+    margin: 0 0 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+}
+
+.swagger-callback p {
+    margin: 0 0 18px;
+    color: #475569;
+}
+
+@media (max-width: 720px) {
+    .swagger-shell {
+        padding: 24px 16px 40px;
+    }
+
+    .swagger-hero {
+        padding: 18px;
+    }
+}

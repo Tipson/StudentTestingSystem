@@ -1,0 +1,104 @@
+.notification-center {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 360px;
+    pointer-events: none;
+}
+
+.notification-card {
+    pointer-events: auto;
+    background: #ffffff;
+    color: #1b1b1b;
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    border-left: 4px solid #4b5563;
+    animation: notification-slide-in 0.2s ease-out;
+}
+
+.notification-card.notification-success {
+    background: #ecfdf3;
+    color: #14532d;
+    border-left-color: #22c55e;
+}
+
+.notification-card.notification-warning {
+    background: #fff7ed;
+    color: #9a3412;
+    border-left-color: #f97316;
+}
+
+.notification-card.notification-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-left-color: #3b82f6;
+}
+
+.notification-card.notification-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-left-color: #ef4444;
+}
+
+.notification-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.notification-title {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.notification-message {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.notification-close {
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px;
+    border-radius: 6px;
+}
+
+.notification-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.notification-close:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+@keyframes notification-slide-in {
+    from {
+        transform: translateX(12px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 480px) {
+    .notification-center {
+        left: 12px;
+        right: 12px;
+        max-width: none;
+    }
+}

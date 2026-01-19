@@ -7,6 +7,7 @@ const assetsPath = path.resolve(__dirname, 'public/assets');
 const aliasModuleNameMapper = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@app/(.*)$': '<rootDir>/src/app/$1',
+    '^@api$': '<rootDir>/src/api/index.js',
     '^@api/(.*)$': '<rootDir>/src/api/$1',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
     '^@pages/(.*)$': '<rootDir>/src/pages/$1',
