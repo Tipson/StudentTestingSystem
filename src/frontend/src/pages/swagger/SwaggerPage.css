@@ -153,6 +153,72 @@
     gap: 24px;
 }
 
+.swagger-profile {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.swagger-profile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.swagger-profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.swagger-profile-list {
+    display: grid;
+    gap: 10px;
+}
+
+.swagger-profile-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.swagger-profile-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.swagger-profile-value {
+    font-size: 14px;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.swagger-role-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swagger-role-pill {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .swagger-tests-header {
     display: flex;
     align-items: center;
@@ -978,6 +1044,10 @@
     .swagger-selection-item {
         grid-template-columns: 1fr;
         align-items: flex-start;
+    }
+
+    .swagger-profile-row {
+        grid-template-columns: 1fr;
     }
 
     .swagger-status-pill {

@@ -6,7 +6,8 @@ import {AUTH, getAccessToken} from '@api/auth.js';
 import {assessmentApiDocs, identifyApiDocs, mediaApiDocs} from '@api';
 import testCatImage from './testCat.png';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
-import {clearStoredTokens, getStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
+import {clearStoredTokens, getKeycloakConfig, getStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
+import {useUser} from '@shared/auth/UserProvider.jsx';
 import './SwaggerPage.css';
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
@@ -29,6 +30,13 @@ const AUTH_OPTIONS = [
     {value: AUTH.OPTIONAL, label: 'Опционально'},
     {value: AUTH.FALSE, label: 'Без авторизации'},
 ];
+
+const USER_SOURCE_LABELS = {
+    'backend+keycloak': 'Backend + Keycloak',
+    keycloak: 'Keycloak',
+    backend: 'Backend',
+    none: 'Нет данных',
+};
 
 const DEFAULT_REQUEST = {
     service: 'assessment',
@@ -958,6 +966,7 @@ const buildPathLabel = (item, groupTitle) => {
 };
 
 export default function SwaggerPage() {
+    const {profile, roles, source, refreshUser, clearUser} = useUser();
     const [tokens, setTokens] = useState(() => getStoredTokens());
     const serviceEntries = useMemo(
         () => Object.entries(API_BASE_URLS)
@@ -1292,6 +1301,24 @@ export default function SwaggerPage() {
     const tokenExpiresAt = tokens?.expiresAt
         ? new Date(tokens.expiresAt).toLocaleString('ru-RU')
         : '';
+    // Ссылка на личный кабинет Keycloak для быстрого перехода.
+    const keycloakAccountUrl = useMemo(() => {
+        const config = getKeycloakConfig();
+        const baseUrl = config.baseUrl?.replace(/\/$/, '');
+        if (!baseUrl || !config.realm) return '';
+        return `${baseUrl}/realms/${config.realm}/account`;
+    }, []);
+    const profileRows = useMemo(() => ([
+        {label: 'ID', value: profile?.id},
+        {label: 'Логин', value: profile?.username},
+        {label: 'Email', value: profile?.email},
+        {label: 'Имя', value: profile?.name},
+        {label: 'Фамилия', value: profile?.familyName},
+        {label: 'Источник', value: USER_SOURCE_LABELS[source] || source},
+    ]), [profile, source]);
+    const sortedRoles = useMemo(() => (
+        Array.isArray(roles) ? roles.slice().sort((a, b) => a.localeCompare(b)) : []
+    ), [roles]);
 
     // Загружает Swagger и формирует список эндпоинтов.
     const loadSwagger = useCallback(async () => {
@@ -1353,6 +1380,7 @@ export default function SwaggerPage() {
 
     const handleLogout = () => {
         clearStoredTokens();
+        clearUser();
         setTokens(null);
     };
 
@@ -2893,6 +2921,13 @@ export default function SwaggerPage() {
                 >
                     Сценарии
                 </button>
+                <button
+                    className={`swagger-tab ${activeTab === 'profile' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                >
+                    Профиль
+                </button>
             </div>
                 </div>
                 <div className="swagger-card">
@@ -3651,6 +3686,64 @@ export default function SwaggerPage() {
                             </div>
                         ) : (
                             <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {activeTab === 'profile' && (
+                <section className="swagger-profile">
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Профиль пользователя</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={() => refreshUser(true)}
+                                >
+                                    Обновить профиль
+                                </button>
+                                {keycloakAccountUrl && (
+                                    <a
+                                        className="swagger-button"
+                                        href={keycloakAccountUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Профиль в Keycloak
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                        {profile ? (
+                            <div className="swagger-profile-list">
+                                {profileRows.map((row) => (
+                                    <div key={row.label} className="swagger-profile-row">
+                                        <span className="swagger-profile-label">{row.label}</span>
+                                        <span className="swagger-profile-value">{row.value || '—'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Нет данных профиля. Авторизуйтесь через Keycloak.</p>
+                        )}
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Роли</h2>
+                            {sortedRoles.length > 0 && (
+                                <span className="swagger-hint">Всего: {sortedRoles.length}</span>
+                            )}
+                        </div>
+                        {sortedRoles.length ? (
+                            <div className="swagger-role-list">
+                                {sortedRoles.map((role) => (
+                                    <span key={role} className="swagger-role-pill">{role}</span>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Роли не найдены.</p>
                         )}
                     </div>
                 </section>

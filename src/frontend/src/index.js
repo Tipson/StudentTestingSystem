@@ -4,6 +4,7 @@ import './index.css';
 import App from './app/App.jsx';
 import NotificationProvider from '@shared/notifications/NotificationProvider.jsx';
 import KeycloakTokenProvider from '@shared/auth/KeycloakTokenProvider.jsx';
+import UserProvider from '@shared/auth/UserProvider.jsx';
 
 function supportsModernViewportUnits() {
   return typeof window !== 'undefined'
@@ -41,7 +42,9 @@ root.render(
     <StrictMode>
       <NotificationProvider>
         <KeycloakTokenProvider>
-          <App />
+          <UserProvider>
+            <App />
+          </UserProvider>
         </KeycloakTokenProvider>
       </NotificationProvider>
     </StrictMode>
