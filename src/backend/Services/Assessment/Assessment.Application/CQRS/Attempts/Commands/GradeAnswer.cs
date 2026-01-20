@@ -54,8 +54,8 @@ public sealed class GradeAnswerHandler(
         var answer = attempt.Answers.FirstOrDefault(a => a.QuestionId == request.QuestionId)
                      ?? throw new EntityNotFoundException("Ответ не найден");
 
-        if (!answer.ManualGradingRequired)
-            throw new BadRequestApiException("Этот ответ не требует ручной проверки");
+        /*if (!answer.ManualGradingRequired)
+            throw new BadRequestApiException("Этот ответ не требует ручной проверки");*/
 
         if (request.Dto.Points < 0)
             throw new BadRequestApiException("Количество баллов не может быть отрицательным.");
