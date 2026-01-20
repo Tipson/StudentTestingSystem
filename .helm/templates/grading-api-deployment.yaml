@@ -68,7 +68,7 @@ spec:
               name: gemini-secrets
               key: Gemini__ApiKey
         - name: Gemini__Model
-          value: "gemini-2.0-flash-exp"
+          value: "gemini-2.5-flash"
         
         - name: AI__Enabled
           value: "true"
