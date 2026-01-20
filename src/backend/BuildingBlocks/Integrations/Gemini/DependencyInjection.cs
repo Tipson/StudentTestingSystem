@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Extensions.Http;
 
@@ -13,9 +14,12 @@ public static class DependencyInjection
     {
         services.Configure<GeminiOptions>(configuration.GetSection("Gemini"));
 
-        services.AddHttpClient<IGeminiClient, GeminiClient>(client =>
+        services.AddHttpClient<IGeminiClient, GeminiClient>((serviceProvider, client) =>
             {
-                client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+                // Получаем BaseUrl из конфигурации
+                var options = serviceProvider.GetRequiredService<IOptions<GeminiOptions>>().Value;
+                
+                client.BaseAddress = new Uri(options.BaseUrl);
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
                 client.Timeout = TimeSpan.FromSeconds(30);
             })
