@@ -459,6 +459,386 @@
     justify-content: flex-end;
 }
 
+.swagger-workflow {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.swagger-workflow-lane {
+    display: grid;
+    gap: 12px;
+    padding: 6px 0 12px;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.swagger-workflow-lane:last-child {
+    border-bottom: none;
+}
+
+.swagger-workflow-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 2px 8px;
+    overflow-x: auto;
+}
+
+.swagger-workflow-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.swagger-workflow-arrow {
+    width: 24px;
+    height: 2px;
+    background: rgba(148, 163, 184, 0.7);
+    position: relative;
+}
+
+.swagger-workflow-arrow::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-top: 2px solid rgba(148, 163, 184, 0.7);
+    border-right: 2px solid rgba(148, 163, 184, 0.7);
+    transform: translateY(-50%) rotate(45deg);
+}
+
+.swagger-workflow-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-top: 4px;
+}
+
+.swagger-workflow-node {
+    position: relative;
+    padding-left: calc(22px + var(--level, 0) * 18px);
+}
+
+.swagger-workflow-node::before {
+    content: '';
+    position: absolute;
+    left: calc(10px + var(--level, 0) * 18px);
+    top: 10px;
+    bottom: -12px;
+    width: 2px;
+    background: rgba(148, 163, 184, 0.35);
+}
+
+.swagger-workflow-node:last-child::before {
+    bottom: 24px;
+}
+
+.swagger-workflow-card {
+    width: auto;
+    min-width: 260px;
+    max-width: 360px;
+    display: grid;
+    gap: 8px;
+    border-radius: 16px;
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.swagger-workflow-card:hover {
+    border-color: rgba(15, 118, 110, 0.5);
+    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+    transform: translateY(-1px);
+}
+
+.swagger-workflow-card.selected {
+    border-color: rgba(15, 118, 110, 0.7);
+    box-shadow: 0 16px 30px rgba(15, 118, 110, 0.2);
+}
+
+.swagger-workflow-card.compact {
+    min-width: 220px;
+    max-width: 300px;
+}
+
+.swagger-workflow-select {
+    width: 100%;
+    text-align: left;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+.swagger-workflow-select:focus-visible {
+    outline: 2px solid rgba(15, 118, 110, 0.45);
+    outline-offset: 2px;
+    border-radius: 12px;
+}
+
+.swagger-workflow-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    margin-top: 4px;
+    box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.18);
+}
+
+.swagger-workflow-dot.success {
+    background: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+}
+
+.swagger-workflow-dot.failed {
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+.swagger-workflow-dot.running {
+    background: #38bdf8;
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.22);
+    animation: workflowPulse 1.6s ease-in-out infinite;
+}
+
+.swagger-workflow-dot.skipped {
+    background: #94a3b8;
+    box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.2);
+}
+
+.swagger-workflow-content {
+    display: grid;
+    gap: 4px;
+}
+
+.swagger-workflow-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #0f172a;
+}
+
+.swagger-workflow-desc {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.swagger-workflow-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.swagger-workflow-tag {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.swagger-workflow-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+    background: rgba(148, 163, 184, 0.15);
+    border-radius: 999px;
+    padding: 4px 8px;
+}
+
+.swagger-workflow-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-left: 2px;
+}
+
+.swagger-workflow-run {
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.swagger-workflow-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.swagger-workflow-toggle:hover {
+    border-color: rgba(15, 118, 110, 0.5);
+}
+
+.swagger-workflow-toggle-icon {
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #0f172a;
+    border-bottom: 2px solid #0f172a;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.swagger-workflow-toggle.open .swagger-workflow-toggle-icon {
+    transform: rotate(-135deg);
+}
+
+.swagger-workflow-next {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-workflow-link {
+    border: none;
+    background: none;
+    color: #0f766e;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+}
+
+.swagger-workflow-link:hover {
+    text-decoration: underline;
+}
+
+.swagger-workflow-children {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.swagger-scenario-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr);
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.swagger-scenario-detail-main {
+    display: grid;
+    gap: 12px;
+}
+
+.swagger-scenario-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.swagger-scenario-children {
+    display: grid;
+    gap: 10px;
+}
+
+.swagger-scenario-child {
+    display: grid;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.swagger-scenario-child-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: start;
+    text-align: left;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+}
+
+.swagger-scenario-child-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.swagger-scenario-child-meta {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-scenario-child-next {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-scenario-steps {
+    display: grid;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.swagger-scenario-step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.swagger-scenario-step-index {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(15, 118, 110, 0.15);
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.swagger-scenario-step-text {
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.swagger-scenario-result {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(15, 118, 110, 0.08);
+    font-size: 13px;
+    color: #0f172a;
+    border: 1px solid rgba(15, 118, 110, 0.2);
+}
+
+.swagger-scenario-detail-charts {
+    display: grid;
+    gap: 14px;
+}
+
 .swagger-selection-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -1206,9 +1586,44 @@
         justify-content: flex-start;
     }
 
+    .swagger-scenario-detail {
+        grid-template-columns: 1fr;
+    }
+
+    .swagger-workflow-row {
+        gap: 12px;
+    }
+
+    .swagger-workflow-card {
+        min-width: 220px;
+    }
+
+    .swagger-workflow-card.compact {
+        min-width: 200px;
+    }
+
+    .swagger-workflow-meta {
+        align-items: flex-start;
+    }
+
     .swagger-donut {
         width: 130px;
         height: 130px;
+    }
+}
+
+@keyframes workflowPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
+    }
+    50% {
+        transform: scale(1.15);
+        box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.28);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
     }
 }
 

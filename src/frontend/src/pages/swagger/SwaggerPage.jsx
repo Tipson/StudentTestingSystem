@@ -85,6 +85,77 @@ const SCENARIO_EXPECTED_TOTALS = {
     'draft-flow': 8,
 };
 
+const SCENARIO_CHILDREN = Object.freeze({
+    'full-cycle': ['test-create-flow', 'test-pass-flow'],
+});
+
+const SCENARIO_NEXT = Object.freeze({
+    'test-create-flow': 'test-pass-flow',
+    'test-pass-flow': 'publish-without-questions',
+    'publish-without-questions': 'draft-flow',
+});
+
+const SCENARIO_STEPS = Object.freeze({
+    'full-cycle': [
+        'Создать тест',
+        'Добавить вопросы',
+        'Опубликовать тест',
+        'Создать попытку',
+        'Ответить на вопросы',
+        'Запросить подсказку AI',
+        'Завершить попытку',
+        'Получить результат',
+        'Снять с публикации',
+        'Удалить вопросы и тест',
+    ],
+    'test-create-flow': [
+        'Создать тест',
+        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Опубликовать тест',
+        'Снять тест с публикации',
+        'Обновить параметры теста',
+        'Изменить старые вопросы',
+        'Добавить 3 новых вопроса',
+        'Опубликовать тест повторно',
+        'Снять тест с публикации',
+        'Удалить вопросы',
+        'Удалить тест',
+    ],
+    'test-pass-flow': [
+        'Создать тест',
+        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Опубликовать тест',
+        'Создать попытку',
+        'Ответить на вопрос верно',
+        'Ответить на вопрос неверно',
+        'Запросить подсказку AI',
+        'Завершить попытку',
+        'Оценить попытку через grade',
+        'Получить результат оценки',
+        'Снять тест с публикации',
+        'Удалить вопросы',
+        'Удалить тест',
+    ],
+    'publish-without-questions': [
+        'Создать тест',
+        'Попробовать опубликовать без вопросов (ожидаем отказ)',
+        'Добавить вопрос',
+        'Опубликовать тест',
+        'Снять тест с публикации',
+        'Удалить вопрос',
+        'Удалить тест',
+    ],
+    'draft-flow': [
+        'Создать тест',
+        'Обновить параметры теста',
+        'Добавить вопросы',
+        'Переупорядочить вопросы',
+        'Обновить один вопрос',
+        'Удалить один вопрос',
+        'Удалить тест',
+    ],
+});
+
 const getScenarioExpectedTotal = (scenarioId) => SCENARIO_EXPECTED_TOTALS[scenarioId] ?? 0;
 
 const normalizePathParams = (path) => (path ? path.replace(/\{[^}]+\}/g, '{}') : '');
@@ -1210,9 +1281,12 @@ export default function SwaggerPage() {
     const [scenarioRunning, setScenarioRunning] = useState(false);
     const [scenarioResults, setScenarioResults] = useState([]);
     const [activeScenarioId, setActiveScenarioId] = useState('full-cycle');
+    const [selectedScenarioId, setSelectedScenarioId] = useState('full-cycle');
     const [expandedScenarioRows, setExpandedScenarioRows] = useState({});
     // Если включено, ответы в сценариях открываются по умолчанию.
     const [scenarioAutoExpand, setScenarioAutoExpand] = useState(false);
+    // Сохраняем раскрытие горизонтальных цепочек сценариев.
+    const [expandedWorkflowRoots, setExpandedWorkflowRoots] = useState({});
     const [endpointMeta, setEndpointMeta] = useState(DEFAULT_ENDPOINT_META);
     const [uploadFiles, setUploadFiles] = useState([]);
     const lastAppliedKeyRef = useRef('');
@@ -1416,7 +1490,12 @@ export default function SwaggerPage() {
             description: 'Работа с черновиком: обновления, порядок вопросов и удаление.',
             expectedTotal: getScenarioExpectedTotal('draft-flow'),
         },
-    ]), []);
+    ].map((scenario) => ({
+        ...scenario,
+        steps: SCENARIO_STEPS[scenario.id] || [],
+        children: SCENARIO_CHILDREN[scenario.id] || [],
+        nextId: SCENARIO_NEXT[scenario.id] || '',
+    }))), []);
     const activeScenario = useMemo(
         () => scenarioDefinitions.find((scenario) => scenario.id === activeScenarioId),
         [scenarioDefinitions, activeScenarioId],
@@ -1427,6 +1506,56 @@ export default function SwaggerPage() {
         () => Math.max(scenarioExpectedTotal - scenarioCompleted, 0),
         [scenarioExpectedTotal, scenarioCompleted],
     );
+    const scenarioById = useMemo(
+        () => new Map(scenarioDefinitions.map((scenario) => [scenario.id, scenario])),
+        [scenarioDefinitions],
+    );
+    const scenarioChildIds = useMemo(() => {
+        const ids = new Set();
+        scenarioDefinitions.forEach((scenario) => {
+            (scenario.children || []).forEach((childId) => ids.add(childId));
+        });
+        return ids;
+    }, [scenarioDefinitions]);
+    const scenarioRoots = useMemo(
+        () => scenarioDefinitions.filter((scenario) => !scenarioChildIds.has(scenario.id)),
+        [scenarioDefinitions, scenarioChildIds],
+    );
+    const selectedScenario = useMemo(
+        () => scenarioById.get(selectedScenarioId) || scenarioDefinitions[0] || null,
+        [scenarioById, scenarioDefinitions, selectedScenarioId],
+    );
+    const selectedScenarioExpectedTotal = selectedScenario?.expectedTotal ?? 0;
+    const selectedScenarioCompleted = selectedScenarioId === activeScenarioId ? scenarioCompleted : 0;
+    const selectedScenarioRemaining = Math.max(
+        selectedScenarioExpectedTotal - selectedScenarioCompleted,
+        0,
+    );
+    const selectedScenarioSummary = selectedScenarioId === activeScenarioId
+        ? scenarioSummary
+        : {total: 0, success: 0, failed: 0, skipped: 0};
+    const scenarioStatusSegments = useMemo(() => ([
+        {key: 'success', label: 'Успешно', value: selectedScenarioSummary.success, color: '#22c55e'},
+        {key: 'failed', label: 'Ошибки', value: selectedScenarioSummary.failed, color: '#ef4444'},
+        {key: 'skipped', label: 'Пропущено', value: selectedScenarioSummary.skipped, color: '#94a3b8'},
+    ]), [selectedScenarioSummary]);
+    const scenarioProgressSegments = useMemo(() => ([
+        {key: 'completed', label: 'Выполнено', value: selectedScenarioCompleted, color: '#0ea5e9'},
+        {key: 'remaining', label: 'Осталось', value: selectedScenarioRemaining, color: '#cbd5e1'},
+    ]), [selectedScenarioCompleted, selectedScenarioRemaining]);
+    const scenarioStatusGradient = useMemo(
+        () => buildConicGradient(scenarioStatusSegments, selectedScenarioSummary.total),
+        [scenarioStatusSegments, selectedScenarioSummary.total],
+    );
+    const scenarioProgressGradient = useMemo(
+        () => buildConicGradient(scenarioProgressSegments, selectedScenarioExpectedTotal),
+        [scenarioProgressSegments, selectedScenarioExpectedTotal],
+    );
+    const scenarioStatusRate = calcPercent(
+        selectedScenarioSummary.success,
+        selectedScenarioSummary.total,
+    );
+    const scenarioProgressRate = calcPercent(selectedScenarioCompleted, selectedScenarioExpectedTotal);
     const statusSegments = useMemo(() => ([
         {key: 'success', label: 'Успешно', value: autoTestSummary.success, color: '#22c55e'},
         {key: 'failed', label: 'Ошибка', value: autoTestSummary.failed, color: '#ef4444'},
@@ -1456,6 +1585,78 @@ export default function SwaggerPage() {
     const statusSuccessRate = calcPercent(autoTestSummary.success, autoTestSummary.total);
     const qualitySuccessRate = calcPercent(autoTestSummary.success, executedTotal);
     const coverageRate = calcPercent(executedTotal, autoTestSummary.total);
+    const selectedScenarioSteps = selectedScenario?.steps || [];
+
+    // Готовим горизонтальные цепочки сценариев в стиле GitHub Actions.
+    const buildScenarioChain = useCallback((startId) => {
+        const chain = [];
+        const visited = new Set();
+        let currentId = startId;
+
+        while (currentId && !visited.has(currentId)) {
+            const scenario = scenarioById.get(currentId);
+            if (!scenario) break;
+
+            chain.push(scenario);
+            visited.add(currentId);
+            currentId = scenario.nextId;
+        }
+
+        return chain;
+    }, [scenarioById]);
+
+    const workflowLanes = useMemo(() => {
+        const lanes = [];
+        const included = new Set();
+
+        scenarioRoots.forEach((root) => {
+            if (included.has(root.id)) return;
+
+            const hasChildren = (root.children || []).length > 0;
+            let nodes = [];
+
+            if (hasChildren) {
+                const childNextTargets = new Set(
+                    root.children
+                        .map((childId) => scenarioById.get(childId)?.nextId)
+                        .filter(Boolean),
+                );
+                const startChildId = root.children.find((childId) => !childNextTargets.has(childId))
+                    || root.children[0];
+                if (startChildId) {
+                    nodes = buildScenarioChain(startChildId);
+                }
+            } else {
+                nodes = buildScenarioChain(root.id);
+            }
+
+            const filteredNodes = nodes.filter((node) => !included.has(node.id));
+            filteredNodes.forEach((node) => included.add(node.id));
+
+            if (!hasChildren && filteredNodes.length === 0) {
+                filteredNodes.push(root);
+                included.add(root.id);
+            }
+
+            lanes.push({
+                id: root.id,
+                root,
+                hasChildren,
+                nodes: filteredNodes,
+            });
+        });
+
+        return lanes;
+    }, [scenarioRoots, scenarioById, buildScenarioChain]);
+
+    const getScenarioNodeStatus = useCallback((scenarioId) => {
+        if (scenarioId !== activeScenarioId) return 'idle';
+        if (scenarioRunning) return 'running';
+        if (scenarioSummary.failed > 0) return 'failed';
+        if (scenarioSummary.success > 0 && scenarioSummary.failed === 0) return 'success';
+        if (scenarioSummary.skipped > 0) return 'skipped';
+        return 'idle';
+    }, [activeScenarioId, scenarioRunning, scenarioSummary]);
 
     const applyEndpoint = useCallback((item, serviceKey) => {
         const nextBody = item.example != null
@@ -2973,6 +3174,7 @@ export default function SwaggerPage() {
         setScenarioRunning(true);
         setScenarioResults([]);
         setActiveScenarioId(scenarioId);
+        setSelectedScenarioId(scenarioId);
         setExpandedScenarioRows({});
 
         const runLabel = new Date().toLocaleString('ru-RU');
@@ -4128,6 +4330,94 @@ export default function SwaggerPage() {
         }
     };
 
+    const renderScenarioCard = (scenario, options = {}) => {
+        if (!scenario) return null;
+        const {compact = false, showRun = true} = options;
+        const nodeStatus = getScenarioNodeStatus(scenario.id);
+        const isSelected = selectedScenarioId === scenario.id;
+
+        return (
+            <div className={`swagger-workflow-card ${compact ? 'compact' : ''} ${isSelected ? 'selected' : ''}`}>
+                <button
+                    className="swagger-workflow-select"
+                    type="button"
+                    onClick={() => setSelectedScenarioId(scenario.id)}
+                >
+                    <span className={`swagger-workflow-dot ${nodeStatus}`} />
+                    <div className="swagger-workflow-content">
+                        <div className="swagger-workflow-title">{scenario.title}</div>
+                        {!compact && (
+                            <div className="swagger-workflow-desc">{scenario.description}</div>
+                        )}
+                    </div>
+                    <div className="swagger-workflow-meta">
+                        {scenario.tag && (
+                            <span className="swagger-workflow-tag">{scenario.tag}</span>
+                        )}
+                        <span className="swagger-workflow-count">Шагов: {scenario.expectedTotal}</span>
+                    </div>
+                </button>
+                {showRun && (
+                    <div className="swagger-workflow-actions">
+                        <button
+                            className="swagger-button ghost swagger-workflow-run"
+                            type="button"
+                            onClick={() => runScenario(scenario.id)}
+                            disabled={scenarioRunning || autoTestRunning}
+                        >
+                            {scenarioRunning && activeScenarioId === scenario.id ? '...' : 'Запустить'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderWorkflowLane = (lane) => {
+        if (!lane) return null;
+        const {root, nodes, hasChildren} = lane;
+        const isExpanded = Boolean(expandedWorkflowRoots[root.id]);
+        const hasToggle = hasChildren && nodes.length > 0;
+        const visibleNodes = hasChildren
+            ? (isExpanded && nodes.length > 0 ? [root, ...nodes] : [root])
+            : nodes;
+
+        return (
+            <div key={root.id} className="swagger-workflow-lane">
+                {visibleNodes.length > 0 && (
+                    <div className="swagger-workflow-row">
+                        {visibleNodes.map((scenario, index) => {
+                            const isRootNode = scenario.id === root.id;
+                            return (
+                                <div key={scenario.id} className="swagger-workflow-item">
+                                    {renderScenarioCard(scenario, {compact: !isRootNode})}
+                                    {index < visibleNodes.length - 1 && (
+                                        <span className="swagger-workflow-arrow" aria-hidden="true" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+                {hasToggle && (
+                    <div className="swagger-workflow-controls">
+                        <button
+                            className={`swagger-workflow-toggle ${isExpanded ? 'open' : ''}`}
+                            type="button"
+                            onClick={() => setExpandedWorkflowRoots((prev) => ({
+                                ...prev,
+                                [root.id]: !isExpanded,
+                            }))}
+                        >
+                            <span className="swagger-workflow-toggle-icon" />
+                            <span>{isExpanded ? 'Скрыть цепочку' : 'Показать цепочку'}</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <main className="swagger-shell">
             <header className="swagger-hero">
@@ -4800,39 +5090,169 @@ export default function SwaggerPage() {
                         <p className="swagger-hint">
                             Запускайте разные сценарии, чтобы быстро проверить ключевые ветки поведения тестов.
                         </p>
-                        <div className="swagger-scenario-grid">
-                            {scenarioDefinitions.map((scenario) => (
-                                <div
-                                    key={scenario.id}
-                                    className={`swagger-scenario-card ${activeScenarioId === scenario.id ? 'active' : ''}`}
-                                >
-                                    <div className="swagger-scenario-header">
-                                        <div>
-                                            <h3>{scenario.title}</h3>
-                                            <p className="swagger-scenario-desc">{scenario.description}</p>
-                                        </div>
-                                        <div className="swagger-scenario-meta">
-                                            {scenario.tag && (
-                                                <span className="swagger-scenario-tag">{scenario.tag}</span>
-                                            )}
-                                            <span className="swagger-scenario-count">
-                                                Шагов: {scenario.expectedTotal}
-                                            </span>
-                                        </div>
+                        <div className="swagger-workflow">
+                            {workflowLanes.map((lane) => renderWorkflowLane(lane))}
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Детали сценария</h2>
+                            <div className="swagger-tests-controls">
+                                {selectedScenario?.title && (
+                                    <span className="swagger-hint">{selectedScenario.title}</span>
+                                )}
+                                {selectedScenario && (
+                                    <button
+                                        className="swagger-button secondary"
+                                        type="button"
+                                        onClick={() => runScenario(selectedScenario.id)}
+                                        disabled={scenarioRunning || autoTestRunning}
+                                    >
+                                        {scenarioRunning && activeScenarioId === selectedScenario.id
+                                            ? '...'
+                                            : 'Запустить выбранный'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        {selectedScenario ? (
+                            <div className="swagger-scenario-detail">
+                                <div className="swagger-scenario-detail-main">
+                                    <div className="swagger-scenario-detail-header">
+                                        <h3>{selectedScenario.title}</h3>
+                                        {selectedScenario.tag && (
+                                            <span className="swagger-scenario-tag">{selectedScenario.tag}</span>
+                                        )}
                                     </div>
-                                    <div className="swagger-scenario-actions">
-                                        <button
-                                            className="swagger-button"
-                                            type="button"
-                                            onClick={() => runScenario(scenario.id)}
-                                            disabled={scenarioRunning || autoTestRunning}
-                                        >
-                                            {scenarioRunning && activeScenarioId === scenario.id ? '...' : 'Запустить сценарий'}
-                                        </button>
+                                    <p className="swagger-scenario-desc">{selectedScenario.description}</p>
+                                    {selectedScenario.children?.length ? (
+                                        <div className="swagger-scenario-children">
+                                            {selectedScenario.children.map((childId) => {
+                                                const child = scenarioById.get(childId);
+                                                if (!child) return null;
+                                                const childNext = child.nextId ? scenarioById.get(child.nextId) : null;
+                                                return (
+                                                    <div key={child.id} className="swagger-scenario-child">
+                                                        <button
+                                                            className="swagger-scenario-child-button"
+                                                            type="button"
+                                                            onClick={() => setSelectedScenarioId(child.id)}
+                                                        >
+                                                            <span className={`swagger-workflow-dot ${getScenarioNodeStatus(child.id)}`} />
+                                                            <div>
+                                                                <div className="swagger-scenario-child-title">{child.title}</div>
+                                                                <div className="swagger-scenario-child-meta">
+                                                                    Шагов: {child.expectedTotal}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                        {childNext && (
+                                                            <div className="swagger-scenario-child-next">
+                                                                Далее:{' '}
+                                                                <button
+                                                                    className="swagger-workflow-link"
+                                                                    type="button"
+                                                                    onClick={() => setSelectedScenarioId(childNext.id)}
+                                                                >
+                                                                    {childNext.title}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : selectedScenarioSteps.length ? (
+                                        <ol className="swagger-scenario-steps">
+                                            {selectedScenarioSteps.map((step, index) => (
+                                                <li key={`${selectedScenario.id}-step-${index}`} className="swagger-scenario-step">
+                                                    <span className="swagger-scenario-step-index">{index + 1}</span>
+                                                    <span className="swagger-scenario-step-text">{step}</span>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    ) : (
+                                        <p className="swagger-subtitle">Шаги сценария не описаны.</p>
+                                    )}
+                                    <div className="swagger-scenario-result">
+                                        {selectedScenarioId === activeScenarioId && scenarioResults.length ? (
+                                            <span>
+                                                Результат: успешно {scenarioSummary.success}, ошибки {scenarioSummary.failed},
+                                                пропущено {scenarioSummary.skipped}.
+                                            </span>
+                                        ) : (
+                                            <span>Результат: нет данных для выбранного сценария.</span>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="swagger-scenario-detail-charts">
+                                    <div className="swagger-chart-card">
+                                        <div className="swagger-chart-header">
+                                            <h3>Статусы</h3>
+                                            <span className="swagger-chart-total">{selectedScenarioSummary.total} шагов</span>
+                                        </div>
+                                        <div
+                                            className="swagger-donut"
+                                            style={{'--chart-gradient': scenarioStatusGradient}}
+                                        >
+                                            <div className="swagger-donut-center">
+                                                <div className="swagger-donut-value">{scenarioStatusRate}%</div>
+                                                <div className="swagger-donut-label">успех</div>
+                                            </div>
+                                        </div>
+                                        <div className="swagger-chart-legend">
+                                            {scenarioStatusSegments.map((segment) => (
+                                                <div key={segment.key} className="swagger-chart-legend-row">
+                                                    <span
+                                                        className="swagger-chart-dot"
+                                                        style={{'--dot-color': segment.color}}
+                                                    />
+                                                    <span className="swagger-chart-label">{segment.label}</span>
+                                                    <span className="swagger-chart-value">{segment.value}</span>
+                                                    <span className="swagger-chart-percent">
+                                                        {calcPercent(segment.value, selectedScenarioSummary.total)}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="swagger-chart-card">
+                                        <div className="swagger-chart-header">
+                                            <h3>Выполнение</h3>
+                                            <span className="swagger-chart-total">
+                                                {selectedScenarioCompleted} из {selectedScenarioExpectedTotal}
+                                            </span>
+                                        </div>
+                                        <div
+                                            className="swagger-donut"
+                                            style={{'--chart-gradient': scenarioProgressGradient}}
+                                        >
+                                            <div className="swagger-donut-center">
+                                                <div className="swagger-donut-value">{scenarioProgressRate}%</div>
+                                                <div className="swagger-donut-label">готово</div>
+                                            </div>
+                                        </div>
+                                        <div className="swagger-chart-legend">
+                                            {scenarioProgressSegments.map((segment) => (
+                                                <div key={segment.key} className="swagger-chart-legend-row">
+                                                    <span
+                                                        className="swagger-chart-dot"
+                                                        style={{'--dot-color': segment.color}}
+                                                    />
+                                                    <span className="swagger-chart-label">{segment.label}</span>
+                                                    <span className="swagger-chart-value">{segment.value}</span>
+                                                    <span className="swagger-chart-percent">
+                                                        {calcPercent(segment.value, selectedScenarioExpectedTotal)}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Нет доступных сценариев.</p>
+                        )}
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
@@ -4850,7 +5270,11 @@ export default function SwaggerPage() {
                                     <span>Открывать ответы заранее</span>
                                 </label>
                                 {activeScenario?.title && (
-                                    <span className="swagger-hint">{activeScenario.title}</span>
+                                    <span className="swagger-hint">
+                                        {selectedScenarioId === activeScenarioId
+                                            ? activeScenario.title
+                                            : `Результаты: ${activeScenario.title}`}
+                                    </span>
                                 )}
                             </div>
                         </div>
