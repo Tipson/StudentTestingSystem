@@ -85,16 +85,6 @@ const SCENARIO_EXPECTED_TOTALS = {
     'draft-flow': 8,
 };
 
-const SCENARIO_CHILDREN = Object.freeze({
-    'full-cycle': ['test-create-flow', 'test-pass-flow'],
-});
-
-const SCENARIO_NEXT = Object.freeze({
-    'test-create-flow': 'test-pass-flow',
-    'test-pass-flow': 'publish-without-questions',
-    'publish-without-questions': 'draft-flow',
-});
-
 const SCENARIO_STEPS = Object.freeze({
     'full-cycle': [
         'Создать тест',
@@ -156,7 +146,103 @@ const SCENARIO_STEPS = Object.freeze({
     ],
 });
 
+// Сопоставляем шаги сценариев с выполненными тестами по id шагов.
+const SCENARIO_STEP_MATCHERS = Object.freeze({
+    'full-cycle': [
+        {label: 'Создать тест', matchers: ['scenario-full-create']},
+        {label: 'Добавить вопросы', matchers: ['scenario-full-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-full-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-full-attempt']},
+        {label: 'Ответить на вопросы', matchers: ['scenario-full-answer-*']},
+        {label: 'Запросить подсказку AI', matchers: ['scenario-full-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-full-submit']},
+        {label: 'Получить результат', matchers: ['scenario-full-result']},
+        {label: 'Снять с публикации', matchers: ['scenario-full-unpublish']},
+        {label: 'Удалить вопросы и тест', matchers: ['scenario-full-delete-question-*', 'scenario-full-delete-test']},
+    ],
+    'test-create-flow': [
+        {label: 'Создать тест', matchers: ['scenario-create-test']},
+        {label: 'Добавить 4 вопроса разных типов (один с картинкой)', matchers: ['scenario-create-media', 'scenario-create-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-create-publish']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-create-update-test']},
+        {label: 'Изменить старые вопросы', matchers: ['scenario-create-update-question-*']},
+        {label: 'Добавить 3 новых вопроса', matchers: ['scenario-create-extra-question-*']},
+        {label: 'Опубликовать тест повторно', matchers: ['scenario-create-publish-again']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish-again']},
+        {label: 'Удалить вопросы', matchers: ['scenario-create-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-create-delete-test']},
+    ],
+    'test-pass-flow': [
+        {label: 'Создать тест', matchers: ['scenario-pass-test']},
+        {label: 'Добавить 4 вопроса разных типов (один с картинкой)', matchers: ['scenario-pass-media', 'scenario-pass-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-pass-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-pass-attempt']},
+        {label: 'Ответить на вопрос верно', matchers: ['scenario-pass-answer-correct']},
+        {label: 'Ответить на вопрос неверно', matchers: ['scenario-pass-answer-wrong', 'scenario-pass-answer-*']},
+        {label: 'Запросить подсказку AI', matchers: ['scenario-pass-ai-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-pass-submit']},
+        {label: 'Оценить попытку через grade', matchers: ['scenario-pass-grade']},
+        {label: 'Получить результат оценки', matchers: ['scenario-pass-result']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-pass-unpublish']},
+        {label: 'Удалить вопросы', matchers: ['scenario-pass-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-pass-delete-test']},
+    ],
+    'publish-without-questions': [
+        {label: 'Создать тест', matchers: ['scenario-publish-create']},
+        {label: 'Попробовать опубликовать без вопросов (ожидаем отказ)', matchers: ['scenario-publish-publish']},
+        {label: 'Добавить вопрос', matchers: ['scenario-publish-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-publish-success']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-publish-unpublish']},
+        {label: 'Удалить вопрос', matchers: ['scenario-publish-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-publish-delete-test']},
+    ],
+    'draft-flow': [
+        {label: 'Создать тест', matchers: ['scenario-draft-create']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-draft-update']},
+        {label: 'Добавить вопросы', matchers: ['scenario-draft-question-*']},
+        {label: 'Переупорядочить вопросы', matchers: ['scenario-draft-reorder']},
+        {label: 'Обновить один вопрос', matchers: ['scenario-draft-update-question']},
+        {label: 'Удалить один вопрос', matchers: ['scenario-draft-delete-question']},
+        {label: 'Удалить тест', matchers: ['scenario-draft-delete-test']},
+    ],
+});
+
 const getScenarioExpectedTotal = (scenarioId) => SCENARIO_EXPECTED_TOTALS[scenarioId] ?? 0;
+
+const getScenarioStepDefinitions = (scenarioId) => {
+    const custom = SCENARIO_STEP_MATCHERS[scenarioId];
+    if (custom) return custom;
+    return (SCENARIO_STEPS[scenarioId] || []).map((label) => ({label, matchers: []}));
+};
+
+const matchScenarioStepResult = (item, matchers) => {
+    if (!item || !matchers?.length) return false;
+    const id = String(item.id || '');
+    if (!id) return false;
+
+    return matchers.some((matcher) => {
+        if (!matcher) return false;
+        if (typeof matcher === 'function') return Boolean(matcher(item));
+        const raw = String(matcher);
+        if (raw.endsWith('*')) {
+            return id.startsWith(raw.slice(0, -1));
+        }
+        return id === raw;
+    });
+};
+
+const buildScenarioStepSummary = (items) => {
+    const summary = {total: items.length, success: 0, failed: 0, skipped: 0};
+
+    items.forEach((item) => {
+        if (item.status === 'success') summary.success += 1;
+        else if (item.status === 'failed') summary.failed += 1;
+        else if (item.status === 'skipped') summary.skipped += 1;
+    });
+
+    return summary;
+};
 
 const normalizePathParams = (path) => (path ? path.replace(/\{[^}]+\}/g, '{}') : '');
 
@@ -1278,15 +1364,17 @@ export default function SwaggerPage() {
     const [expandedAutoTestRows, setExpandedAutoTestRows] = useState({});
     // Если включено, ответы в автотестах открываются по умолчанию.
     const [autoTestAutoExpand, setAutoTestAutoExpand] = useState(false);
+    // Индекс последнего выполненного автотеста для анимации.
+    const [autoTestActiveIndex, setAutoTestActiveIndex] = useState(-1);
     const [scenarioRunning, setScenarioRunning] = useState(false);
     const [scenarioResults, setScenarioResults] = useState([]);
     const [activeScenarioId, setActiveScenarioId] = useState('full-cycle');
     const [selectedScenarioId, setSelectedScenarioId] = useState('full-cycle');
     const [expandedScenarioRows, setExpandedScenarioRows] = useState({});
+    // Раскрытие шагов сценария в деталях.
+    const [expandedScenarioSteps, setExpandedScenarioSteps] = useState({});
     // Если включено, ответы в сценариях открываются по умолчанию.
     const [scenarioAutoExpand, setScenarioAutoExpand] = useState(false);
-    // Сохраняем раскрытие горизонтальных цепочек сценариев.
-    const [expandedWorkflowRoots, setExpandedWorkflowRoots] = useState({});
     const [endpointMeta, setEndpointMeta] = useState(DEFAULT_ENDPOINT_META);
     const [uploadFiles, setUploadFiles] = useState([]);
     const lastAppliedKeyRef = useRef('');
@@ -1365,6 +1453,7 @@ export default function SwaggerPage() {
         () => Math.max(autoTestExpectedTotal - autoTestCompleted, 0),
         [autoTestExpectedTotal, autoTestCompleted],
     );
+    const autoTestProgress = calcPercent(autoTestCompleted, autoTestExpectedTotal);
     const autoTestSummary = useMemo(() => {
         const summary = {total: autoTestResults.length, success: 0, failed: 0, skipped: 0};
 
@@ -1454,7 +1543,7 @@ export default function SwaggerPage() {
 
         return summary;
     }, [scenarioResults]);
-    const scenarioDefinitions = useMemo(() => ([
+const scenarioDefinitions = useMemo(() => ([
         {
             id: 'full-cycle',
             title: 'Полный цикл теста',
@@ -1493,8 +1582,6 @@ export default function SwaggerPage() {
     ].map((scenario) => ({
         ...scenario,
         steps: SCENARIO_STEPS[scenario.id] || [],
-        children: SCENARIO_CHILDREN[scenario.id] || [],
-        nextId: SCENARIO_NEXT[scenario.id] || '',
     }))), []);
     const activeScenario = useMemo(
         () => scenarioDefinitions.find((scenario) => scenario.id === activeScenarioId),
@@ -1510,17 +1597,7 @@ export default function SwaggerPage() {
         () => new Map(scenarioDefinitions.map((scenario) => [scenario.id, scenario])),
         [scenarioDefinitions],
     );
-    const scenarioChildIds = useMemo(() => {
-        const ids = new Set();
-        scenarioDefinitions.forEach((scenario) => {
-            (scenario.children || []).forEach((childId) => ids.add(childId));
-        });
-        return ids;
-    }, [scenarioDefinitions]);
-    const scenarioRoots = useMemo(
-        () => scenarioDefinitions.filter((scenario) => !scenarioChildIds.has(scenario.id)),
-        [scenarioDefinitions, scenarioChildIds],
-    );
+    const scenarioRoots = useMemo(() => scenarioDefinitions, [scenarioDefinitions]);
     const selectedScenario = useMemo(
         () => scenarioById.get(selectedScenarioId) || scenarioDefinitions[0] || null,
         [scenarioById, scenarioDefinitions, selectedScenarioId],
@@ -1585,69 +1662,58 @@ export default function SwaggerPage() {
     const statusSuccessRate = calcPercent(autoTestSummary.success, autoTestSummary.total);
     const qualitySuccessRate = calcPercent(autoTestSummary.success, executedTotal);
     const coverageRate = calcPercent(executedTotal, autoTestSummary.total);
-    const selectedScenarioSteps = selectedScenario?.steps || [];
+    const selectedScenarioStepDefs = useMemo(
+        () => (selectedScenario?.id ? getScenarioStepDefinitions(selectedScenario.id) : []),
+        [selectedScenario],
+    );
+    const scopedScenarioResults = useMemo(
+        () => (selectedScenarioId === activeScenarioId ? scenarioResults : []),
+        [selectedScenarioId, activeScenarioId, scenarioResults],
+    );
+    const lastScenarioResultId = scopedScenarioResults.length
+        ? scopedScenarioResults[scopedScenarioResults.length - 1].id
+        : '';
+    const scenarioStepDetails = useMemo(() => selectedScenarioStepDefs.map((step, index) => {
+        const matchers = step.matchers || [];
+        const matched = matchers.length
+            ? scopedScenarioResults.filter((item) => matchScenarioStepResult(item, matchers))
+            : [];
+        const summary = buildScenarioStepSummary(matched);
+        const expectedStatuses = Array.isArray(step.expectedStatus) && step.expectedStatus.length
+            ? step.expectedStatus
+            : ['success'];
+        const accounted = matched.reduce((total, item) => (
+            total + (expectedStatuses.includes(item.status) ? 1 : 0)
+        ), 0);
+        const hasMatched = matched.length > 0;
+        const isAligned = hasMatched && matched.every((item) => expectedStatuses.includes(item.status));
+        let status = 'idle';
 
-    // Готовим горизонтальные цепочки сценариев в стиле GitHub Actions.
-    const buildScenarioChain = useCallback((startId) => {
-        const chain = [];
-        const visited = new Set();
-        let currentId = startId;
-
-        while (currentId && !visited.has(currentId)) {
-            const scenario = scenarioById.get(currentId);
-            if (!scenario) break;
-
-            chain.push(scenario);
-            visited.add(currentId);
-            currentId = scenario.nextId;
+        if (hasMatched) {
+            status = isAligned ? 'success' : 'failed';
+            if (summary.skipped > 0 && summary.success === 0 && summary.failed === 0) {
+                status = 'skipped';
+            }
         }
 
-        return chain;
-    }, [scenarioById]);
+        if (scenarioRunning && lastScenarioResultId && matched.some((item) => item.id === lastScenarioResultId)) {
+            status = 'running';
+        }
 
-    const workflowLanes = useMemo(() => {
-        const lanes = [];
-        const included = new Set();
+        return {
+            key: `${selectedScenario?.id || 'scenario'}-${index}`,
+            label: step.label,
+            summary,
+            results: matched,
+            progress: hasMatched ? calcPercent(accounted, matched.length) : 0,
+            status,
+        };
+    }), [selectedScenario?.id, selectedScenarioStepDefs, scopedScenarioResults, lastScenarioResultId, scenarioRunning]);
 
-        scenarioRoots.forEach((root) => {
-            if (included.has(root.id)) return;
-
-            const hasChildren = (root.children || []).length > 0;
-            let nodes = [];
-
-            if (hasChildren) {
-                const childNextTargets = new Set(
-                    root.children
-                        .map((childId) => scenarioById.get(childId)?.nextId)
-                        .filter(Boolean),
-                );
-                const startChildId = root.children.find((childId) => !childNextTargets.has(childId))
-                    || root.children[0];
-                if (startChildId) {
-                    nodes = buildScenarioChain(startChildId);
-                }
-            } else {
-                nodes = buildScenarioChain(root.id);
-            }
-
-            const filteredNodes = nodes.filter((node) => !included.has(node.id));
-            filteredNodes.forEach((node) => included.add(node.id));
-
-            if (!hasChildren && filteredNodes.length === 0) {
-                filteredNodes.push(root);
-                included.add(root.id);
-            }
-
-            lanes.push({
-                id: root.id,
-                root,
-                hasChildren,
-                nodes: filteredNodes,
-            });
-        });
-
-        return lanes;
-    }, [scenarioRoots, scenarioById, buildScenarioChain]);
+    const workflowLanes = useMemo(
+        () => scenarioDefinitions.map((scenario) => ({id: scenario.id, scenario})),
+        [scenarioDefinitions],
+    );
 
     const getScenarioNodeStatus = useCallback((scenarioId) => {
         if (scenarioId !== activeScenarioId) return 'idle';
@@ -1679,6 +1745,11 @@ export default function SwaggerPage() {
             body: nextBody,
         }));
     }, []);
+
+    // При смене выбранного сценария скрываем детали шагов.
+    useEffect(() => {
+        setExpandedScenarioSteps({});
+    }, [selectedScenarioId]);
 
     // Сбрасываем путь и метаданные, если текущий путь не подходит под выбранные сервис/метод.
     useEffect(() => {
@@ -2322,6 +2393,7 @@ export default function SwaggerPage() {
         setAutoTestRunning(true);
         setAutoTestResults([]);
         setExpandedAutoTestRows({});
+        setAutoTestActiveIndex(-1);
 
         const runLabel = new Date().toLocaleString('ru-RU');
         const ctx = {
@@ -2344,7 +2416,12 @@ export default function SwaggerPage() {
         };
 
         const pushResult = (result) => {
-            setAutoTestResults((prev) => [...prev, result]);
+            setAutoTestResults((prev) => {
+                const nextIndex = prev.length;
+                const next = [...prev, {...result, sequenceIndex: nextIndex}];
+                setAutoTestActiveIndex(nextIndex);
+                return next;
+            });
         };
 
         const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
@@ -3164,6 +3241,7 @@ export default function SwaggerPage() {
             });
         } finally {
             setAutoTestRunning(false);
+            setAutoTestActiveIndex(-1);
         }
     };
 
@@ -3176,6 +3254,7 @@ export default function SwaggerPage() {
         setActiveScenarioId(scenarioId);
         setSelectedScenarioId(scenarioId);
         setExpandedScenarioRows({});
+        setExpandedScenarioSteps({});
 
         const runLabel = new Date().toLocaleString('ru-RU');
         const ctx = {
@@ -4159,6 +4238,27 @@ export default function SwaggerPage() {
                     }
 
                     await runStep({
+                        id: 'scenario-full-hint',
+                        title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        service: 'ai',
+                        method: 'POST',
+                        path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
+                            const hintQuestion = ctx.values.questions[0];
+                            return hintQuestion ? '' : 'Нет вопроса для подсказки.';
+                        },
+                        run: () => {
+                            const hintQuestion = ctx.values.questions[0];
+                            return ctx.ai.post(
+                                `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(hintQuestion)}/hint`,
+                                null,
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
                         id: 'scenario-full-submit',
                         title: 'POST /api/attempts/{id}/submit',
                         service: 'assessment',
@@ -4330,6 +4430,67 @@ export default function SwaggerPage() {
         }
     };
 
+    const renderScenarioResultRow = (item, index) => {
+        const rowKey = makeResultRowKey(item, index);
+        const responseText = formatAutoTestResponse(item.responseData);
+        const canToggle = Boolean(responseText);
+        const hasOverride = Object.prototype.hasOwnProperty.call(
+            expandedScenarioRows,
+            rowKey,
+        );
+        const isExpanded = hasOverride
+            ? expandedScenarioRows[rowKey]
+            : scenarioAutoExpand;
+
+        return (
+            <div
+                key={rowKey}
+                className={`swagger-test-row ${item.status}`}
+            >
+                <div className="swagger-test-main">
+                    <span className={`method-badge ${item.method.toLowerCase()}`}>
+                        {item.method}
+                    </span>
+                    <div className="swagger-test-meta">
+                        <div className="swagger-test-path">{item.path}</div>
+                        {item.title && (
+                            <div className="swagger-test-title">{item.title}</div>
+                        )}
+                    </div>
+                </div>
+                <div className="swagger-test-metrics">
+                    <span className="swagger-test-status">
+                        {getAutoTestStatusLabel(item.status)}
+                    </span>
+                    {item.httpStatus != null && (
+                        <span className="swagger-test-code">HTTP {item.httpStatus}</span>
+                    )}
+                    <span className="swagger-test-time">{item.durationMs} мс</span>
+                    {canToggle && (
+                        <button
+                            className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                            type="button"
+                            onClick={() => setExpandedScenarioRows((prev) => ({
+                                ...prev,
+                                [rowKey]: !isExpanded,
+                            }))}
+                            aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                            title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                        >
+                            <span className="swagger-chevron" />
+                        </button>
+                    )}
+                </div>
+                {item.message && (
+                    <div className="swagger-test-message">{item.message}</div>
+                )}
+                {canToggle && isExpanded && (
+                    <pre className="swagger-test-response">{responseText}</pre>
+                )}
+            </div>
+        );
+    };
+
     const renderScenarioCard = (scenario, options = {}) => {
         if (!scenario) return null;
         const {compact = false, showRun = true} = options;
@@ -4375,45 +4536,15 @@ export default function SwaggerPage() {
 
     const renderWorkflowLane = (lane) => {
         if (!lane) return null;
-        const {root, nodes, hasChildren} = lane;
-        const isExpanded = Boolean(expandedWorkflowRoots[root.id]);
-        const hasToggle = hasChildren && nodes.length > 0;
-        const visibleNodes = hasChildren
-            ? (isExpanded && nodes.length > 0 ? [root, ...nodes] : [root])
-            : nodes;
+        const {scenario} = lane;
 
         return (
-            <div key={root.id} className="swagger-workflow-lane">
-                {visibleNodes.length > 0 && (
-                    <div className="swagger-workflow-row">
-                        {visibleNodes.map((scenario, index) => {
-                            const isRootNode = scenario.id === root.id;
-                            return (
-                                <div key={scenario.id} className="swagger-workflow-item">
-                                    {renderScenarioCard(scenario, {compact: !isRootNode})}
-                                    {index < visibleNodes.length - 1 && (
-                                        <span className="swagger-workflow-arrow" aria-hidden="true" />
-                                    )}
-                                </div>
-                            );
-                        })}
+            <div key={scenario.id} className="swagger-workflow-lane">
+                <div className="swagger-workflow-row">
+                    <div className="swagger-workflow-item">
+                        {renderScenarioCard(scenario)}
                     </div>
-                )}
-                {hasToggle && (
-                    <div className="swagger-workflow-controls">
-                        <button
-                            className={`swagger-workflow-toggle ${isExpanded ? 'open' : ''}`}
-                            type="button"
-                            onClick={() => setExpandedWorkflowRoots((prev) => ({
-                                ...prev,
-                                [root.id]: !isExpanded,
-                            }))}
-                        >
-                            <span className="swagger-workflow-toggle-icon" />
-                            <span>{isExpanded ? 'Скрыть цепочку' : 'Показать цепочку'}</span>
-                        </button>
-                    </div>
-                )}
+                </div>
             </div>
         );
     };
@@ -4741,6 +4872,15 @@ export default function SwaggerPage() {
                             <span>Ошибки: {autoTestSummary.failed}</span>
                             <span>Пропущено: {autoTestSummary.skipped}</span>
                         </div>
+                        <div className="swagger-progress">
+                            <div
+                                className={`swagger-progress-bar ${autoTestRunning ? 'running' : ''}`}
+                                style={{'--progress': `${autoTestProgress}%`}}
+                            />
+                            <div className="swagger-progress-meta">
+                                Прогресс: {autoTestProgress}%
+                            </div>
+                        </div>
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
@@ -4885,11 +5025,13 @@ export default function SwaggerPage() {
                                                             const isExpanded = hasOverride
                                                                 ? expandedAutoTestRows[rowKey]
                                                                 : autoTestAutoExpand;
+                                                            const isActive = autoTestRunning
+                                                                && item.sequenceIndex === autoTestActiveIndex;
 
                                                             return (
                                                                 <div
                                                                     key={rowKey}
-                                                                    className={`swagger-selection-item ${item.status}`}
+                                                                    className={`swagger-selection-item ${item.status} ${isActive ? 'is-active' : ''}`}
                                                                 >
                                                                     <span className={`method-badge ${item.method.toLowerCase()}`}>
                                                                         {item.method}
@@ -4944,11 +5086,13 @@ export default function SwaggerPage() {
                                     const isExpanded = hasOverride
                                         ? expandedAutoTestRows[rowKey]
                                         : autoTestAutoExpand;
+                                    const isActive = autoTestRunning
+                                        && item.sequenceIndex === autoTestActiveIndex;
 
                                     return (
                                         <div
                                             key={rowKey}
-                                            className={`swagger-selection-item ${item.status}`}
+                                            className={`swagger-selection-item ${item.status} ${isActive ? 'is-active' : ''}`}
                                         >
                                             <span className={`method-badge ${item.method.toLowerCase()}`}>
                                                 {item.method}
@@ -5018,11 +5162,13 @@ export default function SwaggerPage() {
                                     const isExpanded = hasOverride
                                         ? expandedAutoTestRows[rowKey]
                                         : autoTestAutoExpand;
+                                    const isActive = autoTestRunning
+                                        && item.sequenceIndex === autoTestActiveIndex;
 
                                     return (
                                         <div
                                             key={rowKey}
-                                            className={`swagger-test-row ${item.status}`}
+                                            className={`swagger-test-row ${item.status} ${isActive ? 'is-active' : ''}`}
                                         >
                                             <div className="swagger-test-main">
                                                 <span className={`method-badge ${item.method.toLowerCase()}`}>
@@ -5125,52 +5271,67 @@ export default function SwaggerPage() {
                                         )}
                                     </div>
                                     <p className="swagger-scenario-desc">{selectedScenario.description}</p>
-                                    {selectedScenario.children?.length ? (
-                                        <div className="swagger-scenario-children">
-                                            {selectedScenario.children.map((childId) => {
-                                                const child = scenarioById.get(childId);
-                                                if (!child) return null;
-                                                const childNext = child.nextId ? scenarioById.get(child.nextId) : null;
+                                    {scenarioStepDetails.length ? (
+                                        <div className="swagger-scenario-steps">
+                                            {scenarioStepDetails.map((step, index) => {
+                                                const stepKey = step.key;
+                                                const isExpanded = Boolean(expandedScenarioSteps[stepKey]);
+                                                const canToggle = step.results.length > 0;
+
                                                 return (
-                                                    <div key={child.id} className="swagger-scenario-child">
-                                                        <button
-                                                            className="swagger-scenario-child-button"
-                                                            type="button"
-                                                            onClick={() => setSelectedScenarioId(child.id)}
-                                                        >
-                                                            <span className={`swagger-workflow-dot ${getScenarioNodeStatus(child.id)}`} />
-                                                            <div>
-                                                                <div className="swagger-scenario-child-title">{child.title}</div>
-                                                                <div className="swagger-scenario-child-meta">
-                                                                    Шагов: {child.expectedTotal}
-                                                                </div>
+                                                    <div
+                                                        key={stepKey}
+                                                        className={`swagger-scenario-step-item ${step.status}`}
+                                                        style={{'--step-progress': `${step.progress}%`}}
+                                                    >
+                                                        <div className="swagger-scenario-step-head">
+                                                            <div className="swagger-scenario-step-title">
+                                                                <span className="swagger-scenario-step-index">{index + 1}</span>
+                                                                <span className="swagger-scenario-step-text">{step.label}</span>
                                                             </div>
-                                                        </button>
-                                                        {childNext && (
-                                                            <div className="swagger-scenario-child-next">
-                                                                Далее:{' '}
-                                                                <button
-                                                                    className="swagger-workflow-link"
-                                                                    type="button"
-                                                                    onClick={() => setSelectedScenarioId(childNext.id)}
-                                                                >
-                                                                    {childNext.title}
-                                                                </button>
+                                                            <div className="swagger-scenario-step-metrics">
+                                                                <span className="swagger-scenario-step-count">
+                                                                    {step.summary.total} тестов
+                                                                </span>
+                                                                <span className="swagger-scenario-step-rate">
+                                                                    {step.progress}%
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill success">
+                                                                    ✓ {step.summary.success}
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill failed">
+                                                                    ✕ {step.summary.failed}
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill skipped">
+                                                                    → {step.summary.skipped}
+                                                                </span>
+                                                                {canToggle && (
+                                                                    <button
+                                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                                        type="button"
+                                                                        onClick={() => setExpandedScenarioSteps((prev) => ({
+                                                                            ...prev,
+                                                                            [stepKey]: !isExpanded,
+                                                                        }))}
+                                                                        aria-label={isExpanded ? 'Скрыть тесты шага' : 'Показать тесты шага'}
+                                                                        title={isExpanded ? 'Скрыть тесты шага' : 'Показать тесты шага'}
+                                                                    >
+                                                                        <span className="swagger-chevron" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {canToggle && isExpanded && (
+                                                            <div className="swagger-scenario-step-tests">
+                                                                {step.results.map((item, resultIndex) => (
+                                                                    renderScenarioResultRow(item, resultIndex)
+                                                                ))}
                                                             </div>
                                                         )}
                                                     </div>
                                                 );
                                             })}
                                         </div>
-                                    ) : selectedScenarioSteps.length ? (
-                                        <ol className="swagger-scenario-steps">
-                                            {selectedScenarioSteps.map((step, index) => (
-                                                <li key={`${selectedScenario.id}-step-${index}`} className="swagger-scenario-step">
-                                                    <span className="swagger-scenario-step-index">{index + 1}</span>
-                                                    <span className="swagger-scenario-step-text">{step}</span>
-                                                </li>
-                                            ))}
-                                        </ol>
                                     ) : (
                                         <p className="swagger-subtitle">Шаги сценария не описаны.</p>
                                     )}
@@ -5287,66 +5448,7 @@ export default function SwaggerPage() {
                         </div>
                         {scenarioResults.length ? (
                             <div className="swagger-tests-list">
-                                {scenarioResults.map((item, index) => {
-                                    const rowKey = makeResultRowKey(item, index);
-                                    const responseText = formatAutoTestResponse(item.responseData);
-                                    const canToggle = Boolean(responseText);
-                                    const hasOverride = Object.prototype.hasOwnProperty.call(
-                                        expandedScenarioRows,
-                                        rowKey,
-                                    );
-                                    const isExpanded = hasOverride
-                                        ? expandedScenarioRows[rowKey]
-                                        : scenarioAutoExpand;
-
-                                    return (
-                                        <div
-                                            key={rowKey}
-                                            className={`swagger-test-row ${item.status}`}
-                                        >
-                                            <div className="swagger-test-main">
-                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
-                                                    {item.method}
-                                                </span>
-                                                <div className="swagger-test-meta">
-                                                    <div className="swagger-test-path">{item.path}</div>
-                                                    {item.title && (
-                                                        <div className="swagger-test-title">{item.title}</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="swagger-test-metrics">
-                                                <span className="swagger-test-status">
-                                                    {getAutoTestStatusLabel(item.status)}
-                                                </span>
-                                                {item.httpStatus != null && (
-                                                    <span className="swagger-test-code">HTTP {item.httpStatus}</span>
-                                                )}
-                                                <span className="swagger-test-time">{item.durationMs} мс</span>
-                                                {canToggle && (
-                                                    <button
-                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
-                                                        type="button"
-                                                        onClick={() => setExpandedScenarioRows((prev) => ({
-                                                            ...prev,
-                                                            [rowKey]: !isExpanded,
-                                                        }))}
-                                                        aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
-                                                        title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
-                                                    >
-                                                        <span className="swagger-chevron" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {item.message && (
-                                                <div className="swagger-test-message">{item.message}</div>
-                                            )}
-                                            {canToggle && isExpanded && (
-                                                <pre className="swagger-test-response">{responseText}</pre>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                {scenarioResults.map((item, index) => renderScenarioResultRow(item, index))}
                             </div>
                         ) : (
                             <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
