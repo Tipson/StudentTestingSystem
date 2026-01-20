@@ -204,6 +204,145 @@
     word-break: break-word;
 }
 
+.swagger-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 16px;
+    margin-bottom: 8px;
+}
+
+.swagger-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.swagger-form-actions .swagger-hint {
+    margin: 0;
+}
+
+.swagger-security-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.swagger-security-block h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.swagger-security-list {
+    display: grid;
+    gap: 10px;
+}
+
+.swagger-security-item {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.swagger-security-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.swagger-security-meta {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-security-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.swagger-security-tag {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    color: #0f172a;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.swagger-security-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swagger-security-stack {
+    margin-top: 16px;
+}
+
+.swagger-otp-grid {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 1fr;
+    gap: 16px;
+    margin: 8px 0 12px;
+    align-items: start;
+}
+
+.swagger-otp-qr {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+}
+
+.swagger-otp-qr img {
+    width: 100%;
+    height: auto;
+    max-width: 220px;
+}
+
+.swagger-otp-placeholder {
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.swagger-otp-details {
+    display: grid;
+    gap: 8px;
+}
+
+.swagger-otp-code {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.swagger-otp-meta {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.swagger-otp-apps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 .swagger-role-list {
     display: flex;
     flex-wrap: wrap;
@@ -1047,6 +1186,10 @@
     }
 
     .swagger-profile-row {
+        grid-template-columns: 1fr;
+    }
+
+    .swagger-otp-grid {
         grid-template-columns: 1fr;
     }
 

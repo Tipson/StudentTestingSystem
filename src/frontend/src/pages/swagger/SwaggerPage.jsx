@@ -6,7 +6,20 @@ import {AUTH, getAccessToken} from '@api/auth.js';
 import {assessmentApiDocs, identifyApiDocs, mediaApiDocs} from '@api';
 import testCatImage from './testCat.png';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
-import {clearStoredTokens, getKeycloakConfig, getStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
+import {clearStoredTokens, getStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
+import {
+    deleteKeycloakCredential,
+    fetchKeycloakAccountProfile,
+    fetchKeycloakCredentials,
+    fetchKeycloakOtpSecret,
+    fetchKeycloakSessions,
+    getKeycloakAccountUrl,
+    enableKeycloakOtp,
+    logoutAllKeycloakSessions,
+    logoutKeycloakSession,
+    updateKeycloakAccountProfile,
+    updateKeycloakPassword,
+} from '@shared/auth/keycloakAccount.js';
 import {useUser} from '@shared/auth/UserProvider.jsx';
 import './SwaggerPage.css';
 
@@ -246,6 +259,76 @@ const formatResponse = (payload) => {
     } catch (error) {
         return String(payload.data);
     }
+};
+
+   const formatDateTime = (value) => {
+       if (value == null || value === '') return '';
+       const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
+       if (Number.isNaN(date.getTime())) return String(value);
+       return date.toLocaleString('ru-RU');
+   };
+
+// Нормализуем список клиентов сессии для отображения.
+const normalizeSessionClients = (clients) => {
+    if (!clients) return [];
+    if (Array.isArray(clients)) {
+        return clients
+            .map((client) => {
+                if (typeof client === 'string') return client;
+                return client?.clientId || client?.id || client?.name || '';
+            })
+            .filter(Boolean);
+    }
+    if (typeof clients === 'object') return Object.keys(clients);
+    return [];
+};
+
+// Подбираем человекочитаемую подпись для credential.
+const resolveCredentialLabel = (credential) => {
+    if (!credential) return 'Учётные данные';
+    if (credential.userLabel) return credential.userLabel;
+    const type = credential.type || credential.credentialType || '';
+    if (type === 'password') return 'Пароль';
+    if (type === 'otp') return 'OTP';
+    if (type === 'webauthn') return 'WebAuthn';
+    return type || 'Учётные данные';
+};
+
+// Достаём секрет и QR для OTP из разных версий ответа Keycloak.
+const resolveOtpSecret = (data) => (
+    data?.totpSecret
+    || data?.totpSecretEncoded
+    || data?.secret
+    || data?.secretEncoded
+    || data?.totp?.totpSecret
+    || data?.totp?.totpSecretEncoded
+    || ''
+);
+
+const resolveOtpQrSource = (data) => (
+    data?.qrCode
+    || data?.qrCodeUrl
+    || data?.qrUrl
+    || data?.totpSecretQrCode
+    || data?.totp?.qrCode
+    || data?.totp?.qrUrl
+    || ''
+);
+
+const normalizeOtpQrSource = (value) => {
+    if (!value) return '';
+    if (/^data:image/i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) return value;
+    return `data:image/png;base64,${value}`;
+};
+
+const buildAccountProfilePayload = (form) => {
+    const payload = {};
+    if (form.username) payload.username = form.username;
+    if (form.email) payload.email = form.email;
+    if (form.firstName) payload.firstName = form.firstName;
+    if (form.lastName) payload.lastName = form.lastName;
+    return payload;
 };
 
 const isBinaryPayload = (value) => {
@@ -968,6 +1051,41 @@ const buildPathLabel = (item, groupTitle) => {
 export default function SwaggerPage() {
     const {profile, roles, source, refreshUser, clearUser} = useUser();
     const [tokens, setTokens] = useState(() => getStoredTokens());
+    const [accountProfile, setAccountProfile] = useState(null);
+    const [accountProfileLoading, setAccountProfileLoading] = useState(false);
+    const [accountProfileError, setAccountProfileError] = useState('');
+    const [accountSecurityLoading, setAccountSecurityLoading] = useState(false);
+    const [accountSecurityError, setAccountSecurityError] = useState('');
+    const [accountSessions, setAccountSessions] = useState([]);
+    const [accountCredentials, setAccountCredentials] = useState([]);
+    const [profileForm, setProfileForm] = useState({
+        username: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+    });
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileDirty, setProfileDirty] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+    });
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [otpData, setOtpData] = useState(null);
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [otpError, setOtpError] = useState('');
+    const [otpForm, setOtpForm] = useState({
+        code: '',
+        deviceName: '',
+    });
+    const [otpSaving, setOtpSaving] = useState(false);
+    const profileInitRef = useRef('');
+    // Рефы для защиты от повторных загрузок профиля/безопасности.
+    const profileDirtyRef = useRef(false);
+    const accountProfileLoadingRef = useRef(false);
+    const accountSecurityLoadingRef = useRef(false);
+    const profileTabLoadedRef = useRef(false);
     const serviceEntries = useMemo(
         () => Object.entries(API_BASE_URLS)
             .filter(([, url]) => Boolean(url))
@@ -1302,12 +1420,11 @@ export default function SwaggerPage() {
         ? new Date(tokens.expiresAt).toLocaleString('ru-RU')
         : '';
     // Ссылка на личный кабинет Keycloak для быстрого перехода.
-    const keycloakAccountUrl = useMemo(() => {
-        const config = getKeycloakConfig();
-        const baseUrl = config.baseUrl?.replace(/\/$/, '');
-        if (!baseUrl || !config.realm) return '';
-        return `${baseUrl}/realms/${config.realm}/account`;
-    }, []);
+    const keycloakAccountUrl = useMemo(() => getKeycloakAccountUrl(), []);
+    const keycloakSecurityUrl = useMemo(
+        () => (keycloakAccountUrl ? `${keycloakAccountUrl}/#/security/signing-in` : ''),
+        [keycloakAccountUrl],
+    );
     const profileRows = useMemo(() => ([
         {label: 'ID', value: profile?.id},
         {label: 'Логин', value: profile?.username},
@@ -1319,6 +1436,172 @@ export default function SwaggerPage() {
     const sortedRoles = useMemo(() => (
         Array.isArray(roles) ? roles.slice().sort((a, b) => a.localeCompare(b)) : []
     ), [roles]);
+    const otpSecret = useMemo(() => resolveOtpSecret(otpData), [otpData]);
+    const otpQrSource = useMemo(
+        () => normalizeOtpQrSource(resolveOtpQrSource(otpData)),
+        [otpData],
+    );
+    const otpPolicy = useMemo(
+        () => otpData?.policy || otpData?.totp?.policy || null,
+        [otpData],
+    );
+    const otpApps = useMemo(() => {
+        const apps = otpData?.supportedApplications || otpData?.totp?.supportedApplications || [];
+        return Array.isArray(apps) ? apps : [];
+    }, [otpData]);
+    const otpAppNames = useMemo(() => (
+        otpApps
+            .map((app) => {
+                if (typeof app === 'string') return app;
+                return app?.name || app?.displayName || app?.label || app?.id || '';
+            })
+            .filter(Boolean)
+    ), [otpApps]);
+    const otpPolicyText = useMemo(() => {
+        if (!otpPolicy) return '';
+        const parts = [];
+        if (otpPolicy.type) parts.push(`Тип: ${otpPolicy.type}`);
+        if (otpPolicy.algorithm || otpPolicy.algorithmKey) {
+            parts.push(`Алгоритм: ${otpPolicy.algorithm || otpPolicy.algorithmKey}`);
+        }
+        if (otpPolicy.digits) parts.push(`Цифры: ${otpPolicy.digits}`);
+        if (otpPolicy.period) parts.push(`Интервал: ${otpPolicy.period}`);
+        if (otpPolicy.initialCounter) parts.push(`Счётчик: ${otpPolicy.initialCounter}`);
+        return parts.join(' | ');
+    }, [otpPolicy]);
+    const otpCredentialsCount = useMemo(() => (
+        Array.isArray(accountCredentials)
+            ? accountCredentials.filter((cred) => (
+                (cred?.type || cred?.credentialType) === 'otp'
+            )).length
+            : 0
+    ), [accountCredentials]);
+    const syncProfileForm = useCallback((data, resetDirty = true) => {
+        const next = {
+            username: data?.username || profile?.username || '',
+            email: data?.email || profile?.email || '',
+            firstName: data?.firstName || profile?.name || '',
+            lastName: data?.lastName || profile?.familyName || '',
+        };
+        setProfileForm(next);
+        if (resetDirty) {
+            setProfileDirty(false);
+        }
+    }, [profile]);
+    const loadAccountProfile = useCallback(async (force = false) => {
+        if (!hasToken) {
+            setAccountProfile(null);
+            setAccountProfileError('');
+            accountProfileLoadingRef.current = false;
+            return;
+        }
+
+        if (accountProfileLoadingRef.current && !force) return;
+
+        accountProfileLoadingRef.current = true;
+        setAccountProfileLoading(true);
+        setAccountProfileError('');
+
+        try {
+            const data = await fetchKeycloakAccountProfile();
+            setAccountProfile(data);
+            if (!profileDirtyRef.current || force) {
+                syncProfileForm(data, true);
+            }
+        } catch (error) {
+            setAccountProfileError(error?.message || 'Не удалось загрузить профиль Keycloak.');
+        } finally {
+            accountProfileLoadingRef.current = false;
+            setAccountProfileLoading(false);
+        }
+    }, [hasToken, syncProfileForm]);
+    const loadSecurityInfo = useCallback(async (force = false) => {
+        if (!hasToken) {
+            setAccountSessions([]);
+            setAccountCredentials([]);
+            setAccountSecurityError('');
+            accountSecurityLoadingRef.current = false;
+            return;
+        }
+
+        if (accountSecurityLoadingRef.current && !force) return;
+
+        accountSecurityLoadingRef.current = true;
+        setAccountSecurityLoading(true);
+        setAccountSecurityError('');
+
+        const results = await Promise.allSettled([
+            fetchKeycloakSessions(),
+            fetchKeycloakCredentials(),
+        ]);
+
+        const errors = [];
+
+        if (results[0].status === 'fulfilled') {
+            setAccountSessions(Array.isArray(results[0].value) ? results[0].value : []);
+        } else {
+            errors.push(`Сессии: ${results[0].reason?.message || 'ошибка загрузки'}`);
+        }
+
+        if (results[1].status === 'fulfilled') {
+            setAccountCredentials(Array.isArray(results[1].value) ? results[1].value : []);
+        } else {
+            errors.push(`Учётные данные: ${results[1].reason?.message || 'ошибка загрузки'}`);
+        }
+
+        setAccountSecurityError(errors.join('. '));
+        accountSecurityLoadingRef.current = false;
+        setAccountSecurityLoading(false);
+    }, [hasToken]);
+
+    useEffect(() => {
+        profileDirtyRef.current = profileDirty;
+    }, [profileDirty]);
+
+    useEffect(() => {
+        accountProfileLoadingRef.current = accountProfileLoading;
+    }, [accountProfileLoading]);
+
+    useEffect(() => {
+        accountSecurityLoadingRef.current = accountSecurityLoading;
+    }, [accountSecurityLoading]);
+
+    useEffect(() => {
+        const identity = profile?.id || profile?.username || '';
+        if (!identity) return;
+
+        if (profileInitRef.current !== identity && !profileDirty) {
+            profileInitRef.current = identity;
+            syncProfileForm(null, true);
+        } else if (profileInitRef.current !== identity) {
+            profileInitRef.current = identity;
+            syncProfileForm(null, true);
+        }
+    }, [profile, profileDirty, syncProfileForm]);
+
+    useEffect(() => {
+        if (activeTab !== 'profile') {
+            profileTabLoadedRef.current = false;
+            return;
+        }
+        if (!hasToken) {
+            profileTabLoadedRef.current = false;
+            return;
+        }
+        if (profileTabLoadedRef.current) return;
+        profileTabLoadedRef.current = true;
+        loadAccountProfile(false);
+        loadSecurityInfo(false);
+    }, [activeTab, hasToken, loadAccountProfile, loadSecurityInfo]);
+
+    useEffect(() => {
+        if (hasToken) return;
+        setOtpData(null);
+        setOtpError('');
+        setOtpLoading(false);
+        setOtpSaving(false);
+        setOtpForm({code: '', deviceName: ''});
+    }, [hasToken]);
 
     // Загружает Swagger и формирует список эндпоинтов.
     const loadSwagger = useCallback(async () => {
@@ -1382,6 +1665,11 @@ export default function SwaggerPage() {
         clearStoredTokens();
         clearUser();
         setTokens(null);
+        setOtpData(null);
+        setOtpError('');
+        setOtpLoading(false);
+        setOtpSaving(false);
+        setOtpForm({code: '', deviceName: ''});
     };
 
     const handleCopyToken = async () => {
@@ -1407,6 +1695,283 @@ export default function SwaggerPage() {
                 message: 'Не удалось скопировать токен.',
                 duration: 2400,
             });
+        }
+    };
+
+    const handleProfileChange = (field) => (event) => {
+        const value = event.target.value;
+        setProfileForm((prev) => ({...prev, [field]: value}));
+        setProfileDirty(true);
+    };
+
+    const handleProfileReset = () => {
+        syncProfileForm(accountProfile || null, true);
+    };
+
+    const handleProfileSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для обновления профиля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        const payload = buildAccountProfilePayload(profileForm);
+        if (!Object.keys(payload).length) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Заполните поля для обновления профиля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setProfileSaving(true);
+        try {
+            await updateKeycloakAccountProfile(payload);
+            notifyCustom({
+                type: 'success',
+                message: 'Профиль обновлён в Keycloak.',
+                duration: 2400,
+            });
+            setProfileDirty(false);
+            await refreshUser(true);
+            await loadAccountProfile(true);
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось обновить профиль.',
+                duration: 3200,
+            });
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handlePasswordChange = (field) => (event) => {
+        const value = event.target.value;
+        setPasswordForm((prev) => ({...prev, [field]: value}));
+    };
+
+    const handlePasswordSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для смены пароля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (!passwordForm.newPassword) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Введите новый пароль.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Пароли не совпадают.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setPasswordSaving(true);
+        try {
+            await updateKeycloakPassword({
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword,
+                confirmation: passwordForm.confirmPassword,
+            });
+            notifyCustom({
+                type: 'success',
+                message: 'Пароль обновлён.',
+                duration: 2400,
+            });
+            setPasswordForm({currentPassword: '', newPassword: '', confirmPassword: ''});
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось обновить пароль.',
+                duration: 3200,
+            });
+        } finally {
+            setPasswordSaving(false);
+        }
+    };
+
+    const handleOtpChange = (field) => (event) => {
+        const value = event.target.value;
+        setOtpForm((prev) => ({...prev, [field]: value}));
+    };
+
+    const handleOtpReset = () => {
+        setOtpData(null);
+        setOtpError('');
+        setOtpForm((prev) => ({...prev, code: ''}));
+    };
+
+    const handleOtpLoad = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для подключения OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (otpLoading) return;
+
+        setOtpLoading(true);
+        setOtpError('');
+
+        try {
+            const data = await fetchKeycloakOtpSecret();
+            setOtpData(data);
+            if (!otpForm.deviceName) {
+                setOtpForm((prev) => ({...prev, deviceName: 'Моё устройство'}));
+            }
+        } catch (error) {
+            if (error?.status === 404) {
+                setOtpError('OTP endpoint не найден. Проверьте версию Keycloak или включите account API.');
+            } else {
+                setOtpError(error?.message || 'Не удалось получить данные для OTP.');
+            }
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleOtpSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для подключения OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        const secret = resolveOtpSecret(otpData);
+        if (!secret) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Сначала получите секрет для OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (!otpForm.code) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Введите код из приложения.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setOtpSaving(true);
+        try {
+            await enableKeycloakOtp({
+                totp: otpForm.code,
+                totpSecret: secret,
+                userLabel: otpForm.deviceName,
+                deviceName: otpForm.deviceName,
+            });
+            notifyCustom({
+                type: 'success',
+                message: 'OTP подключён.',
+                duration: 2400,
+            });
+            setOtpForm((prev) => ({...prev, code: ''}));
+            setOtpData(null);
+            await loadSecurityInfo(true);
+        } catch (error) {
+            const message = error?.status === 404
+                ? 'OTP endpoint не найден. Используйте страницу Keycloak.'
+                : error?.message || 'Не удалось подключить OTP.';
+            notifyCustom({
+                type: 'error',
+                message,
+                duration: 3200,
+            });
+        } finally {
+            setOtpSaving(false);
+        }
+    };
+
+    const handleSecurityRefresh = async () => {
+        await loadSecurityInfo(true);
+    };
+
+    const handleLogoutAllSessions = async () => {
+        setAccountSecurityLoading(true);
+        try {
+            await logoutAllKeycloakSessions();
+            notifyCustom({
+                type: 'success',
+                message: 'Все сессии завершены.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось завершить все сессии.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
+        }
+    };
+
+    const handleLogoutSession = async (sessionId) => {
+        if (!sessionId) return;
+        setAccountSecurityLoading(true);
+        try {
+            await logoutKeycloakSession(sessionId);
+            notifyCustom({
+                type: 'success',
+                message: 'Сессия завершена.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось завершить сессию.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
+        }
+    };
+
+    const handleRemoveCredential = async (credentialId) => {
+        if (!credentialId) return;
+        setAccountSecurityLoading(true);
+        try {
+            await deleteKeycloakCredential(credentialId);
+            notifyCustom({
+                type: 'success',
+                message: 'Учётные данные удалены.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось удалить учётные данные.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
         }
     };
 
@@ -3728,6 +4293,399 @@ export default function SwaggerPage() {
                         ) : (
                             <p className="swagger-subtitle">Нет данных профиля. Авторизуйтесь через Keycloak.</p>
                         )}
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Профиль Keycloak</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={() => loadAccountProfile(true)}
+                                    disabled={accountProfileLoading || !hasToken}
+                                >
+                                    {accountProfileLoading ? '...' : 'Обновить из Keycloak'}
+                                </button>
+                                <button
+                                    className="swagger-button ghost"
+                                    type="button"
+                                    onClick={handleProfileReset}
+                                    disabled={!profileDirty}
+                                >
+                                    Сбросить
+                                </button>
+                            </div>
+                        </div>
+                        {accountProfileError && (
+                            <p className="swagger-subtitle swagger-error">{accountProfileError}</p>
+                        )}
+                        {!hasToken && (
+                            <p className="swagger-subtitle">Авторизуйтесь, чтобы редактировать профиль.</p>
+                        )}
+                        {accountProfileLoading && hasToken && (
+                            <p className="swagger-subtitle swagger-loading">Загружаем профиль Keycloak...</p>
+                        )}
+                        <div className="swagger-form-grid">
+                            <div className="swagger-field">
+                                <label htmlFor="profile-username">Логин</label>
+                                <input
+                                    id="profile-username"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.username}
+                                    onChange={handleProfileChange('username')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-email">Email</label>
+                                <input
+                                    id="profile-email"
+                                    className="swagger-input"
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={handleProfileChange('email')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-first-name">Имя</label>
+                                <input
+                                    id="profile-first-name"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.firstName}
+                                    onChange={handleProfileChange('firstName')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-last-name">Фамилия</label>
+                                <input
+                                    id="profile-last-name"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.lastName}
+                                    onChange={handleProfileChange('lastName')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                        </div>
+                        <div className="swagger-form-actions">
+                            <button
+                                className="swagger-button"
+                                type="button"
+                                onClick={handleProfileSave}
+                                disabled={!hasToken || profileSaving || !profileDirty}
+                            >
+                                {profileSaving ? '...' : 'Сохранить профиль'}
+                            </button>
+                            {profileDirty && (
+                                <span className="swagger-hint">Есть несохранённые изменения.</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Безопасность Keycloak</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={handleSecurityRefresh}
+                                    disabled={accountSecurityLoading || !hasToken}
+                                >
+                                    {accountSecurityLoading ? '...' : 'Обновить'}
+                                </button>
+                                <button
+                                    className="swagger-button ghost"
+                                    type="button"
+                                    onClick={handleLogoutAllSessions}
+                                    disabled={accountSecurityLoading || !hasToken || !accountSessions.length}
+                                >
+                                    Завершить все сессии
+                                </button>
+                            </div>
+                        </div>
+                        {accountSecurityError && (
+                            <p className="swagger-subtitle swagger-error">{accountSecurityError}</p>
+                        )}
+                        {!hasToken && (
+                            <p className="swagger-subtitle">Авторизуйтесь, чтобы видеть безопасность.</p>
+                        )}
+                        {accountSecurityLoading && hasToken && (
+                            <p className="swagger-subtitle swagger-loading">Загружаем безопасность Keycloak...</p>
+                        )}
+                        <div className="swagger-security-grid">
+                            <div className="swagger-security-block">
+                                <h3>Сессии</h3>
+                                {accountSessions.length ? (
+                                    <div className="swagger-security-list">
+                                        {accountSessions.map((session, index) => {
+                                            const sessionId = session?.id || session?.sessionId || session?.session || session?.uuid || '';
+                                            const sessionClients = normalizeSessionClients(session?.clients);
+                                            const startedAt = formatDateTime(
+                                                session?.started || session?.start || session?.createdTimestamp,
+                                            );
+                                            const lastAccessAt = formatDateTime(
+                                                session?.lastAccess || session?.lastAccessTime || session?.lastAccessed,
+                                            );
+                                            const sessionMeta = [
+                                                session?.ipAddress || session?.ip
+                                                    ? `IP: ${session.ipAddress || session.ip}`
+                                                    : '',
+                                                startedAt ? `Старт: ${startedAt}` : '',
+                                                lastAccessAt ? `Последний доступ: ${lastAccessAt}` : '',
+                                            ].filter(Boolean).join(' | ');
+
+                                            return (
+                                                <div key={sessionId || index} className="swagger-security-item">
+                                                    <div className="swagger-security-title">
+                                                        Сессия {index + 1}
+                                                    </div>
+                                                    {sessionMeta && (
+                                                        <div className="swagger-security-meta">{sessionMeta}</div>
+                                                    )}
+                                                    {sessionClients.length > 0 && (
+                                                        <div className="swagger-security-tags">
+                                                            {sessionClients.map((client) => (
+                                                                <span
+                                                                    key={`${sessionId || index}-${client}`}
+                                                                    className="swagger-security-tag"
+                                                                >
+                                                                    {client}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="swagger-security-actions">
+                                                        <button
+                                                            className="swagger-button ghost"
+                                                            type="button"
+                                                            onClick={() => handleLogoutSession(sessionId)}
+                                                            disabled={accountSecurityLoading || !sessionId}
+                                                        >
+                                                            Завершить
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="swagger-subtitle">Нет активных сессий.</p>
+                                )}
+                            </div>
+                            <div className="swagger-security-block">
+                                <h3>Учётные данные</h3>
+                                {accountCredentials.length ? (
+                                    <div className="swagger-security-list">
+                                        {accountCredentials.map((credential, index) => {
+                                            const credentialId = credential?.id || credential?.credentialId || '';
+                                            const credentialType = credential?.type || credential?.credentialType || '';
+                                            const credentialLabel = resolveCredentialLabel(credential);
+                                            const createdAt = formatDateTime(
+                                                credential?.createdDate ?? credential?.createdTimestamp,
+                                            );
+                                            const canRemove = credential?.removable ?? credential?.removableByUser
+                                                ?? (credentialType && credentialType !== 'password');
+
+                                            return (
+                                                <div key={credentialId || index} className="swagger-security-item">
+                                                    <div className="swagger-security-title">{credentialLabel}</div>
+                                                    <div className="swagger-security-meta">
+                                                        {credentialType && `Тип: ${credentialType}`}
+                                                        {createdAt && ` | Создано: ${createdAt}`}
+                                                    </div>
+                                                    {credentialId && (
+                                                        <div className="swagger-security-meta">ID: {credentialId}</div>
+                                                    )}
+                                                    {canRemove && (
+                                                        <div className="swagger-security-actions">
+                                                            <button
+                                                                className="swagger-button ghost"
+                                                                type="button"
+                                                                onClick={() => handleRemoveCredential(credentialId)}
+                                                                disabled={accountSecurityLoading || !credentialId}
+                                                            >
+                                                                Удалить
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="swagger-subtitle">Нет дополнительных учётных данных.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="swagger-security-block swagger-security-stack">
+                            <div className="swagger-profile-header">
+                                <h3>OTP</h3>
+                                <div className="swagger-profile-actions">
+                                    <button
+                                        className="swagger-button secondary"
+                                        type="button"
+                                        onClick={handleOtpLoad}
+                                        disabled={!hasToken || otpLoading}
+                                    >
+                                        {otpLoading ? '...' : 'Получить QR'}
+                                    </button>
+                                    <button
+                                        className="swagger-button ghost"
+                                        type="button"
+                                        onClick={handleOtpReset}
+                                        disabled={!otpData && !otpForm.code}
+                                    >
+                                        Сбросить
+                                    </button>
+                                    {keycloakSecurityUrl && (
+                                        <a
+                                            className="swagger-button ghost"
+                                            href={keycloakSecurityUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Открыть в Keycloak
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                            {otpCredentialsCount > 0 && (
+                                <p className="swagger-subtitle">Подключено OTP: {otpCredentialsCount}</p>
+                            )}
+                            {otpError && (
+                                <p className="swagger-subtitle swagger-error">{otpError}</p>
+                            )}
+                            {otpLoading && (
+                                <p className="swagger-subtitle swagger-loading">Получаем данные для OTP...</p>
+                            )}
+                            {otpData ? (
+                                <>
+                                    <div className="swagger-otp-grid">
+                                        <div className="swagger-otp-qr">
+                                            {otpQrSource ? (
+                                                <img
+                                                    src={otpQrSource}
+                                                    alt="QR для OTP"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="swagger-otp-placeholder">QR недоступен</div>
+                                            )}
+                                        </div>
+                                        <div className="swagger-otp-details">
+                                            <div className="swagger-otp-meta">
+                                                Отсканируйте QR или введите секрет вручную.
+                                            </div>
+                                            {otpSecret && (
+                                                <code className="swagger-otp-code">{otpSecret}</code>
+                                            )}
+                                            {otpPolicyText && (
+                                                <div className="swagger-otp-meta">{otpPolicyText}</div>
+                                            )}
+                                            {otpAppNames.length > 0 && (
+                                                <div className="swagger-otp-apps">
+                                                    {otpAppNames.map((name) => (
+                                                        <span key={name} className="swagger-security-tag">
+                                                            {name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="swagger-form-grid">
+                                        <div className="swagger-field">
+                                            <label htmlFor="otp-device">Название устройства</label>
+                                            <input
+                                                id="otp-device"
+                                                className="swagger-input"
+                                                type="text"
+                                                value={otpForm.deviceName}
+                                                onChange={handleOtpChange('deviceName')}
+                                                disabled={!hasToken || otpSaving}
+                                            />
+                                        </div>
+                                        <div className="swagger-field">
+                                            <label htmlFor="otp-code">Код из приложения</label>
+                                            <input
+                                                id="otp-code"
+                                                className="swagger-input"
+                                                type="text"
+                                                value={otpForm.code}
+                                                onChange={handleOtpChange('code')}
+                                                disabled={!hasToken || otpSaving}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="swagger-form-actions">
+                                        <button
+                                            className="swagger-button"
+                                            type="button"
+                                            onClick={handleOtpSave}
+                                            disabled={!hasToken || otpSaving}
+                                        >
+                                            {otpSaving ? '...' : 'Подключить OTP'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="swagger-subtitle">
+                                    Нажмите "Получить QR", чтобы подключить одноразовый пароль.
+                                </p>
+                            )}
+                        </div>
+                        <div className="swagger-security-block swagger-security-stack">
+                            <h3>Смена пароля</h3>
+                            <div className="swagger-form-grid">
+                                <div className="swagger-field">
+                                    <label htmlFor="password-current">Текущий пароль</label>
+                                    <input
+                                        id="password-current"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.currentPassword}
+                                        onChange={handlePasswordChange('currentPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                                <div className="swagger-field">
+                                    <label htmlFor="password-new">Новый пароль</label>
+                                    <input
+                                        id="password-new"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.newPassword}
+                                        onChange={handlePasswordChange('newPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                                <div className="swagger-field">
+                                    <label htmlFor="password-confirm">Подтверждение</label>
+                                    <input
+                                        id="password-confirm"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.confirmPassword}
+                                        onChange={handlePasswordChange('confirmPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                            </div>
+                            <div className="swagger-form-actions">
+                                <button
+                                    className="swagger-button"
+                                    type="button"
+                                    onClick={handlePasswordSave}
+                                    disabled={!hasToken || passwordSaving}
+                                >
+                                    {passwordSaving ? '...' : 'Обновить пароль'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-profile-header">

@@ -11,6 +11,9 @@ const DEFAULT_STATUS = {
 };
 
 const EXCHANGE_STATUS_PREFIX = 'swagger:pkce_exchange';
+const EXCHANGE_INFLIGHT_TTL_MS = 20_000;
+const EXCHANGE_POLL_INTERVAL_MS = 700;
+const EXCHANGE_POLL_LIMIT = 6;
 
 const getExchangeKeys = (code) => ({
     doneKey: `${EXCHANGE_STATUS_PREFIX}:${code}`,
@@ -82,6 +85,44 @@ export default function SwaggerOAuthRedirect() {
                 return;
             }
 
+            const inflightValue = window.sessionStorage.getItem(inflightKey);
+            if (inflightValue) {
+                const inflightStartedAt = Number(inflightValue);
+                const inflightAge = Number.isFinite(inflightStartedAt)
+                    ? Date.now() - inflightStartedAt
+                    : null;
+
+                if (inflightAge != null && inflightAge > EXCHANGE_INFLIGHT_TTL_MS) {
+                    window.sessionStorage.removeItem(inflightKey);
+                } else {
+                    setStatus({
+                        state: 'loading',
+                        title: 'Авторизация',
+                        message: 'Обмен кода уже выполняется. Ожидаем завершение...',
+                    });
+
+                    for (let i = 0; i < EXCHANGE_POLL_LIMIT; i += 1) {
+                        await new Promise((resolve) => {
+                            redirectTimer = window.setTimeout(resolve, EXCHANGE_POLL_INTERVAL_MS);
+                        });
+                        if (!isActive) return;
+                        if (window.sessionStorage.getItem(doneKey) === 'done') {
+                            setStatus({
+                                state: 'success',
+                                title: 'Готово',
+                                message: 'Код уже обработан. Перенаправляем в Swagger...',
+                            });
+                            redirectTimer = window.setTimeout(() => {
+                                navigate('/swagger', {replace: true});
+                            }, 400);
+                            return;
+                        }
+                    }
+
+                    window.sessionStorage.removeItem(inflightKey);
+                }
+            }
+
             if (window.sessionStorage.getItem(inflightKey)) {
                 setStatus({
                     state: 'loading',
@@ -97,7 +138,7 @@ export default function SwaggerOAuthRedirect() {
                 message: 'Получаем токены из Keycloak...',
             });
 
-            window.sessionStorage.setItem(inflightKey, '1');
+            window.sessionStorage.setItem(inflightKey, String(Date.now()));
 
             try {
                 const tokenResponse = await exchangeCodeForTokens({code, state});
