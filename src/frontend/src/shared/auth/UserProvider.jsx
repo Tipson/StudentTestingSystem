@@ -166,7 +166,9 @@ export default function UserProvider({children}) {
 
     const refreshUser = useCallback(async (force = false) => {
         if (refreshInFlightRef.current) {
-            pendingRefreshRef.current = pendingRefreshRef.current || force;
+            if (force) {
+                pendingRefreshRef.current = true;
+            }
             return;
         }
 
@@ -232,7 +234,7 @@ export default function UserProvider({children}) {
 
         if (pendingRefreshRef.current) {
             pendingRefreshRef.current = false;
-            refreshUser(false);
+            refreshUser(true);
         }
     }, [clearUser]);
 
