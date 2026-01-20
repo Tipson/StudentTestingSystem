@@ -72,6 +72,8 @@ spec:
                 secretKeyRef:
                   name: gemini-secrets
                   key: Gemini__ApiKey
+            - name: Gemini__BaseUrl
+              value: "https://gemini-proxy.tipson-510.workers.dev/"
             - name: Gemini__Model
               value: {{ .Values.assessmentApi.gemini.model | quote }}
             - name: Gemini__Temperature
