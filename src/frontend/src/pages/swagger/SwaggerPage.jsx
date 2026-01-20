@@ -276,7 +276,12 @@ const formatAutoTestResponse = (value) => {
     }
 };
 
-const makeResultRowKey = (item, index) => `${item.id}-${index}`;
+const makeResultRowKey = (item, index) => {
+    if (item?.id) return String(item.id);
+    const method = item?.method || 'unknown';
+    const path = item?.path || 'unknown';
+    return `${method}-${path}-${index}`;
+};
 
 const normalizeBaseUrl = (value) => {
     if (!value) return '';
@@ -2079,6 +2084,24 @@ export default function SwaggerPage() {
             }
 
             await runStep({
+                id: 'ai-hint',
+                title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                service: 'ai',
+                method: 'POST',
+                path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                skip: () => {
+                    if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
+                    if (!ctx.values.questions.length) return 'Нет вопросов для подсказки.';
+                    return '';
+                },
+                run: () => ctx.ai.post(
+                    `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(ctx.values.questions[0])}/hint`,
+                    null,
+                    {auth: AUTH.TRUE},
+                ),
+            });
+
+            await runStep({
                 id: 'attempts-submit',
                 title: 'POST /api/attempts/{id}/submit',
                 service: 'assessment',
@@ -2136,24 +2159,6 @@ export default function SwaggerPage() {
                         {auth: AUTH.TRUE},
                     );
                 },
-            });
-
-            await runStep({
-                id: 'ai-hint',
-                title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
-                service: 'ai',
-                method: 'POST',
-                path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
-                skip: () => {
-                    if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
-                    if (!ctx.values.questions.length) return 'Нет вопросов для подсказки.';
-                    return '';
-                },
-                run: () => ctx.ai.post(
-                    `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(ctx.values.questions[0])}/hint`,
-                    null,
-                    {auth: AUTH.TRUE},
-                ),
             });
 
             await runStep({
@@ -3304,25 +3309,55 @@ export default function SwaggerPage() {
                                                 <div key={group.groupTitle} className="swagger-selection-group">
                                                     <div className="swagger-selection-group-title">{group.groupTitle}</div>
                                                     <div className="swagger-selection-items">
-                                                        {group.items.map((item, index) => (
-                                                            <div
-                                                                key={`${item.id}-${index}`}
-                                                                className={`swagger-selection-item ${item.status}`}
-                                                            >
-                                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
-                                                                    {item.method}
-                                                                </span>
-                                                                <div className="swagger-selection-item-main">
-                                                                    <div className="swagger-selection-item-path">{item.path}</div>
-                                                                    {item.title && (
-                                                                        <div className="swagger-selection-item-title">{item.title}</div>
+                                                        {group.items.map((item, index) => {
+                                                            const rowKey = makeResultRowKey(item, index);
+                                                            const responseText = formatAutoTestResponse(item.responseData);
+                                                            const canToggle = Boolean(responseText);
+                                                            const hasOverride = Object.prototype.hasOwnProperty.call(
+                                                                expandedAutoTestRows,
+                                                                rowKey,
+                                                            );
+                                                            const isExpanded = hasOverride
+                                                                ? expandedAutoTestRows[rowKey]
+                                                                : autoTestAutoExpand;
+
+                                                            return (
+                                                                <div
+                                                                    key={rowKey}
+                                                                    className={`swagger-selection-item ${item.status}`}
+                                                                >
+                                                                    <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                                                        {item.method}
+                                                                    </span>
+                                                                    <div className="swagger-selection-item-main">
+                                                                        <div className="swagger-selection-item-path">{item.path}</div>
+                                                                        {item.title && (
+                                                                            <div className="swagger-selection-item-title">{item.title}</div>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className={`swagger-status-pill ${item.status}`}>
+                                                                        {getAutoTestStatusLabel(item.status)}
+                                                                    </span>
+                                                                    {canToggle && (
+                                                                        <button
+                                                                            className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                                            type="button"
+                                                                            onClick={() => setExpandedAutoTestRows((prev) => ({
+                                                                                ...prev,
+                                                                                [rowKey]: !isExpanded,
+                                                                            }))}
+                                                                            aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                                            title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                                        >
+                                                                            <span className="swagger-chevron" />
+                                                                        </button>
+                                                                    )}
+                                                                    {canToggle && isExpanded && (
+                                                                        <pre className="swagger-selection-response">{responseText}</pre>
                                                                     )}
                                                                 </div>
-                                                                <span className={`swagger-status-pill ${item.status}`}>
-                                                                    {getAutoTestStatusLabel(item.status)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             ))}
@@ -3333,25 +3368,55 @@ export default function SwaggerPage() {
                         )}
                         {autoTestResults.length > 0 && autoTestView !== 'grouped' && (
                             <div className="swagger-selection-list">
-                                {(autoTestByStatus[autoTestView] || []).map((item, index) => (
-                                    <div
-                                        key={`${item.id}-${index}`}
-                                        className={`swagger-selection-item ${item.status}`}
-                                    >
-                                        <span className={`method-badge ${item.method.toLowerCase()}`}>
-                                            {item.method}
-                                        </span>
-                                        <div className="swagger-selection-item-main">
-                                            <div className="swagger-selection-item-path">{item.path}</div>
-                                            {item.title && (
-                                                <div className="swagger-selection-item-title">{item.title}</div>
+                                {(autoTestByStatus[autoTestView] || []).map((item, index) => {
+                                    const rowKey = makeResultRowKey(item, index);
+                                    const responseText = formatAutoTestResponse(item.responseData);
+                                    const canToggle = Boolean(responseText);
+                                    const hasOverride = Object.prototype.hasOwnProperty.call(
+                                        expandedAutoTestRows,
+                                        rowKey,
+                                    );
+                                    const isExpanded = hasOverride
+                                        ? expandedAutoTestRows[rowKey]
+                                        : autoTestAutoExpand;
+
+                                    return (
+                                        <div
+                                            key={rowKey}
+                                            className={`swagger-selection-item ${item.status}`}
+                                        >
+                                            <span className={`method-badge ${item.method.toLowerCase()}`}>
+                                                {item.method}
+                                            </span>
+                                            <div className="swagger-selection-item-main">
+                                                <div className="swagger-selection-item-path">{item.path}</div>
+                                                {item.title && (
+                                                    <div className="swagger-selection-item-title">{item.title}</div>
+                                                )}
+                                            </div>
+                                            <span className={`swagger-status-pill ${item.status}`}>
+                                                {getAutoTestStatusLabel(item.status)}
+                                            </span>
+                                            {canToggle && (
+                                                <button
+                                                    className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                    type="button"
+                                                    onClick={() => setExpandedAutoTestRows((prev) => ({
+                                                        ...prev,
+                                                        [rowKey]: !isExpanded,
+                                                    }))}
+                                                    aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                    title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                                                >
+                                                    <span className="swagger-chevron" />
+                                                </button>
+                                            )}
+                                            {canToggle && isExpanded && (
+                                                <pre className="swagger-selection-response">{responseText}</pre>
                                             )}
                                         </div>
-                                        <span className={`swagger-status-pill ${item.status}`}>
-                                            {getAutoTestStatusLabel(item.status)}
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -225,8 +225,15 @@ export const exchangeCodeForTokens = async ({code, state}) => {
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Не удалось получить токены.');
+        const contentType = response.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json')
+            ? await response.json()
+            : await response.text();
+        const message = typeof payload === 'string'
+            ? payload
+            : payload?.error_description || payload?.error || payload?.message;
+
+        throw new Error(message || 'Не удалось получить токены.');
     }
 
     const data = await response.json();

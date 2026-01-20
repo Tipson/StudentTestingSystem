@@ -10,6 +10,13 @@ const DEFAULT_STATUS = {
     message: 'Проверяем ответ от Keycloak...',
 };
 
+const EXCHANGE_STATUS_PREFIX = 'swagger:pkce_exchange';
+
+const getExchangeKeys = (code) => ({
+    doneKey: `${EXCHANGE_STATUS_PREFIX}:${code}`,
+    inflightKey: `${EXCHANGE_STATUS_PREFIX}:${code}:inflight`,
+});
+
 const buildErrorMessage = (error, description) => {
     if (!error && !description) {
         return 'Не удалось выполнить авторизацию.';
@@ -61,17 +68,45 @@ export default function SwaggerOAuthRedirect() {
                 return;
             }
 
+            const {doneKey, inflightKey} = getExchangeKeys(code);
+
+            if (window.sessionStorage.getItem(doneKey) === 'done') {
+                setStatus({
+                    state: 'success',
+                    title: 'Готово',
+                    message: 'Код уже обработан. Перенаправляем в Swagger...',
+                });
+                redirectTimer = window.setTimeout(() => {
+                    navigate('/swagger', {replace: true});
+                }, 400);
+                return;
+            }
+
+            if (window.sessionStorage.getItem(inflightKey)) {
+                setStatus({
+                    state: 'loading',
+                    title: 'Авторизация',
+                    message: 'Обмен кода уже выполняется. Ожидаем завершение...',
+                });
+                return;
+            }
+
             setStatus({
                 state: 'loading',
                 title: 'Авторизация',
                 message: 'Получаем токены из Keycloak...',
             });
 
+            window.sessionStorage.setItem(inflightKey, '1');
+
             try {
                 const tokenResponse = await exchangeCodeForTokens({code, state});
                 const tokens = persistTokens(tokenResponse);
 
                 if (!isActive) return;
+
+                window.sessionStorage.setItem(doneKey, 'done');
+                window.sessionStorage.removeItem(inflightKey);
 
                 setStatus({
                     state: 'success',
@@ -91,6 +126,7 @@ export default function SwaggerOAuthRedirect() {
                     navigate('/swagger', {replace: true});
                 }, 800);
             } catch (error) {
+                window.sessionStorage.removeItem(inflightKey);
                 finishWithError(error?.message || 'Не удалось получить токены.');
             }
         };
