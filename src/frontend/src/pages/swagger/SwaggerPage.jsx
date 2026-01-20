@@ -79,6 +79,8 @@ const AUTO_TEST_PER_QUESTION_STEP_COUNT = 3;
 // Ожидаемые шаги в сценариях (обновляйте при изменении сценариев).
 const SCENARIO_EXPECTED_TOTALS = {
     'full-cycle': 13,
+    'test-create-flow': 26,
+    'test-pass-flow': 22,
     'publish-without-questions': 7,
     'draft-flow': 8,
 };
@@ -640,6 +642,51 @@ const buildAutoTestQuestions = (label) => ([
     },
 ]);
 
+// Формирует payload вопроса с учётом медиа-аттачей.
+const buildQuestionPayload = (template, mediaIds = []) => {
+    const hasMedia = Array.isArray(mediaIds) && mediaIds.length > 0;
+    const questionMediaIds = template.attachMediaToQuestion && hasMedia
+        ? mediaIds.slice(0, 1)
+        : null;
+    const options = (template.options || []).map((option, optionIndex) => {
+        if (template.attachMediaToOptionIndex === optionIndex && hasMedia) {
+            return {...option, mediaIds: mediaIds.slice(0, 1)};
+        }
+        return option;
+    });
+
+    return {
+        text: template.title,
+        type: template.type,
+        isRequired: template.isRequired ?? true,
+        points: template.points ?? 1,
+        options,
+        mediaIds: questionMediaIds && questionMediaIds.length ? questionMediaIds : null,
+    };
+};
+
+// Собирает метаданные вопроса для ответов и последующего удаления.
+const buildQuestionRecord = (question, sourceOptions, fallback = {}) => {
+    const options = question?.options || [];
+    const optionMap = new Map(options.map((option) => [option.text, option.id]));
+    const correctOptionIds = (sourceOptions || [])
+        .filter((option) => option.isCorrect)
+        .map((option) => optionMap.get(option.text))
+        .filter(Boolean);
+    const correctText = (sourceOptions || [])
+        .find((option) => option.isCorrect)?.text || '';
+
+    return {
+        id: question?.id ?? question?.Id ?? null,
+        type: question?.type ?? fallback.type ?? null,
+        points: question?.points ?? fallback.points ?? null,
+        options,
+        correctOptionIds,
+        correctText,
+        answerText: fallback.answerText || correctText || '',
+    };
+};
+
 // Собирает корректный payload ответа для SaveAnswer.
 const buildAnswerPayload = (question) => {
     if (!question) {
@@ -681,6 +728,42 @@ const buildAnswerPayload = (question) => {
     }
 
     return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
+};
+
+// Формирует заведомо неверный ответ.
+const buildIncorrectAnswerPayload = (question) => {
+    if (!question) {
+        return {optionId: null, optionIds: [], text: 'Неверный ответ'};
+    }
+
+    const type = question.type;
+    const options = Array.isArray(question.options) ? question.options : [];
+    const correctIds = Array.isArray(question.correctOptionIds) ? question.correctOptionIds : [];
+    const wrongOptions = options.filter((option) => option.id && !correctIds.includes(option.id));
+    const wrongOptionId = wrongOptions[0]?.id || options[0]?.id || null;
+
+    if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
+        return {
+            optionId: wrongOptionId,
+            optionIds: wrongOptionId ? [wrongOptionId] : [],
+            text: 'Неверный вариант',
+        };
+    }
+
+    if (type === QUESTION_TYPES.MultiChoice) {
+        const optionIds = wrongOptions.map((option) => option.id).filter(Boolean).slice(0, 2);
+        return {
+            optionId: optionIds[0] || wrongOptionId || null,
+            optionIds,
+            text: optionIds.length ? 'Неверные варианты' : 'Неверный вариант',
+        };
+    }
+
+    if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
+        return {optionId: null, optionIds: [], text: 'Неверный ответ'};
+    }
+
+    return {optionId: null, optionIds: [], text: 'Неверный ответ'};
 };
 
 const getQuestionId = (question) => question?.id ?? question?.Id ?? null;
@@ -1304,6 +1387,20 @@ export default function SwaggerPage() {
             tag: 'E2E',
             description: 'Создание теста, вопросы, публикация, прохождение, результат и очистка.',
             expectedTotal: getScenarioExpectedTotal('full-cycle'),
+        },
+        {
+            id: 'test-create-flow',
+            title: 'Сценарий создания теста',
+            tag: 'Создание',
+            description: 'Создание теста, 4 вопроса разных типов с медиа-добавлениями, публикация, правки и повторная публикация.',
+            expectedTotal: getScenarioExpectedTotal('test-create-flow'),
+        },
+        {
+            id: 'test-pass-flow',
+            title: 'Сценарий прохождения теста',
+            tag: 'Прохождение',
+            description: 'Создание теста, попытка и ответы (верные/неверные), подсказка AI, оценка, результат и очистка.',
+            expectedTotal: getScenarioExpectedTotal('test-pass-flow'),
         },
         {
             id: 'publish-without-questions',
@@ -2889,6 +2986,7 @@ export default function SwaggerPage() {
                 testId: null,
                 attemptId: null,
                 questions: [],
+                mediaIds: [],
                 isPublished: false,
             },
         };
@@ -2898,9 +2996,586 @@ export default function SwaggerPage() {
         };
 
         const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
+        // Готовим payload вопроса с учётом медиа и возвращаем запись для сценария.
+        const buildScenarioQuestionPayload = (template) => buildQuestionPayload(template, ctx.values.mediaIds);
+        const pushScenarioQuestion = (template, response) => {
+            const question = response?.data ?? {};
+            ctx.values.questions.push(
+                buildQuestionRecord(question, template.options, {
+                    type: template.type,
+                    points: template.points,
+                    answerText: template.answerText,
+                }),
+            );
+        };
+        const updateScenarioQuestion = (index, payload, response) => {
+            const question = response?.data ?? {};
+            ctx.values.questions[index] = buildQuestionRecord(question, payload.options, {
+                type: payload.type,
+                points: payload.points,
+                answerText: payload.answerText,
+            });
+        };
+        const buildUpdatedQuestionPayload = (question, index) => {
+            const type = question?.type ?? QUESTION_TYPES.SingleChoice;
+            const hasMedia = ctx.values.mediaIds.length > 0;
+            const mediaIds = hasMedia ? ctx.values.mediaIds.slice(0, 1) : null;
+
+            if (type === QUESTION_TYPES.SingleChoice) {
+                const payload = {
+                    text: `HTTP: какой заголовок указывает длину ответа? (${runLabel})`,
+                    type,
+                    points: 2,
+                    isRequired: true,
+                    options: [
+                        {text: 'Content-Length', isCorrect: true, order: 1},
+                        {text: 'Accept', isCorrect: false, order: 2},
+                        {text: 'ETag', isCorrect: false, order: 3},
+                    ],
+                    mediaIds: index === 0 && mediaIds ? mediaIds : null,
+                };
+                return payload;
+            }
+
+            if (type === QUESTION_TYPES.MultiChoice) {
+                const options = [
+                    {text: 'POST', isCorrect: true, order: 1},
+                    {text: 'PUT', isCorrect: true, order: 2},
+                    {text: 'GET', isCorrect: false, order: 3},
+                    {text: 'HEAD', isCorrect: false, order: 4},
+                ].map((option, optionIndex) => {
+                    if (index === 1 && optionIndex === 0 && mediaIds) {
+                        return {...option, mediaIds};
+                    }
+                    return option;
+                });
+
+                return {
+                    text: `HTTP: методы, изменяющие данные (${runLabel})`,
+                    type,
+                    points: 3,
+                    isRequired: true,
+                    options,
+                };
+            }
+
+            if (type === QUESTION_TYPES.TrueFalse) {
+                return {
+                    text: `HTTP/2 использует бинарный формат (${runLabel})`,
+                    type,
+                    points: 1,
+                    isRequired: true,
+                    options: [
+                        {text: 'Да', isCorrect: true, order: 1},
+                        {text: 'Нет', isCorrect: false, order: 2},
+                    ],
+                };
+            }
+
+            if (type === QUESTION_TYPES.ShortText) {
+                const answerText = '302';
+                return {
+                    text: `Укажите код статуса временного перенаправления (${runLabel})`,
+                    type,
+                    points: 2,
+                    isRequired: true,
+                    answerText,
+                    options: [
+                        {text: answerText, isCorrect: true, order: 1},
+                    ],
+                };
+            }
+
+            if (type === QUESTION_TYPES.LongText) {
+                const answerText = 'PUT заменяет ресурс целиком, PATCH обновляет частично.';
+                return {
+                    text: `Опишите разницу между PUT и PATCH (${runLabel})`,
+                    type,
+                    points: 4,
+                    isRequired: true,
+                    answerText,
+                    options: [
+                        {text: answerText, isCorrect: true, order: 1},
+                    ],
+                };
+            }
+
+            return {
+                text: `Вопрос сценария (${runLabel})`,
+                type,
+                points: 1,
+                isRequired: true,
+                options: [],
+            };
+        };
+        const buildExtraQuestionTemplates = (label) => ([
+            ...buildAutoTestQuestions(`${label} (доп)`).slice(4, 5),
+            {
+                title: `HTTP: какой код означает "Нет содержимого"? (${label})`,
+                type: QUESTION_TYPES.ShortText,
+                points: 1,
+                isRequired: true,
+                answerText: '204',
+                options: [
+                    {text: '204', isCorrect: true, order: 1},
+                ],
+            },
+            {
+                title: `Выберите идемпотентные методы (${label})`,
+                type: QUESTION_TYPES.MultiChoice,
+                points: 2,
+                isRequired: true,
+                options: [
+                    {text: 'GET', isCorrect: true, order: 1},
+                    {text: 'PUT', isCorrect: true, order: 2},
+                    {text: 'POST', isCorrect: false, order: 3},
+                    {text: 'PATCH', isCorrect: false, order: 4},
+                ],
+            },
+        ]);
 
         try {
             switch (scenarioId) {
+                case 'test-create-flow': {
+                    await runStep({
+                        id: 'scenario-create-test',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: создание теста (${runLabel})`,
+                                description: 'Создание теста с вопросами, медиа и правками.',
+                                passScore: 3,
+                                attemptsLimit: 2,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-media',
+                        title: 'POST /api/files/upload',
+                        service: 'media',
+                        method: 'POST',
+                        path: '/api/files/upload',
+                        run: async () => {
+                            const formData = new FormData();
+                            const file = await createSampleImageFile();
+                            formData.append('files', file);
+                            return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
+                        },
+                        onSuccess: (response) => {
+                            const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
+                            ctx.values.mediaIds = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
+                        },
+                        getMessage: () => (
+                            ctx.values.mediaIds.length ? `mediaIds=${ctx.values.mediaIds.join(', ')}` : ''
+                        ),
+                    });
+
+                    const baseTemplates = buildAutoTestQuestions(runLabel);
+                    const initialTemplates = [baseTemplates[0], baseTemplates[1], baseTemplates[2], baseTemplates[3]]
+                        .filter(Boolean);
+
+                    for (const [index, template] of initialTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-create-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-publish',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-update-test',
+                        title: 'PUT /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для обновления.' : ''),
+                        run: () => ctx.assessment.put(
+                            `/api/tests/${ctx.values.testId}`,
+                            {
+                                title: `Сценарий: создание теста (обновлён) ${runLabel}`,
+                                description: 'Обновляем параметры теста и вопросы.',
+                                passScore: 4,
+                                attemptsLimit: 3,
+                                timeLimitSeconds: 900,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        const payload = buildUpdatedQuestionPayload(question, index);
+                        await runStep({
+                            id: `scenario-create-update-question-${index}`,
+                            title: 'PUT /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/questions/{id}',
+                            skip: () => (!getQuestionId(question) ? 'Нет вопроса для обновления.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/questions/${getQuestionId(question)}`,
+                                payload,
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                updateScenarioQuestion(index, payload, response);
+                            },
+                        });
+                    }
+
+                    const extraTemplates = buildExtraQuestionTemplates(runLabel);
+                    for (const [index, template] of extraTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-create-extra-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для дополнительных вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-publish-again',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-unpublish-again',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-create-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
+
+                case 'test-pass-flow': {
+                    await runStep({
+                        id: 'scenario-pass-test',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: прохождение теста (${runLabel})`,
+                                description: 'Проверка попытки, ответов и оценки.',
+                                passScore: 2,
+                                attemptsLimit: 1,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-media',
+                        title: 'POST /api/files/upload',
+                        service: 'media',
+                        method: 'POST',
+                        path: '/api/files/upload',
+                        run: async () => {
+                            const formData = new FormData();
+                            const file = await createSampleImageFile();
+                            formData.append('files', file);
+                            return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
+                        },
+                        onSuccess: (response) => {
+                            const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
+                            ctx.values.mediaIds = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
+                        },
+                    });
+
+                    const passTemplates = buildAutoTestQuestions(runLabel);
+                    const selectedTemplates = [passTemplates[0], passTemplates[1], passTemplates[2], passTemplates[4]]
+                        .filter(Boolean);
+
+                    for (const [index, template] of selectedTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-pass-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-publish',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-attempt',
+                        title: 'POST /api/tests/{testId}/attempts',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests/{testId}/attempts',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.post(`/api/tests/${ctx.values.testId}/attempts`, null, {auth: AUTH.TRUE}),
+                        onSuccess: (response) => {
+                            ctx.values.attemptId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    const correctQuestion = ctx.values.questions[0];
+                    const incorrectQuestion = ctx.values.questions[1];
+                    const remainingQuestions = ctx.values.questions.slice(2);
+
+                    if (correctQuestion) {
+                        await runStep({
+                            id: 'scenario-pass-answer-correct',
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId} (верный)',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(correctQuestion)}`,
+                                buildAnswerPayload(correctQuestion),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    if (incorrectQuestion) {
+                        await runStep({
+                            id: 'scenario-pass-answer-wrong',
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId} (неверный)',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(incorrectQuestion)}`,
+                                buildIncorrectAnswerPayload(incorrectQuestion),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    for (const [index, question] of remainingQuestions.entries()) {
+                        await runStep({
+                            id: `scenario-pass-answer-${index}`,
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId}',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(question)}`,
+                                buildAnswerPayload(question),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-ai-hint',
+                        title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        service: 'ai',
+                        method: 'POST',
+                        path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
+                            const hintQuestion = incorrectQuestion || correctQuestion;
+                            return hintQuestion ? '' : 'Нет вопроса для подсказки.';
+                        },
+                        run: () => {
+                            const hintQuestion = incorrectQuestion || correctQuestion;
+                            return ctx.ai.post(
+                                `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(hintQuestion)}/hint`,
+                                null,
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-submit',
+                        title: 'POST /api/attempts/{id}/submit',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/attempts/{id}/submit',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для отправки.' : ''),
+                        run: () => ctx.assessment.post(`/api/attempts/${ctx.values.attemptId}/submit`, null, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-grade',
+                        title: 'PUT /api/attempts/{attemptId}/answers/{questionId}/grade',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/attempts/{attemptId}/answers/{questionId}/grade',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для оценки.';
+                            const longText = ctx.values.questions.find((question) => question.type === QUESTION_TYPES.LongText);
+                            return longText ? '' : 'Нет вопроса LongText для оценки.';
+                        },
+                        run: () => {
+                            const longText = ctx.values.questions.find((question) => question.type === QUESTION_TYPES.LongText);
+                            const points = Math.min(longText?.points ?? 2, 2);
+                            return ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(longText)}/grade`,
+                                {points, comment: 'Ручная проверка: ответ частично верный.'},
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-result',
+                        title: 'GET /api/attempts/{id}/result',
+                        service: 'assessment',
+                        method: 'GET',
+                        path: '/api/attempts/{id}/result',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для результата.' : ''),
+                        run: () => ctx.assessment.get(`/api/attempts/${ctx.values.attemptId}/result`, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-pass-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
                 case 'publish-without-questions': {
                     await runStep({
                         id: 'scenario-publish-create',
