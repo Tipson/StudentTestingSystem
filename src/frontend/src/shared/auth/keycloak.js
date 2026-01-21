@@ -189,10 +189,6 @@ export const clearStoredTokens = () => {
 export const startKeycloakLogin = async () => {
     if (typeof window === 'undefined') return;
 
-    if (!window.crypto?.subtle) {
-        throw new Error('Браузер не поддерживает PKCE.');
-    }
-
     const config = getKeycloakConfig();
     const verifier = createRandomString(64);
     const state = createRandomString(16);
