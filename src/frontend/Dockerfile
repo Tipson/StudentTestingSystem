@@ -24,9 +24,6 @@ RUN npm i -g serve
 # Копируем build
 COPY --from=builder /app/build ./build
 
-# Копируем serve.json в корень (там где будет запускаться serve)
-COPY --from=builder /app/serve.json ./serve.json
-
 # Копируем скрипт для runtime подстановки ENV переменных
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
@@ -34,4 +31,4 @@ RUN chmod +x /docker-entrypoint.sh
 EXPOSE 3000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["serve", "-s", "build", "-l", "3000", "-c", "serve.json"]
+CMD ["serve", "-s", "build", "-l", "3000"]
