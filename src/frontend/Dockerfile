@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Создаём шаблон для runtime подстановки переменных
+# Создаём build
 RUN npm run build
 
 FROM node:18-alpine AS runner
@@ -20,10 +20,12 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 RUN npm i -g serve
+
+# Копируем build
 COPY --from=builder /app/build ./build
 
-# Копируем конфиг для serve
-COPY serve.json ./
+# Копируем serve.json в корень (там где будет запускаться serve)
+COPY --from=builder /app/serve.json ./serve.json
 
 # Копируем скрипт для runtime подстановки ENV переменных
 COPY docker-entrypoint.sh /docker-entrypoint.sh
