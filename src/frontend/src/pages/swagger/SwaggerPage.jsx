@@ -7,6 +7,20 @@ import {assessmentApiDocs, identifyApiDocs, mediaApiDocs} from '@api';
 import testCatImage from './testCat.png';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
 import {clearStoredTokens, getStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
+import {
+    deleteKeycloakCredential,
+    fetchKeycloakAccountProfile,
+    fetchKeycloakCredentials,
+    fetchKeycloakOtpSecret,
+    fetchKeycloakSessions,
+    getKeycloakAccountUrl,
+    enableKeycloakOtp,
+    logoutAllKeycloakSessions,
+    logoutKeycloakSession,
+    updateKeycloakAccountProfile,
+    updateKeycloakPassword,
+} from '@shared/auth/keycloakAccount.js';
+import {useUser} from '@shared/auth/UserProvider.jsx';
 import './SwaggerPage.css';
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
@@ -29,6 +43,13 @@ const AUTH_OPTIONS = [
     {value: AUTH.OPTIONAL, label: 'Опционально'},
     {value: AUTH.FALSE, label: 'Без авторизации'},
 ];
+
+const USER_SOURCE_LABELS = {
+    'backend+keycloak': 'Backend + Keycloak',
+    keycloak: 'Keycloak',
+    backend: 'Backend',
+    none: 'Нет данных',
+};
 
 const DEFAULT_REQUEST = {
     service: 'assessment',
@@ -58,11 +79,171 @@ const AUTO_TEST_PER_QUESTION_STEP_COUNT = 3;
 // Ожидаемые шаги в сценариях (обновляйте при изменении сценариев).
 const SCENARIO_EXPECTED_TOTALS = {
     'full-cycle': 13,
+    'test-create-flow': 26,
+    'test-pass-flow': 22,
     'publish-without-questions': 7,
     'draft-flow': 8,
 };
 
+const SCENARIO_STEPS = Object.freeze({
+    'full-cycle': [
+        'Создать тест',
+        'Добавить вопросы',
+        'Опубликовать тест',
+        'Создать попытку',
+        'Ответить на вопросы',
+        'Запросить подсказку AI',
+        'Завершить попытку',
+        'Получить результат',
+        'Снять с публикации',
+        'Удалить вопросы и тест',
+    ],
+    'test-create-flow': [
+        'Создать тест',
+        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Опубликовать тест',
+        'Снять тест с публикации',
+        'Обновить параметры теста',
+        'Изменить старые вопросы',
+        'Добавить 3 новых вопроса',
+        'Опубликовать тест повторно',
+        'Снять тест с публикации',
+        'Удалить вопросы',
+        'Удалить тест',
+    ],
+    'test-pass-flow': [
+        'Создать тест',
+        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Опубликовать тест',
+        'Создать попытку',
+        'Ответить на вопрос верно',
+        'Ответить на вопрос неверно',
+        'Запросить подсказку AI',
+        'Завершить попытку',
+        'Оценить попытку через grade',
+        'Получить результат оценки',
+        'Снять тест с публикации',
+        'Удалить вопросы',
+        'Удалить тест',
+    ],
+    'publish-without-questions': [
+        'Создать тест',
+        'Попробовать опубликовать без вопросов (ожидаем отказ)',
+        'Добавить вопрос',
+        'Опубликовать тест',
+        'Снять тест с публикации',
+        'Удалить вопрос',
+        'Удалить тест',
+    ],
+    'draft-flow': [
+        'Создать тест',
+        'Обновить параметры теста',
+        'Добавить вопросы',
+        'Переупорядочить вопросы',
+        'Обновить один вопрос',
+        'Удалить один вопрос',
+        'Удалить тест',
+    ],
+});
+
+// Сопоставляем шаги сценариев с выполненными тестами по id шагов.
+const SCENARIO_STEP_MATCHERS = Object.freeze({
+    'full-cycle': [
+        {label: 'Создать тест', matchers: ['scenario-full-create']},
+        {label: 'Добавить вопросы', matchers: ['scenario-full-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-full-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-full-attempt']},
+        {label: 'Ответить на вопросы', matchers: ['scenario-full-answer-*']},
+        {label: 'Запросить подсказку AI', matchers: ['scenario-full-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-full-submit']},
+        {label: 'Получить результат', matchers: ['scenario-full-result']},
+        {label: 'Снять с публикации', matchers: ['scenario-full-unpublish']},
+        {label: 'Удалить вопросы и тест', matchers: ['scenario-full-delete-question-*', 'scenario-full-delete-test']},
+    ],
+    'test-create-flow': [
+        {label: 'Создать тест', matchers: ['scenario-create-test']},
+        {label: 'Добавить 4 вопроса разных типов (один с картинкой)', matchers: ['scenario-create-media', 'scenario-create-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-create-publish']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-create-update-test']},
+        {label: 'Изменить старые вопросы', matchers: ['scenario-create-update-question-*']},
+        {label: 'Добавить 3 новых вопроса', matchers: ['scenario-create-extra-question-*']},
+        {label: 'Опубликовать тест повторно', matchers: ['scenario-create-publish-again']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish-again']},
+        {label: 'Удалить вопросы', matchers: ['scenario-create-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-create-delete-test']},
+    ],
+    'test-pass-flow': [
+        {label: 'Создать тест', matchers: ['scenario-pass-test']},
+        {label: 'Добавить 4 вопроса разных типов (один с картинкой)', matchers: ['scenario-pass-media', 'scenario-pass-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-pass-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-pass-attempt']},
+        {label: 'Ответить на вопрос верно', matchers: ['scenario-pass-answer-correct']},
+        {label: 'Ответить на вопрос неверно', matchers: ['scenario-pass-answer-wrong', 'scenario-pass-answer-*']},
+        {label: 'Запросить подсказку AI', matchers: ['scenario-pass-ai-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-pass-submit']},
+        {label: 'Оценить попытку через grade', matchers: ['scenario-pass-grade']},
+        {label: 'Получить результат оценки', matchers: ['scenario-pass-result']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-pass-unpublish']},
+        {label: 'Удалить вопросы', matchers: ['scenario-pass-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-pass-delete-test']},
+    ],
+    'publish-without-questions': [
+        {label: 'Создать тест', matchers: ['scenario-publish-create']},
+        {label: 'Попробовать опубликовать без вопросов (ожидаем отказ)', matchers: ['scenario-publish-without-questions']},
+
+        {label: 'Добавить вопрос', matchers: ['scenario-publish-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-publish-success']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-publish-unpublish']},
+        {label: 'Удалить вопрос', matchers: ['scenario-publish-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-publish-delete-test']},
+    ],
+    'draft-flow': [
+        {label: 'Создать тест', matchers: ['scenario-draft-create']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-draft-update']},
+        {label: 'Добавить вопросы', matchers: ['scenario-draft-question-*']},
+        {label: 'Переупорядочить вопросы', matchers: ['scenario-draft-reorder']},
+        {label: 'Обновить один вопрос', matchers: ['scenario-draft-update-question']},
+        {label: 'Удалить один вопрос', matchers: ['scenario-draft-delete-question']},
+        {label: 'Удалить тест', matchers: ['scenario-draft-delete-test']},
+    ],
+});
+
 const getScenarioExpectedTotal = (scenarioId) => SCENARIO_EXPECTED_TOTALS[scenarioId] ?? 0;
+
+const getScenarioStepDefinitions = (scenarioId) => {
+    const custom = SCENARIO_STEP_MATCHERS[scenarioId];
+    if (custom) return custom;
+    return (SCENARIO_STEPS[scenarioId] || []).map((label) => ({label, matchers: []}));
+};
+
+const matchScenarioStepResult = (item, matchers) => {
+    if (!item || !matchers?.length) return false;
+    const id = String(item.id || '');
+    if (!id) return false;
+
+    return matchers.some((matcher) => {
+        if (!matcher) return false;
+        if (typeof matcher === 'function') return Boolean(matcher(item));
+        const raw = String(matcher);
+        if (raw.endsWith('*')) {
+            return id.startsWith(raw.slice(0, -1));
+        }
+        return id === raw;
+    });
+};
+
+const buildScenarioStepSummary = (items) => {
+    const summary = {total: items.length, success: 0, failed: 0, skipped: 0};
+
+    items.forEach((item) => {
+        if (item.status === 'success') summary.success += 1;
+        else if (item.status === 'failed') summary.failed += 1;
+        else if (item.status === 'skipped') summary.skipped += 1;
+    });
+
+    return summary;
+};
 
 const normalizePathParams = (path) => (path ? path.replace(/\{[^}]+\}/g, '{}') : '');
 
@@ -240,6 +421,76 @@ const formatResponse = (payload) => {
     }
 };
 
+   const formatDateTime = (value) => {
+       if (value == null || value === '') return '';
+       const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
+       if (Number.isNaN(date.getTime())) return String(value);
+       return date.toLocaleString('ru-RU');
+   };
+
+// Нормализуем список клиентов сессии для отображения.
+const normalizeSessionClients = (clients) => {
+    if (!clients) return [];
+    if (Array.isArray(clients)) {
+        return clients
+            .map((client) => {
+                if (typeof client === 'string') return client;
+                return client?.clientId || client?.id || client?.name || '';
+            })
+            .filter(Boolean);
+    }
+    if (typeof clients === 'object') return Object.keys(clients);
+    return [];
+};
+
+// Подбираем человекочитаемую подпись для credential.
+const resolveCredentialLabel = (credential) => {
+    if (!credential) return 'Учётные данные';
+    if (credential.userLabel) return credential.userLabel;
+    const type = credential.type || credential.credentialType || '';
+    if (type === 'password') return 'Пароль';
+    if (type === 'otp') return 'OTP';
+    if (type === 'webauthn') return 'WebAuthn';
+    return type || 'Учётные данные';
+};
+
+// Достаём секрет и QR для OTP из разных версий ответа Keycloak.
+const resolveOtpSecret = (data) => (
+    data?.totpSecret
+    || data?.totpSecretEncoded
+    || data?.secret
+    || data?.secretEncoded
+    || data?.totp?.totpSecret
+    || data?.totp?.totpSecretEncoded
+    || ''
+);
+
+const resolveOtpQrSource = (data) => (
+    data?.qrCode
+    || data?.qrCodeUrl
+    || data?.qrUrl
+    || data?.totpSecretQrCode
+    || data?.totp?.qrCode
+    || data?.totp?.qrUrl
+    || ''
+);
+
+const normalizeOtpQrSource = (value) => {
+    if (!value) return '';
+    if (/^data:image/i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) return value;
+    return `data:image/png;base64,${value}`;
+};
+
+const buildAccountProfilePayload = (form) => {
+    const payload = {};
+    if (form.username) payload.username = form.username;
+    if (form.email) payload.email = form.email;
+    if (form.firstName) payload.firstName = form.firstName;
+    if (form.lastName) payload.lastName = form.lastName;
+    return payload;
+};
+
 const isBinaryPayload = (value) => {
     if (!value) return false;
     if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
@@ -350,7 +601,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalizeExpectedStatuses = (value) => {
     if (value === null || value === undefined) return [];
-    return Array.isArray(value) ? value : [value];
+    const arr = Array.isArray(value) ? value : [value];
+    return arr
+        .map((v) => (typeof v === 'string' ? Number(v) : v))
+        .filter((v) => Number.isFinite(v));
 };
 
 // Универсальный исполнитель шага с повтором и поддержкой ожидаемого статуса.
@@ -549,6 +803,51 @@ const buildAutoTestQuestions = (label) => ([
     },
 ]);
 
+// Формирует payload вопроса с учётом медиа-аттачей.
+const buildQuestionPayload = (template, mediaIds = []) => {
+    const hasMedia = Array.isArray(mediaIds) && mediaIds.length > 0;
+    const questionMediaIds = template.attachMediaToQuestion && hasMedia
+        ? mediaIds.slice(0, 1)
+        : null;
+    const options = (template.options || []).map((option, optionIndex) => {
+        if (template.attachMediaToOptionIndex === optionIndex && hasMedia) {
+            return {...option, mediaIds: mediaIds.slice(0, 1)};
+        }
+        return option;
+    });
+
+    return {
+        text: template.title,
+        type: template.type,
+        isRequired: template.isRequired ?? true,
+        points: template.points ?? 1,
+        options,
+        mediaIds: questionMediaIds && questionMediaIds.length ? questionMediaIds : null,
+    };
+};
+
+// Собирает метаданные вопроса для ответов и последующего удаления.
+const buildQuestionRecord = (question, sourceOptions, fallback = {}) => {
+    const options = question?.options || [];
+    const optionMap = new Map(options.map((option) => [option.text, option.id]));
+    const correctOptionIds = (sourceOptions || [])
+        .filter((option) => option.isCorrect)
+        .map((option) => optionMap.get(option.text))
+        .filter(Boolean);
+    const correctText = (sourceOptions || [])
+        .find((option) => option.isCorrect)?.text || '';
+
+    return {
+        id: question?.id ?? question?.Id ?? null,
+        type: question?.type ?? fallback.type ?? null,
+        points: question?.points ?? fallback.points ?? null,
+        options,
+        correctOptionIds,
+        correctText,
+        answerText: fallback.answerText || correctText || '',
+    };
+};
+
 // Собирает корректный payload ответа для SaveAnswer.
 const buildAnswerPayload = (question) => {
     if (!question) {
@@ -590,6 +889,42 @@ const buildAnswerPayload = (question) => {
     }
 
     return {optionId: null, optionIds: [], text: 'Автотестовый ответ'};
+};
+
+// Формирует заведомо неверный ответ.
+const buildIncorrectAnswerPayload = (question) => {
+    if (!question) {
+        return {optionId: null, optionIds: [], text: 'Неверный ответ'};
+    }
+
+    const type = question.type;
+    const options = Array.isArray(question.options) ? question.options : [];
+    const correctIds = Array.isArray(question.correctOptionIds) ? question.correctOptionIds : [];
+    const wrongOptions = options.filter((option) => option.id && !correctIds.includes(option.id));
+    const wrongOptionId = wrongOptions[0]?.id || options[0]?.id || null;
+
+    if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
+        return {
+            optionId: wrongOptionId,
+            optionIds: wrongOptionId ? [wrongOptionId] : [],
+            text: 'Неверный вариант',
+        };
+    }
+
+    if (type === QUESTION_TYPES.MultiChoice) {
+        const optionIds = wrongOptions.map((option) => option.id).filter(Boolean).slice(0, 2);
+        return {
+            optionId: optionIds[0] || wrongOptionId || null,
+            optionIds,
+            text: optionIds.length ? 'Неверные варианты' : 'Неверный вариант',
+        };
+    }
+
+    if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
+        return {optionId: null, optionIds: [], text: 'Неверный ответ'};
+    }
+
+    return {optionId: null, optionIds: [], text: 'Неверный ответ'};
 };
 
 const getQuestionId = (question) => question?.id ?? question?.Id ?? null;
@@ -958,7 +1293,43 @@ const buildPathLabel = (item, groupTitle) => {
 };
 
 export default function SwaggerPage() {
+    const {profile, roles, source, refreshUser, clearUser} = useUser();
     const [tokens, setTokens] = useState(() => getStoredTokens());
+    const [accountProfile, setAccountProfile] = useState(null);
+    const [accountProfileLoading, setAccountProfileLoading] = useState(false);
+    const [accountProfileError, setAccountProfileError] = useState('');
+    const [accountSecurityLoading, setAccountSecurityLoading] = useState(false);
+    const [accountSecurityError, setAccountSecurityError] = useState('');
+    const [accountSessions, setAccountSessions] = useState([]);
+    const [accountCredentials, setAccountCredentials] = useState([]);
+    const [profileForm, setProfileForm] = useState({
+        username: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+    });
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileDirty, setProfileDirty] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+    });
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [otpData, setOtpData] = useState(null);
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [otpError, setOtpError] = useState('');
+    const [otpForm, setOtpForm] = useState({
+        code: '',
+        deviceName: '',
+    });
+    const [otpSaving, setOtpSaving] = useState(false);
+    const profileInitRef = useRef('');
+    // Рефы для защиты от повторных загрузок профиля/безопасности.
+    const profileDirtyRef = useRef(false);
+    const accountProfileLoadingRef = useRef(false);
+    const accountSecurityLoadingRef = useRef(false);
+    const profileTabLoadedRef = useRef(false);
     const serviceEntries = useMemo(
         () => Object.entries(API_BASE_URLS)
             .filter(([, url]) => Boolean(url))
@@ -997,10 +1368,15 @@ export default function SwaggerPage() {
     const [expandedAutoTestRows, setExpandedAutoTestRows] = useState({});
     // Если включено, ответы в автотестах открываются по умолчанию.
     const [autoTestAutoExpand, setAutoTestAutoExpand] = useState(false);
+    // Индекс последнего выполненного автотеста для анимации.
+    const [autoTestActiveIndex, setAutoTestActiveIndex] = useState(-1);
     const [scenarioRunning, setScenarioRunning] = useState(false);
     const [scenarioResults, setScenarioResults] = useState([]);
     const [activeScenarioId, setActiveScenarioId] = useState('full-cycle');
+    const [selectedScenarioId, setSelectedScenarioId] = useState('full-cycle');
     const [expandedScenarioRows, setExpandedScenarioRows] = useState({});
+    // Раскрытие шагов сценария в деталях.
+    const [expandedScenarioSteps, setExpandedScenarioSteps] = useState({});
     // Если включено, ответы в сценариях открываются по умолчанию.
     const [scenarioAutoExpand, setScenarioAutoExpand] = useState(false);
     const [endpointMeta, setEndpointMeta] = useState(DEFAULT_ENDPOINT_META);
@@ -1081,6 +1457,7 @@ export default function SwaggerPage() {
         () => Math.max(autoTestExpectedTotal - autoTestCompleted, 0),
         [autoTestExpectedTotal, autoTestCompleted],
     );
+    const autoTestProgress = calcPercent(autoTestCompleted, autoTestExpectedTotal);
     const autoTestSummary = useMemo(() => {
         const summary = {total: autoTestResults.length, success: 0, failed: 0, skipped: 0};
 
@@ -1170,13 +1547,27 @@ export default function SwaggerPage() {
 
         return summary;
     }, [scenarioResults]);
-    const scenarioDefinitions = useMemo(() => ([
+const scenarioDefinitions = useMemo(() => ([
         {
             id: 'full-cycle',
             title: 'Полный цикл теста',
             tag: 'E2E',
             description: 'Создание теста, вопросы, публикация, прохождение, результат и очистка.',
             expectedTotal: getScenarioExpectedTotal('full-cycle'),
+        },
+        {
+            id: 'test-create-flow',
+            title: 'Сценарий создания теста',
+            tag: 'Создание',
+            description: 'Создание теста, 4 вопроса разных типов с медиа-добавлениями, публикация, правки и повторная публикация.',
+            expectedTotal: getScenarioExpectedTotal('test-create-flow'),
+        },
+        {
+            id: 'test-pass-flow',
+            title: 'Сценарий прохождения теста',
+            tag: 'Прохождение',
+            description: 'Создание теста, попытка и ответы (верные/неверные), подсказка AI, оценка, результат и очистка.',
+            expectedTotal: getScenarioExpectedTotal('test-pass-flow'),
         },
         {
             id: 'publish-without-questions',
@@ -1192,7 +1583,10 @@ export default function SwaggerPage() {
             description: 'Работа с черновиком: обновления, порядок вопросов и удаление.',
             expectedTotal: getScenarioExpectedTotal('draft-flow'),
         },
-    ]), []);
+    ].map((scenario) => ({
+        ...scenario,
+        steps: SCENARIO_STEPS[scenario.id] || [],
+    }))), []);
     const activeScenario = useMemo(
         () => scenarioDefinitions.find((scenario) => scenario.id === activeScenarioId),
         [scenarioDefinitions, activeScenarioId],
@@ -1203,6 +1597,46 @@ export default function SwaggerPage() {
         () => Math.max(scenarioExpectedTotal - scenarioCompleted, 0),
         [scenarioExpectedTotal, scenarioCompleted],
     );
+    const scenarioById = useMemo(
+        () => new Map(scenarioDefinitions.map((scenario) => [scenario.id, scenario])),
+        [scenarioDefinitions],
+    );
+    const scenarioRoots = useMemo(() => scenarioDefinitions, [scenarioDefinitions]);
+    const selectedScenario = useMemo(
+        () => scenarioById.get(selectedScenarioId) || scenarioDefinitions[0] || null,
+        [scenarioById, scenarioDefinitions, selectedScenarioId],
+    );
+    const selectedScenarioExpectedTotal = selectedScenario?.expectedTotal ?? 0;
+    const selectedScenarioCompleted = selectedScenarioId === activeScenarioId ? scenarioCompleted : 0;
+    const selectedScenarioRemaining = Math.max(
+        selectedScenarioExpectedTotal - selectedScenarioCompleted,
+        0,
+    );
+    const selectedScenarioSummary = selectedScenarioId === activeScenarioId
+        ? scenarioSummary
+        : {total: 0, success: 0, failed: 0, skipped: 0};
+    const scenarioStatusSegments = useMemo(() => ([
+        {key: 'success', label: 'Успешно', value: selectedScenarioSummary.success, color: '#22c55e'},
+        {key: 'failed', label: 'Ошибки', value: selectedScenarioSummary.failed, color: '#ef4444'},
+        {key: 'skipped', label: 'Пропущено', value: selectedScenarioSummary.skipped, color: '#94a3b8'},
+    ]), [selectedScenarioSummary]);
+    const scenarioProgressSegments = useMemo(() => ([
+        {key: 'completed', label: 'Выполнено', value: selectedScenarioCompleted, color: '#0ea5e9'},
+        {key: 'remaining', label: 'Осталось', value: selectedScenarioRemaining, color: '#cbd5e1'},
+    ]), [selectedScenarioCompleted, selectedScenarioRemaining]);
+    const scenarioStatusGradient = useMemo(
+        () => buildConicGradient(scenarioStatusSegments, selectedScenarioSummary.total),
+        [scenarioStatusSegments, selectedScenarioSummary.total],
+    );
+    const scenarioProgressGradient = useMemo(
+        () => buildConicGradient(scenarioProgressSegments, selectedScenarioExpectedTotal),
+        [scenarioProgressSegments, selectedScenarioExpectedTotal],
+    );
+    const scenarioStatusRate = calcPercent(
+        selectedScenarioSummary.success,
+        selectedScenarioSummary.total,
+    );
+    const scenarioProgressRate = calcPercent(selectedScenarioCompleted, selectedScenarioExpectedTotal);
     const statusSegments = useMemo(() => ([
         {key: 'success', label: 'Успешно', value: autoTestSummary.success, color: '#22c55e'},
         {key: 'failed', label: 'Ошибка', value: autoTestSummary.failed, color: '#ef4444'},
@@ -1232,6 +1666,67 @@ export default function SwaggerPage() {
     const statusSuccessRate = calcPercent(autoTestSummary.success, autoTestSummary.total);
     const qualitySuccessRate = calcPercent(autoTestSummary.success, executedTotal);
     const coverageRate = calcPercent(executedTotal, autoTestSummary.total);
+    const selectedScenarioStepDefs = useMemo(
+        () => (selectedScenario?.id ? getScenarioStepDefinitions(selectedScenario.id) : []),
+        [selectedScenario],
+    );
+    const scopedScenarioResults = useMemo(
+        () => (selectedScenarioId === activeScenarioId ? scenarioResults : []),
+        [selectedScenarioId, activeScenarioId, scenarioResults],
+    );
+    const lastScenarioResultId = scopedScenarioResults.length
+        ? scopedScenarioResults[scopedScenarioResults.length - 1].id
+        : '';
+    const scenarioStepDetails = useMemo(() => selectedScenarioStepDefs.map((step, index) => {
+        const matchers = step.matchers || [];
+        const matched = matchers.length
+            ? scopedScenarioResults.filter((item) => matchScenarioStepResult(item, matchers))
+            : [];
+        const summary = buildScenarioStepSummary(matched);
+        const expectedStatuses = Array.isArray(step.expectedStatus) && step.expectedStatus.length
+            ? step.expectedStatus
+            : ['success'];
+        const accounted = matched.reduce((total, item) => (
+            total + (expectedStatuses.includes(item.status) ? 1 : 0)
+        ), 0);
+        const hasMatched = matched.length > 0;
+        const isAligned = hasMatched && matched.every((item) => expectedStatuses.includes(item.status));
+        let status = 'idle';
+
+        if (hasMatched) {
+            status = isAligned ? 'success' : 'failed';
+            if (summary.skipped > 0 && summary.success === 0 && summary.failed === 0) {
+                status = 'skipped';
+            }
+        }
+
+        if (scenarioRunning && lastScenarioResultId && matched.some((item) => item.id === lastScenarioResultId)) {
+            status = 'running';
+        }
+
+        return {
+            key: `${selectedScenario?.id || 'scenario'}-${index}`,
+            label: step.label,
+            summary,
+            results: matched,
+            progress: hasMatched ? calcPercent(accounted, matched.length) : 0,
+            status,
+        };
+    }), [selectedScenario?.id, selectedScenarioStepDefs, scopedScenarioResults, lastScenarioResultId, scenarioRunning]);
+
+    const workflowLanes = useMemo(
+        () => scenarioDefinitions.map((scenario) => ({id: scenario.id, scenario})),
+        [scenarioDefinitions],
+    );
+
+    const getScenarioNodeStatus = useCallback((scenarioId) => {
+        if (scenarioId !== activeScenarioId) return 'idle';
+        if (scenarioRunning) return 'running';
+        if (scenarioSummary.failed > 0) return 'failed';
+        if (scenarioSummary.success > 0 && scenarioSummary.failed === 0) return 'success';
+        if (scenarioSummary.skipped > 0) return 'skipped';
+        return 'idle';
+    }, [activeScenarioId, scenarioRunning, scenarioSummary]);
 
     const applyEndpoint = useCallback((item, serviceKey) => {
         const nextBody = item.example != null
@@ -1254,6 +1749,11 @@ export default function SwaggerPage() {
             body: nextBody,
         }));
     }, []);
+
+    // При смене выбранного сценария скрываем детали шагов.
+    useEffect(() => {
+        setExpandedScenarioSteps({});
+    }, [selectedScenarioId]);
 
     // Сбрасываем путь и метаданные, если текущий путь не подходит под выбранные сервис/метод.
     useEffect(() => {
@@ -1292,6 +1792,189 @@ export default function SwaggerPage() {
     const tokenExpiresAt = tokens?.expiresAt
         ? new Date(tokens.expiresAt).toLocaleString('ru-RU')
         : '';
+    // Ссылка на личный кабинет Keycloak для быстрого перехода.
+    const keycloakAccountUrl = useMemo(() => getKeycloakAccountUrl(), []);
+    const keycloakSecurityUrl = useMemo(
+        () => (keycloakAccountUrl ? `${keycloakAccountUrl}/#/security/signing-in` : ''),
+        [keycloakAccountUrl],
+    );
+    const profileRows = useMemo(() => ([
+        {label: 'ID', value: profile?.id},
+        {label: 'Логин', value: profile?.username},
+        {label: 'Email', value: profile?.email},
+        {label: 'Имя', value: profile?.name},
+        {label: 'Фамилия', value: profile?.familyName},
+        {label: 'Источник', value: USER_SOURCE_LABELS[source] || source},
+    ]), [profile, source]);
+    const sortedRoles = useMemo(() => (
+        Array.isArray(roles) ? roles.slice().sort((a, b) => a.localeCompare(b)) : []
+    ), [roles]);
+    const otpSecret = useMemo(() => resolveOtpSecret(otpData), [otpData]);
+    const otpQrSource = useMemo(
+        () => normalizeOtpQrSource(resolveOtpQrSource(otpData)),
+        [otpData],
+    );
+    const otpPolicy = useMemo(
+        () => otpData?.policy || otpData?.totp?.policy || null,
+        [otpData],
+    );
+    const otpApps = useMemo(() => {
+        const apps = otpData?.supportedApplications || otpData?.totp?.supportedApplications || [];
+        return Array.isArray(apps) ? apps : [];
+    }, [otpData]);
+    const otpAppNames = useMemo(() => (
+        otpApps
+            .map((app) => {
+                if (typeof app === 'string') return app;
+                return app?.name || app?.displayName || app?.label || app?.id || '';
+            })
+            .filter(Boolean)
+    ), [otpApps]);
+    const otpPolicyText = useMemo(() => {
+        if (!otpPolicy) return '';
+        const parts = [];
+        if (otpPolicy.type) parts.push(`Тип: ${otpPolicy.type}`);
+        if (otpPolicy.algorithm || otpPolicy.algorithmKey) {
+            parts.push(`Алгоритм: ${otpPolicy.algorithm || otpPolicy.algorithmKey}`);
+        }
+        if (otpPolicy.digits) parts.push(`Цифры: ${otpPolicy.digits}`);
+        if (otpPolicy.period) parts.push(`Интервал: ${otpPolicy.period}`);
+        if (otpPolicy.initialCounter) parts.push(`Счётчик: ${otpPolicy.initialCounter}`);
+        return parts.join(' | ');
+    }, [otpPolicy]);
+    const otpCredentialsCount = useMemo(() => (
+        Array.isArray(accountCredentials)
+            ? accountCredentials.filter((cred) => (
+                (cred?.type || cred?.credentialType) === 'otp'
+            )).length
+            : 0
+    ), [accountCredentials]);
+    const syncProfileForm = useCallback((data, resetDirty = true) => {
+        const next = {
+            username: data?.username || profile?.username || '',
+            email: data?.email || profile?.email || '',
+            firstName: data?.firstName || profile?.name || '',
+            lastName: data?.lastName || profile?.familyName || '',
+        };
+        setProfileForm(next);
+        if (resetDirty) {
+            setProfileDirty(false);
+        }
+    }, [profile]);
+    const loadAccountProfile = useCallback(async (force = false) => {
+        if (!hasToken) {
+            setAccountProfile(null);
+            setAccountProfileError('');
+            accountProfileLoadingRef.current = false;
+            return;
+        }
+
+        if (accountProfileLoadingRef.current && !force) return;
+
+        accountProfileLoadingRef.current = true;
+        setAccountProfileLoading(true);
+        setAccountProfileError('');
+
+        try {
+            const data = await fetchKeycloakAccountProfile();
+            setAccountProfile(data);
+            if (!profileDirtyRef.current || force) {
+                syncProfileForm(data, true);
+            }
+        } catch (error) {
+            setAccountProfileError(error?.message || 'Не удалось загрузить профиль Keycloak.');
+        } finally {
+            accountProfileLoadingRef.current = false;
+            setAccountProfileLoading(false);
+        }
+    }, [hasToken, syncProfileForm]);
+    const loadSecurityInfo = useCallback(async (force = false) => {
+        if (!hasToken) {
+            setAccountSessions([]);
+            setAccountCredentials([]);
+            setAccountSecurityError('');
+            accountSecurityLoadingRef.current = false;
+            return;
+        }
+
+        if (accountSecurityLoadingRef.current && !force) return;
+
+        accountSecurityLoadingRef.current = true;
+        setAccountSecurityLoading(true);
+        setAccountSecurityError('');
+
+        const results = await Promise.allSettled([
+            fetchKeycloakSessions(),
+            fetchKeycloakCredentials(),
+        ]);
+
+        const errors = [];
+
+        if (results[0].status === 'fulfilled') {
+            setAccountSessions(Array.isArray(results[0].value) ? results[0].value : []);
+        } else {
+            errors.push(`Сессии: ${results[0].reason?.message || 'ошибка загрузки'}`);
+        }
+
+        if (results[1].status === 'fulfilled') {
+            setAccountCredentials(Array.isArray(results[1].value) ? results[1].value : []);
+        } else {
+            errors.push(`Учётные данные: ${results[1].reason?.message || 'ошибка загрузки'}`);
+        }
+
+        setAccountSecurityError(errors.join('. '));
+        accountSecurityLoadingRef.current = false;
+        setAccountSecurityLoading(false);
+    }, [hasToken]);
+
+    useEffect(() => {
+        profileDirtyRef.current = profileDirty;
+    }, [profileDirty]);
+
+    useEffect(() => {
+        accountProfileLoadingRef.current = accountProfileLoading;
+    }, [accountProfileLoading]);
+
+    useEffect(() => {
+        accountSecurityLoadingRef.current = accountSecurityLoading;
+    }, [accountSecurityLoading]);
+
+    useEffect(() => {
+        const identity = profile?.id || profile?.username || '';
+        if (!identity) return;
+
+        if (profileInitRef.current !== identity && !profileDirty) {
+            profileInitRef.current = identity;
+            syncProfileForm(null, true);
+        } else if (profileInitRef.current !== identity) {
+            profileInitRef.current = identity;
+            syncProfileForm(null, true);
+        }
+    }, [profile, profileDirty, syncProfileForm]);
+
+    useEffect(() => {
+        if (activeTab !== 'profile') {
+            profileTabLoadedRef.current = false;
+            return;
+        }
+        if (!hasToken) {
+            profileTabLoadedRef.current = false;
+            return;
+        }
+        if (profileTabLoadedRef.current) return;
+        profileTabLoadedRef.current = true;
+        loadAccountProfile(false);
+        loadSecurityInfo(false);
+    }, [activeTab, hasToken, loadAccountProfile, loadSecurityInfo]);
+
+    useEffect(() => {
+        if (hasToken) return;
+        setOtpData(null);
+        setOtpError('');
+        setOtpLoading(false);
+        setOtpSaving(false);
+        setOtpForm({code: '', deviceName: ''});
+    }, [hasToken]);
 
     // Загружает Swagger и формирует список эндпоинтов.
     const loadSwagger = useCallback(async () => {
@@ -1353,7 +2036,13 @@ export default function SwaggerPage() {
 
     const handleLogout = () => {
         clearStoredTokens();
+        clearUser();
         setTokens(null);
+        setOtpData(null);
+        setOtpError('');
+        setOtpLoading(false);
+        setOtpSaving(false);
+        setOtpForm({code: '', deviceName: ''});
     };
 
     const handleCopyToken = async () => {
@@ -1379,6 +2068,283 @@ export default function SwaggerPage() {
                 message: 'Не удалось скопировать токен.',
                 duration: 2400,
             });
+        }
+    };
+
+    const handleProfileChange = (field) => (event) => {
+        const value = event.target.value;
+        setProfileForm((prev) => ({...prev, [field]: value}));
+        setProfileDirty(true);
+    };
+
+    const handleProfileReset = () => {
+        syncProfileForm(accountProfile || null, true);
+    };
+
+    const handleProfileSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для обновления профиля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        const payload = buildAccountProfilePayload(profileForm);
+        if (!Object.keys(payload).length) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Заполните поля для обновления профиля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setProfileSaving(true);
+        try {
+            await updateKeycloakAccountProfile(payload);
+            notifyCustom({
+                type: 'success',
+                message: 'Профиль обновлён в Keycloak.',
+                duration: 2400,
+            });
+            setProfileDirty(false);
+            await refreshUser(true);
+            await loadAccountProfile(true);
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось обновить профиль.',
+                duration: 3200,
+            });
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    const handlePasswordChange = (field) => (event) => {
+        const value = event.target.value;
+        setPasswordForm((prev) => ({...prev, [field]: value}));
+    };
+
+    const handlePasswordSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для смены пароля.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (!passwordForm.newPassword) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Введите новый пароль.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Пароли не совпадают.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setPasswordSaving(true);
+        try {
+            await updateKeycloakPassword({
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword,
+                confirmation: passwordForm.confirmPassword,
+            });
+            notifyCustom({
+                type: 'success',
+                message: 'Пароль обновлён.',
+                duration: 2400,
+            });
+            setPasswordForm({currentPassword: '', newPassword: '', confirmPassword: ''});
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось обновить пароль.',
+                duration: 3200,
+            });
+        } finally {
+            setPasswordSaving(false);
+        }
+    };
+
+    const handleOtpChange = (field) => (event) => {
+        const value = event.target.value;
+        setOtpForm((prev) => ({...prev, [field]: value}));
+    };
+
+    const handleOtpReset = () => {
+        setOtpData(null);
+        setOtpError('');
+        setOtpForm((prev) => ({...prev, code: ''}));
+    };
+
+    const handleOtpLoad = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для подключения OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (otpLoading) return;
+
+        setOtpLoading(true);
+        setOtpError('');
+
+        try {
+            const data = await fetchKeycloakOtpSecret();
+            setOtpData(data);
+            if (!otpForm.deviceName) {
+                setOtpForm((prev) => ({...prev, deviceName: 'Моё устройство'}));
+            }
+        } catch (error) {
+            if (error?.status === 404) {
+                setOtpError('OTP endpoint не найден. Проверьте версию Keycloak или включите account API.');
+            } else {
+                setOtpError(error?.message || 'Не удалось получить данные для OTP.');
+            }
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleOtpSave = async () => {
+        if (!hasToken) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Нет токена для подключения OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        const secret = resolveOtpSecret(otpData);
+        if (!secret) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Сначала получите секрет для OTP.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        if (!otpForm.code) {
+            notifyCustom({
+                type: 'warning',
+                message: 'Введите код из приложения.',
+                duration: 2400,
+            });
+            return;
+        }
+
+        setOtpSaving(true);
+        try {
+            await enableKeycloakOtp({
+                totp: otpForm.code,
+                totpSecret: secret,
+                userLabel: otpForm.deviceName,
+                deviceName: otpForm.deviceName,
+            });
+            notifyCustom({
+                type: 'success',
+                message: 'OTP подключён.',
+                duration: 2400,
+            });
+            setOtpForm((prev) => ({...prev, code: ''}));
+            setOtpData(null);
+            await loadSecurityInfo(true);
+        } catch (error) {
+            const message = error?.status === 404
+                ? 'OTP endpoint не найден. Используйте страницу Keycloak.'
+                : error?.message || 'Не удалось подключить OTP.';
+            notifyCustom({
+                type: 'error',
+                message,
+                duration: 3200,
+            });
+        } finally {
+            setOtpSaving(false);
+        }
+    };
+
+    const handleSecurityRefresh = async () => {
+        await loadSecurityInfo(true);
+    };
+
+    const handleLogoutAllSessions = async () => {
+        setAccountSecurityLoading(true);
+        try {
+            await logoutAllKeycloakSessions();
+            notifyCustom({
+                type: 'success',
+                message: 'Все сессии завершены.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось завершить все сессии.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
+        }
+    };
+
+    const handleLogoutSession = async (sessionId) => {
+        if (!sessionId) return;
+        setAccountSecurityLoading(true);
+        try {
+            await logoutKeycloakSession(sessionId);
+            notifyCustom({
+                type: 'success',
+                message: 'Сессия завершена.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось завершить сессию.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
+        }
+    };
+
+    const handleRemoveCredential = async (credentialId) => {
+        if (!credentialId) return;
+        setAccountSecurityLoading(true);
+        try {
+            await deleteKeycloakCredential(credentialId);
+            notifyCustom({
+                type: 'success',
+                message: 'Учётные данные удалены.',
+                duration: 2400,
+            });
+        } catch (error) {
+            notifyCustom({
+                type: 'error',
+                message: error?.message || 'Не удалось удалить учётные данные.',
+                duration: 3200,
+            });
+        } finally {
+            await loadSecurityInfo(true);
         }
     };
 
@@ -1431,6 +2397,7 @@ export default function SwaggerPage() {
         setAutoTestRunning(true);
         setAutoTestResults([]);
         setExpandedAutoTestRows({});
+        setAutoTestActiveIndex(-1);
 
         const runLabel = new Date().toLocaleString('ru-RU');
         const ctx = {
@@ -1453,7 +2420,12 @@ export default function SwaggerPage() {
         };
 
         const pushResult = (result) => {
-            setAutoTestResults((prev) => [...prev, result]);
+            setAutoTestResults((prev) => {
+                const nextIndex = prev.length;
+                const next = [...prev, {...result, sequenceIndex: nextIndex}];
+                setAutoTestActiveIndex(nextIndex);
+                return next;
+            });
         };
 
         const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
@@ -2273,6 +3245,7 @@ export default function SwaggerPage() {
             });
         } finally {
             setAutoTestRunning(false);
+            setAutoTestActiveIndex(-1);
         }
     };
 
@@ -2283,7 +3256,9 @@ export default function SwaggerPage() {
         setScenarioRunning(true);
         setScenarioResults([]);
         setActiveScenarioId(scenarioId);
+        setSelectedScenarioId(scenarioId);
         setExpandedScenarioRows({});
+        setExpandedScenarioSteps({});
 
         const runLabel = new Date().toLocaleString('ru-RU');
         const ctx = {
@@ -2296,6 +3271,7 @@ export default function SwaggerPage() {
                 testId: null,
                 attemptId: null,
                 questions: [],
+                mediaIds: [],
                 isPublished: false,
             },
         };
@@ -2305,9 +3281,586 @@ export default function SwaggerPage() {
         };
 
         const runStep = (step) => runStepWithRetries(step, ctx, pushResult);
+        // Готовим payload вопроса с учётом медиа и возвращаем запись для сценария.
+        const buildScenarioQuestionPayload = (template) => buildQuestionPayload(template, ctx.values.mediaIds);
+        const pushScenarioQuestion = (template, response) => {
+            const question = response?.data ?? {};
+            ctx.values.questions.push(
+                buildQuestionRecord(question, template.options, {
+                    type: template.type,
+                    points: template.points,
+                    answerText: template.answerText,
+                }),
+            );
+        };
+        const updateScenarioQuestion = (index, payload, response) => {
+            const question = response?.data ?? {};
+            ctx.values.questions[index] = buildQuestionRecord(question, payload.options, {
+                type: payload.type,
+                points: payload.points,
+                answerText: payload.answerText,
+            });
+        };
+        const buildUpdatedQuestionPayload = (question, index) => {
+            const type = question?.type ?? QUESTION_TYPES.SingleChoice;
+            const hasMedia = ctx.values.mediaIds.length > 0;
+            const mediaIds = hasMedia ? ctx.values.mediaIds.slice(0, 1) : null;
+
+            if (type === QUESTION_TYPES.SingleChoice) {
+                const payload = {
+                    text: `HTTP: какой заголовок указывает длину ответа? (${runLabel})`,
+                    type,
+                    points: 2,
+                    isRequired: true,
+                    options: [
+                        {text: 'Content-Length', isCorrect: true, order: 1},
+                        {text: 'Accept', isCorrect: false, order: 2},
+                        {text: 'ETag', isCorrect: false, order: 3},
+                    ],
+                    mediaIds: index === 0 && mediaIds ? mediaIds : null,
+                };
+                return payload;
+            }
+
+            if (type === QUESTION_TYPES.MultiChoice) {
+                const options = [
+                    {text: 'POST', isCorrect: true, order: 1},
+                    {text: 'PUT', isCorrect: true, order: 2},
+                    {text: 'GET', isCorrect: false, order: 3},
+                    {text: 'HEAD', isCorrect: false, order: 4},
+                ].map((option, optionIndex) => {
+                    if (index === 1 && optionIndex === 0 && mediaIds) {
+                        return {...option, mediaIds};
+                    }
+                    return option;
+                });
+
+                return {
+                    text: `HTTP: методы, изменяющие данные (${runLabel})`,
+                    type,
+                    points: 3,
+                    isRequired: true,
+                    options,
+                };
+            }
+
+            if (type === QUESTION_TYPES.TrueFalse) {
+                return {
+                    text: `HTTP/2 использует бинарный формат (${runLabel})`,
+                    type,
+                    points: 1,
+                    isRequired: true,
+                    options: [
+                        {text: 'Да', isCorrect: true, order: 1},
+                        {text: 'Нет', isCorrect: false, order: 2},
+                    ],
+                };
+            }
+
+            if (type === QUESTION_TYPES.ShortText) {
+                const answerText = '302';
+                return {
+                    text: `Укажите код статуса временного перенаправления (${runLabel})`,
+                    type,
+                    points: 2,
+                    isRequired: true,
+                    answerText,
+                    options: [
+                        {text: answerText, isCorrect: true, order: 1},
+                    ],
+                };
+            }
+
+            if (type === QUESTION_TYPES.LongText) {
+                const answerText = 'PUT заменяет ресурс целиком, PATCH обновляет частично.';
+                return {
+                    text: `Опишите разницу между PUT и PATCH (${runLabel})`,
+                    type,
+                    points: 4,
+                    isRequired: true,
+                    answerText,
+                    options: [
+                        {text: answerText, isCorrect: true, order: 1},
+                    ],
+                };
+            }
+
+            return {
+                text: `Вопрос сценария (${runLabel})`,
+                type,
+                points: 1,
+                isRequired: true,
+                options: [],
+            };
+        };
+        const buildExtraQuestionTemplates = (label) => ([
+            ...buildAutoTestQuestions(`${label} (доп)`).slice(4, 5),
+            {
+                title: `HTTP: какой код означает "Нет содержимого"? (${label})`,
+                type: QUESTION_TYPES.ShortText,
+                points: 1,
+                isRequired: true,
+                answerText: '204',
+                options: [
+                    {text: '204', isCorrect: true, order: 1},
+                ],
+            },
+            {
+                title: `Выберите идемпотентные методы (${label})`,
+                type: QUESTION_TYPES.MultiChoice,
+                points: 2,
+                isRequired: true,
+                options: [
+                    {text: 'GET', isCorrect: true, order: 1},
+                    {text: 'PUT', isCorrect: true, order: 2},
+                    {text: 'POST', isCorrect: false, order: 3},
+                    {text: 'PATCH', isCorrect: false, order: 4},
+                ],
+            },
+        ]);
 
         try {
             switch (scenarioId) {
+                case 'test-create-flow': {
+                    await runStep({
+                        id: 'scenario-create-test',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: создание теста (${runLabel})`,
+                                description: 'Создание теста с вопросами, медиа и правками.',
+                                passScore: 3,
+                                attemptsLimit: 2,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-media',
+                        title: 'POST /api/files/upload',
+                        service: 'media',
+                        method: 'POST',
+                        path: '/api/files/upload',
+                        run: async () => {
+                            const formData = new FormData();
+                            const file = await createSampleImageFile();
+                            formData.append('files', file);
+                            return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
+                        },
+                        onSuccess: (response) => {
+                            const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
+                            ctx.values.mediaIds = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
+                        },
+                        getMessage: () => (
+                            ctx.values.mediaIds.length ? `mediaIds=${ctx.values.mediaIds.join(', ')}` : ''
+                        ),
+                    });
+
+                    const baseTemplates = buildAutoTestQuestions(runLabel);
+                    const initialTemplates = [baseTemplates[0], baseTemplates[1], baseTemplates[2], baseTemplates[3]]
+                        .filter(Boolean);
+
+                    for (const [index, template] of initialTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-create-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-publish',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-update-test',
+                        title: 'PUT /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для обновления.' : ''),
+                        run: () => ctx.assessment.put(
+                            `/api/tests/${ctx.values.testId}`,
+                            {
+                                title: `Сценарий: создание теста (обновлён) ${runLabel}`,
+                                description: 'Обновляем параметры теста и вопросы.',
+                                passScore: 4,
+                                attemptsLimit: 3,
+                                timeLimitSeconds: 900,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        const payload = buildUpdatedQuestionPayload(question, index);
+                        await runStep({
+                            id: `scenario-create-update-question-${index}`,
+                            title: 'PUT /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/questions/{id}',
+                            skip: () => (!getQuestionId(question) ? 'Нет вопроса для обновления.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/questions/${getQuestionId(question)}`,
+                                payload,
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                updateScenarioQuestion(index, payload, response);
+                            },
+                        });
+                    }
+
+                    const extraTemplates = buildExtraQuestionTemplates(runLabel);
+                    for (const [index, template] of extraTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-create-extra-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для дополнительных вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-publish-again',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-create-unpublish-again',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-create-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-create-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
+
+                case 'test-pass-flow': {
+                    await runStep({
+                        id: 'scenario-pass-test',
+                        title: 'POST /api/tests',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests',
+                        run: () => ctx.assessment.post(
+                            '/api/tests',
+                            {
+                                title: `Сценарий: прохождение теста (${runLabel})`,
+                                description: 'Проверка попытки, ответов и оценки.',
+                                passScore: 2,
+                                attemptsLimit: 1,
+                            },
+                            {auth: AUTH.TRUE},
+                        ),
+                        onSuccess: (response) => {
+                            ctx.values.testId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-media',
+                        title: 'POST /api/files/upload',
+                        service: 'media',
+                        method: 'POST',
+                        path: '/api/files/upload',
+                        run: async () => {
+                            const formData = new FormData();
+                            const file = await createSampleImageFile();
+                            formData.append('files', file);
+                            return ctx.media.post('/api/files/upload', formData, {auth: AUTH.TRUE});
+                        },
+                        onSuccess: (response) => {
+                            const uploaded = response?.data?.uploaded ?? response?.data?.Uploaded ?? [];
+                            ctx.values.mediaIds = uploaded.map((file) => file.id ?? file.Id).filter(Boolean);
+                        },
+                    });
+
+                    const passTemplates = buildAutoTestQuestions(runLabel);
+                    const selectedTemplates = [passTemplates[0], passTemplates[1], passTemplates[2], passTemplates[4]]
+                        .filter(Boolean);
+
+                    for (const [index, template] of selectedTemplates.entries()) {
+                        await runStep({
+                            id: `scenario-pass-question-${index}`,
+                            title: `POST /api/tests/{testId}/questions (${template.title})`,
+                            service: 'assessment',
+                            method: 'POST',
+                            path: '/api/tests/{testId}/questions',
+                            skip: () => (!ctx.values.testId ? 'Нет testId для вопросов.' : ''),
+                            run: () => ctx.assessment.post(
+                                `/api/tests/${ctx.values.testId}/questions`,
+                                buildScenarioQuestionPayload(template),
+                                {auth: AUTH.TRUE},
+                            ),
+                            onSuccess: (response) => {
+                                pushScenarioQuestion(template, response);
+                            },
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-publish',
+                        title: 'PUT /api/tests/{id}/publish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/publish',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для публикации.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/publish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = true;
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-attempt',
+                        title: 'POST /api/tests/{testId}/attempts',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/tests/{testId}/attempts',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.post(`/api/tests/${ctx.values.testId}/attempts`, null, {auth: AUTH.TRUE}),
+                        onSuccess: (response) => {
+                            ctx.values.attemptId = response?.data?.id ?? response?.data?.Id ?? null;
+                        },
+                    });
+
+                    const correctQuestion = ctx.values.questions[0];
+                    const incorrectQuestion = ctx.values.questions[1];
+                    const remainingQuestions = ctx.values.questions.slice(2);
+
+                    if (correctQuestion) {
+                        await runStep({
+                            id: 'scenario-pass-answer-correct',
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId} (верный)',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(correctQuestion)}`,
+                                buildAnswerPayload(correctQuestion),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    if (incorrectQuestion) {
+                        await runStep({
+                            id: 'scenario-pass-answer-wrong',
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId} (неверный)',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(incorrectQuestion)}`,
+                                buildIncorrectAnswerPayload(incorrectQuestion),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    for (const [index, question] of remainingQuestions.entries()) {
+                        await runStep({
+                            id: `scenario-pass-answer-${index}`,
+                            title: 'PUT /api/attempts/{attemptId}/answers/{questionId}',
+                            service: 'assessment',
+                            method: 'PUT',
+                            path: '/api/attempts/{attemptId}/answers/{questionId}',
+                            skip: () => (!ctx.values.attemptId ? 'Нет attemptId для ответа.' : ''),
+                            run: () => ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(question)}`,
+                                buildAnswerPayload(question),
+                                {auth: AUTH.TRUE},
+                            ),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-ai-hint',
+                        title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        service: 'ai',
+                        method: 'POST',
+                        path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
+                            const hintQuestion = incorrectQuestion || correctQuestion;
+                            return hintQuestion ? '' : 'Нет вопроса для подсказки.';
+                        },
+                        run: () => {
+                            const hintQuestion = incorrectQuestion || correctQuestion;
+                            return ctx.ai.post(
+                                `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(hintQuestion)}/hint`,
+                                null,
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-submit',
+                        title: 'POST /api/attempts/{id}/submit',
+                        service: 'assessment',
+                        method: 'POST',
+                        path: '/api/attempts/{id}/submit',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для отправки.' : ''),
+                        run: () => ctx.assessment.post(`/api/attempts/${ctx.values.attemptId}/submit`, null, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-grade',
+                        title: 'PUT /api/attempts/{attemptId}/answers/{questionId}/grade',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/attempts/{attemptId}/answers/{questionId}/grade',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для оценки.';
+                            const longText = ctx.values.questions.find((question) => question.type === QUESTION_TYPES.LongText);
+                            return longText ? '' : 'Нет вопроса LongText для оценки.';
+                        },
+                        run: () => {
+                            const longText = ctx.values.questions.find((question) => question.type === QUESTION_TYPES.LongText);
+                            const points = Math.min(longText?.points ?? 2, 2);
+                            return ctx.assessment.put(
+                                `/api/attempts/${ctx.values.attemptId}/answers/${getQuestionId(longText)}/grade`,
+                                {points, comment: 'Ручная проверка: ответ частично верный.'},
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-result',
+                        title: 'GET /api/attempts/{id}/result',
+                        service: 'assessment',
+                        method: 'GET',
+                        path: '/api/attempts/{id}/result',
+                        skip: () => (!ctx.values.attemptId ? 'Нет attemptId для результата.' : ''),
+                        run: () => ctx.assessment.get(`/api/attempts/${ctx.values.attemptId}/result`, {auth: AUTH.TRUE}),
+                    });
+
+                    await runStep({
+                        id: 'scenario-pass-unpublish',
+                        title: 'PUT /api/tests/{id}/unpublish',
+                        service: 'assessment',
+                        method: 'PUT',
+                        path: '/api/tests/{id}/unpublish',
+                        skip: () => (!ctx.values.isPublished ? 'Тест не опубликован.' : ''),
+                        run: () => ctx.assessment.put(`/api/tests/${ctx.values.testId}/unpublish`, null, {auth: AUTH.TRUE}),
+                        onSuccess: () => {
+                            ctx.values.isPublished = false;
+                        },
+                    });
+
+                    for (const [index, question] of ctx.values.questions.entries()) {
+                        await runStep({
+                            id: `scenario-pass-delete-question-${index}`,
+                            title: 'DELETE /api/questions/{id}',
+                            service: 'assessment',
+                            method: 'DELETE',
+                            path: '/api/questions/{id}',
+                            run: () => ctx.assessment.delete(`/api/questions/${getQuestionId(question)}`, {auth: AUTH.TRUE}),
+                        });
+                    }
+
+                    await runStep({
+                        id: 'scenario-pass-delete-test',
+                        title: 'DELETE /api/tests/{id}',
+                        service: 'assessment',
+                        method: 'DELETE',
+                        path: '/api/tests/{id}',
+                        skip: () => (!ctx.values.testId ? 'Нет testId для удаления.' : ''),
+                        run: () => ctx.assessment.delete(`/api/tests/${ctx.values.testId}`, {auth: AUTH.TRUE}),
+                    });
+                    break;
+                }
                 case 'publish-without-questions': {
                     await runStep({
                         id: 'scenario-publish-create',
@@ -2689,6 +4242,27 @@ export default function SwaggerPage() {
                     }
 
                     await runStep({
+                        id: 'scenario-full-hint',
+                        title: 'POST /api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        service: 'ai',
+                        method: 'POST',
+                        path: '/api/ai/attempts/{attemptId}/questions/{questionId}/hint',
+                        skip: () => {
+                            if (!ctx.values.attemptId) return 'Нет attemptId для подсказки.';
+                            const hintQuestion = ctx.values.questions[0];
+                            return hintQuestion ? '' : 'Нет вопроса для подсказки.';
+                        },
+                        run: () => {
+                            const hintQuestion = ctx.values.questions[0];
+                            return ctx.ai.post(
+                                `/api/ai/attempts/${ctx.values.attemptId}/questions/${getQuestionId(hintQuestion)}/hint`,
+                                null,
+                                {auth: AUTH.TRUE},
+                            );
+                        },
+                    });
+
+                    await runStep({
                         id: 'scenario-full-submit',
                         title: 'POST /api/attempts/{id}/submit',
                         service: 'assessment',
@@ -2860,6 +4434,125 @@ export default function SwaggerPage() {
         }
     };
 
+    const renderScenarioResultRow = (item, index) => {
+        const rowKey = makeResultRowKey(item, index);
+        const responseText = formatAutoTestResponse(item.responseData);
+        const canToggle = Boolean(responseText);
+        const hasOverride = Object.prototype.hasOwnProperty.call(
+            expandedScenarioRows,
+            rowKey,
+        );
+        const isExpanded = hasOverride
+            ? expandedScenarioRows[rowKey]
+            : scenarioAutoExpand;
+
+        return (
+            <div
+                key={rowKey}
+                className={`swagger-test-row ${item.status}`}
+            >
+                <div className="swagger-test-main">
+                    <span className={`method-badge ${item.method.toLowerCase()}`}>
+                        {item.method}
+                    </span>
+                    <div className="swagger-test-meta">
+                        <div className="swagger-test-path">{item.path}</div>
+                        {item.title && (
+                            <div className="swagger-test-title">{item.title}</div>
+                        )}
+                    </div>
+                </div>
+                <div className="swagger-test-metrics">
+                    <span className="swagger-test-status">
+                        {getAutoTestStatusLabel(item.status)}
+                    </span>
+                    {item.httpStatus != null && (
+                        <span className="swagger-test-code">HTTP {item.httpStatus}</span>
+                    )}
+                    <span className="swagger-test-time">{item.durationMs} мс</span>
+                    {canToggle && (
+                        <button
+                            className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                            type="button"
+                            onClick={() => setExpandedScenarioRows((prev) => ({
+                                ...prev,
+                                [rowKey]: !isExpanded,
+                            }))}
+                            aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                            title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
+                        >
+                            <span className="swagger-chevron" />
+                        </button>
+                    )}
+                </div>
+                {item.message && (
+                    <div className="swagger-test-message">{item.message}</div>
+                )}
+                {canToggle && isExpanded && (
+                    <pre className="swagger-test-response">{responseText}</pre>
+                )}
+            </div>
+        );
+    };
+
+    const renderScenarioCard = (scenario, options = {}) => {
+        if (!scenario) return null;
+        const {compact = false, showRun = true} = options;
+        const nodeStatus = getScenarioNodeStatus(scenario.id);
+        const isSelected = selectedScenarioId === scenario.id;
+
+        return (
+            <div className={`swagger-workflow-card ${compact ? 'compact' : ''} ${isSelected ? 'selected' : ''}`}>
+                <button
+                    className="swagger-workflow-select"
+                    type="button"
+                    onClick={() => setSelectedScenarioId(scenario.id)}
+                >
+                    <span className={`swagger-workflow-dot ${nodeStatus}`} />
+                    <div className="swagger-workflow-content">
+                        <div className="swagger-workflow-title">{scenario.title}</div>
+                        {!compact && (
+                            <div className="swagger-workflow-desc">{scenario.description}</div>
+                        )}
+                    </div>
+                    <div className="swagger-workflow-meta">
+                        {scenario.tag && (
+                            <span className="swagger-workflow-tag">{scenario.tag}</span>
+                        )}
+                        <span className="swagger-workflow-count">Шагов: {scenario.expectedTotal}</span>
+                    </div>
+                </button>
+                {showRun && (
+                    <div className="swagger-workflow-actions">
+                        <button
+                            className="swagger-button ghost swagger-workflow-run"
+                            type="button"
+                            onClick={() => runScenario(scenario.id)}
+                            disabled={scenarioRunning || autoTestRunning}
+                        >
+                            {scenarioRunning && activeScenarioId === scenario.id ? '...' : 'Запустить'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderWorkflowLane = (lane) => {
+        if (!lane) return null;
+        const {scenario} = lane;
+
+        return (
+            <div key={scenario.id} className="swagger-workflow-lane">
+                <div className="swagger-workflow-row">
+                    <div className="swagger-workflow-item">
+                        {renderScenarioCard(scenario)}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <main className="swagger-shell">
             <header className="swagger-hero">
@@ -2892,6 +4585,13 @@ export default function SwaggerPage() {
                     onClick={() => setActiveTab('scenarios')}
                 >
                     Сценарии
+                </button>
+                <button
+                    className={`swagger-tab ${activeTab === 'profile' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                >
+                    Профиль
                 </button>
             </div>
                 </div>
@@ -3176,6 +4876,15 @@ export default function SwaggerPage() {
                             <span>Ошибки: {autoTestSummary.failed}</span>
                             <span>Пропущено: {autoTestSummary.skipped}</span>
                         </div>
+                        <div className="swagger-progress">
+                            <div
+                                className={`swagger-progress-bar ${autoTestRunning ? 'running' : ''}`}
+                                style={{'--progress': `${autoTestProgress}%`}}
+                            />
+                            <div className="swagger-progress-meta">
+                                Прогресс: {autoTestProgress}%
+                            </div>
+                        </div>
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
@@ -3320,11 +5029,13 @@ export default function SwaggerPage() {
                                                             const isExpanded = hasOverride
                                                                 ? expandedAutoTestRows[rowKey]
                                                                 : autoTestAutoExpand;
+                                                            const isActive = autoTestRunning
+                                                                && item.sequenceIndex === autoTestActiveIndex;
 
                                                             return (
                                                                 <div
                                                                     key={rowKey}
-                                                                    className={`swagger-selection-item ${item.status}`}
+                                                                    className={`swagger-selection-item ${item.status} ${isActive ? 'is-active' : ''}`}
                                                                 >
                                                                     <span className={`method-badge ${item.method.toLowerCase()}`}>
                                                                         {item.method}
@@ -3379,11 +5090,13 @@ export default function SwaggerPage() {
                                     const isExpanded = hasOverride
                                         ? expandedAutoTestRows[rowKey]
                                         : autoTestAutoExpand;
+                                    const isActive = autoTestRunning
+                                        && item.sequenceIndex === autoTestActiveIndex;
 
                                     return (
                                         <div
                                             key={rowKey}
-                                            className={`swagger-selection-item ${item.status}`}
+                                            className={`swagger-selection-item ${item.status} ${isActive ? 'is-active' : ''}`}
                                         >
                                             <span className={`method-badge ${item.method.toLowerCase()}`}>
                                                 {item.method}
@@ -3453,11 +5166,13 @@ export default function SwaggerPage() {
                                     const isExpanded = hasOverride
                                         ? expandedAutoTestRows[rowKey]
                                         : autoTestAutoExpand;
+                                    const isActive = autoTestRunning
+                                        && item.sequenceIndex === autoTestActiveIndex;
 
                                     return (
                                         <div
                                             key={rowKey}
-                                            className={`swagger-test-row ${item.status}`}
+                                            className={`swagger-test-row ${item.status} ${isActive ? 'is-active' : ''}`}
                                         >
                                             <div className="swagger-test-main">
                                                 <span className={`method-badge ${item.method.toLowerCase()}`}>
@@ -3525,39 +5240,184 @@ export default function SwaggerPage() {
                         <p className="swagger-hint">
                             Запускайте разные сценарии, чтобы быстро проверить ключевые ветки поведения тестов.
                         </p>
-                        <div className="swagger-scenario-grid">
-                            {scenarioDefinitions.map((scenario) => (
-                                <div
-                                    key={scenario.id}
-                                    className={`swagger-scenario-card ${activeScenarioId === scenario.id ? 'active' : ''}`}
-                                >
-                                    <div className="swagger-scenario-header">
-                                        <div>
-                                            <h3>{scenario.title}</h3>
-                                            <p className="swagger-scenario-desc">{scenario.description}</p>
-                                        </div>
-                                        <div className="swagger-scenario-meta">
-                                            {scenario.tag && (
-                                                <span className="swagger-scenario-tag">{scenario.tag}</span>
-                                            )}
-                                            <span className="swagger-scenario-count">
-                                                Шагов: {scenario.expectedTotal}
-                                            </span>
-                                        </div>
+                        <div className="swagger-workflow">
+                            {workflowLanes.map((lane) => renderWorkflowLane(lane))}
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-tests-header">
+                            <h2>Детали сценария</h2>
+                            <div className="swagger-tests-controls">
+                                {selectedScenario?.title && (
+                                    <span className="swagger-hint">{selectedScenario.title}</span>
+                                )}
+                                {selectedScenario && (
+                                    <button
+                                        className="swagger-button secondary"
+                                        type="button"
+                                        onClick={() => runScenario(selectedScenario.id)}
+                                        disabled={scenarioRunning || autoTestRunning}
+                                    >
+                                        {scenarioRunning && activeScenarioId === selectedScenario.id
+                                            ? '...'
+                                            : 'Запустить выбранный'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        {selectedScenario ? (
+                            <div className="swagger-scenario-detail">
+                                <div className="swagger-scenario-detail-main">
+                                    <div className="swagger-scenario-detail-header">
+                                        <h3>{selectedScenario.title}</h3>
+                                        {selectedScenario.tag && (
+                                            <span className="swagger-scenario-tag">{selectedScenario.tag}</span>
+                                        )}
                                     </div>
-                                    <div className="swagger-scenario-actions">
-                                        <button
-                                            className="swagger-button"
-                                            type="button"
-                                            onClick={() => runScenario(scenario.id)}
-                                            disabled={scenarioRunning || autoTestRunning}
-                                        >
-                                            {scenarioRunning && activeScenarioId === scenario.id ? '...' : 'Запустить сценарий'}
-                                        </button>
+                                    <p className="swagger-scenario-desc">{selectedScenario.description}</p>
+                                    {scenarioStepDetails.length ? (
+                                        <div className="swagger-scenario-steps">
+                                            {scenarioStepDetails.map((step, index) => {
+                                                const stepKey = step.key;
+                                                const isExpanded = Boolean(expandedScenarioSteps[stepKey]);
+                                                const canToggle = step.results.length > 0;
+
+                                                return (
+                                                    <div
+                                                        key={stepKey}
+                                                        className={`swagger-scenario-step-item ${step.status}`}
+                                                        style={{'--step-progress': `${step.progress}%`}}
+                                                    >
+                                                        <div className="swagger-scenario-step-head">
+                                                            <div className="swagger-scenario-step-title">
+                                                                <span className="swagger-scenario-step-index">{index + 1}</span>
+                                                                <span className="swagger-scenario-step-text">{step.label}</span>
+                                                            </div>
+                                                            <div className="swagger-scenario-step-metrics">
+                                                                <span className="swagger-scenario-step-count">
+                                                                    {step.summary.total} тестов
+                                                                </span>
+                                                                <span className="swagger-scenario-step-rate">
+                                                                    {step.progress}%
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill success">
+                                                                    ✓ {step.summary.success}
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill failed">
+                                                                    ✕ {step.summary.failed}
+                                                                </span>
+                                                                <span className="swagger-scenario-step-pill skipped">
+                                                                    → {step.summary.skipped}
+                                                                </span>
+                                                                {canToggle && (
+                                                                    <button
+                                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
+                                                                        type="button"
+                                                                        onClick={() => setExpandedScenarioSteps((prev) => ({
+                                                                            ...prev,
+                                                                            [stepKey]: !isExpanded,
+                                                                        }))}
+                                                                        aria-label={isExpanded ? 'Скрыть тесты шага' : 'Показать тесты шага'}
+                                                                        title={isExpanded ? 'Скрыть тесты шага' : 'Показать тесты шага'}
+                                                                    >
+                                                                        <span className="swagger-chevron" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {canToggle && isExpanded && (
+                                                            <div className="swagger-scenario-step-tests">
+                                                                {step.results.map((item, resultIndex) => (
+                                                                    renderScenarioResultRow(item, resultIndex)
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="swagger-subtitle">Шаги сценария не описаны.</p>
+                                    )}
+                                    <div className="swagger-scenario-result">
+                                        {selectedScenarioId === activeScenarioId && scenarioResults.length ? (
+                                            <span>
+                                                Результат: успешно {scenarioSummary.success}, ошибки {scenarioSummary.failed},
+                                                пропущено {scenarioSummary.skipped}.
+                                            </span>
+                                        ) : (
+                                            <span>Результат: нет данных для выбранного сценария.</span>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="swagger-scenario-detail-charts">
+                                    <div className="swagger-chart-card">
+                                        <div className="swagger-chart-header">
+                                            <h3>Статусы</h3>
+                                            <span className="swagger-chart-total">{selectedScenarioSummary.total} шагов</span>
+                                        </div>
+                                        <div
+                                            className="swagger-donut"
+                                            style={{'--chart-gradient': scenarioStatusGradient}}
+                                        >
+                                            <div className="swagger-donut-center">
+                                                <div className="swagger-donut-value">{scenarioStatusRate}%</div>
+                                                <div className="swagger-donut-label">успех</div>
+                                            </div>
+                                        </div>
+                                        <div className="swagger-chart-legend">
+                                            {scenarioStatusSegments.map((segment) => (
+                                                <div key={segment.key} className="swagger-chart-legend-row">
+                                                    <span
+                                                        className="swagger-chart-dot"
+                                                        style={{'--dot-color': segment.color}}
+                                                    />
+                                                    <span className="swagger-chart-label">{segment.label}</span>
+                                                    <span className="swagger-chart-value">{segment.value}</span>
+                                                    <span className="swagger-chart-percent">
+                                                        {calcPercent(segment.value, selectedScenarioSummary.total)}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="swagger-chart-card">
+                                        <div className="swagger-chart-header">
+                                            <h3>Выполнение</h3>
+                                            <span className="swagger-chart-total">
+                                                {selectedScenarioCompleted} из {selectedScenarioExpectedTotal}
+                                            </span>
+                                        </div>
+                                        <div
+                                            className="swagger-donut"
+                                            style={{'--chart-gradient': scenarioProgressGradient}}
+                                        >
+                                            <div className="swagger-donut-center">
+                                                <div className="swagger-donut-value">{scenarioProgressRate}%</div>
+                                                <div className="swagger-donut-label">готово</div>
+                                            </div>
+                                        </div>
+                                        <div className="swagger-chart-legend">
+                                            {scenarioProgressSegments.map((segment) => (
+                                                <div key={segment.key} className="swagger-chart-legend-row">
+                                                    <span
+                                                        className="swagger-chart-dot"
+                                                        style={{'--dot-color': segment.color}}
+                                                    />
+                                                    <span className="swagger-chart-label">{segment.label}</span>
+                                                    <span className="swagger-chart-value">{segment.value}</span>
+                                                    <span className="swagger-chart-percent">
+                                                        {calcPercent(segment.value, selectedScenarioExpectedTotal)}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Нет доступных сценариев.</p>
+                        )}
                     </div>
                     <div className="swagger-panel">
                         <div className="swagger-tests-header">
@@ -3575,7 +5435,11 @@ export default function SwaggerPage() {
                                     <span>Открывать ответы заранее</span>
                                 </label>
                                 {activeScenario?.title && (
-                                    <span className="swagger-hint">{activeScenario.title}</span>
+                                    <span className="swagger-hint">
+                                        {selectedScenarioId === activeScenarioId
+                                            ? activeScenario.title
+                                            : `Результаты: ${activeScenario.title}`}
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -3588,69 +5452,461 @@ export default function SwaggerPage() {
                         </div>
                         {scenarioResults.length ? (
                             <div className="swagger-tests-list">
-                                {scenarioResults.map((item, index) => {
-                                    const rowKey = makeResultRowKey(item, index);
-                                    const responseText = formatAutoTestResponse(item.responseData);
-                                    const canToggle = Boolean(responseText);
-                                    const hasOverride = Object.prototype.hasOwnProperty.call(
-                                        expandedScenarioRows,
-                                        rowKey,
-                                    );
-                                    const isExpanded = hasOverride
-                                        ? expandedScenarioRows[rowKey]
-                                        : scenarioAutoExpand;
-
-                                    return (
-                                        <div
-                                            key={rowKey}
-                                            className={`swagger-test-row ${item.status}`}
-                                        >
-                                            <div className="swagger-test-main">
-                                                <span className={`method-badge ${item.method.toLowerCase()}`}>
-                                                    {item.method}
-                                                </span>
-                                                <div className="swagger-test-meta">
-                                                    <div className="swagger-test-path">{item.path}</div>
-                                                    {item.title && (
-                                                        <div className="swagger-test-title">{item.title}</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="swagger-test-metrics">
-                                                <span className="swagger-test-status">
-                                                    {getAutoTestStatusLabel(item.status)}
-                                                </span>
-                                                {item.httpStatus != null && (
-                                                    <span className="swagger-test-code">HTTP {item.httpStatus}</span>
-                                                )}
-                                                <span className="swagger-test-time">{item.durationMs} мс</span>
-                                                {canToggle && (
-                                                    <button
-                                                        className={`swagger-row-toggle ${isExpanded ? 'open' : ''}`}
-                                                        type="button"
-                                                        onClick={() => setExpandedScenarioRows((prev) => ({
-                                                            ...prev,
-                                                            [rowKey]: !isExpanded,
-                                                        }))}
-                                                        aria-label={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
-                                                        title={isExpanded ? 'Скрыть ответ' : 'Показать ответ'}
-                                                    >
-                                                        <span className="swagger-chevron" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {item.message && (
-                                                <div className="swagger-test-message">{item.message}</div>
-                                            )}
-                                            {canToggle && isExpanded && (
-                                                <pre className="swagger-test-response">{responseText}</pre>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                {scenarioResults.map((item, index) => renderScenarioResultRow(item, index))}
                             </div>
                         ) : (
                             <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {activeTab === 'profile' && (
+                <section className="swagger-profile">
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Профиль пользователя</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={() => refreshUser(true)}
+                                >
+                                    Обновить профиль
+                                </button>
+                                {keycloakAccountUrl && (
+                                    <a
+                                        className="swagger-button"
+                                        href={keycloakAccountUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Профиль в Keycloak
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                        {profile ? (
+                            <div className="swagger-profile-list">
+                                {profileRows.map((row) => (
+                                    <div key={row.label} className="swagger-profile-row">
+                                        <span className="swagger-profile-label">{row.label}</span>
+                                        <span className="swagger-profile-value">{row.value || '—'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Нет данных профиля. Авторизуйтесь через Keycloak.</p>
+                        )}
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Профиль Keycloak</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={() => loadAccountProfile(true)}
+                                    disabled={accountProfileLoading || !hasToken}
+                                >
+                                    {accountProfileLoading ? '...' : 'Обновить из Keycloak'}
+                                </button>
+                                <button
+                                    className="swagger-button ghost"
+                                    type="button"
+                                    onClick={handleProfileReset}
+                                    disabled={!profileDirty}
+                                >
+                                    Сбросить
+                                </button>
+                            </div>
+                        </div>
+                        {accountProfileError && (
+                            <p className="swagger-subtitle swagger-error">{accountProfileError}</p>
+                        )}
+                        {!hasToken && (
+                            <p className="swagger-subtitle">Авторизуйтесь, чтобы редактировать профиль.</p>
+                        )}
+                        {accountProfileLoading && hasToken && (
+                            <p className="swagger-subtitle swagger-loading">Загружаем профиль Keycloak...</p>
+                        )}
+                        <div className="swagger-form-grid">
+                            <div className="swagger-field">
+                                <label htmlFor="profile-username">Логин</label>
+                                <input
+                                    id="profile-username"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.username}
+                                    onChange={handleProfileChange('username')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-email">Email</label>
+                                <input
+                                    id="profile-email"
+                                    className="swagger-input"
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={handleProfileChange('email')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-first-name">Имя</label>
+                                <input
+                                    id="profile-first-name"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.firstName}
+                                    onChange={handleProfileChange('firstName')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                            <div className="swagger-field">
+                                <label htmlFor="profile-last-name">Фамилия</label>
+                                <input
+                                    id="profile-last-name"
+                                    className="swagger-input"
+                                    type="text"
+                                    value={profileForm.lastName}
+                                    onChange={handleProfileChange('lastName')}
+                                    disabled={!hasToken || profileSaving}
+                                />
+                            </div>
+                        </div>
+                        <div className="swagger-form-actions">
+                            <button
+                                className="swagger-button"
+                                type="button"
+                                onClick={handleProfileSave}
+                                disabled={!hasToken || profileSaving || !profileDirty}
+                            >
+                                {profileSaving ? '...' : 'Сохранить профиль'}
+                            </button>
+                            {profileDirty && (
+                                <span className="swagger-hint">Есть несохранённые изменения.</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Безопасность Keycloak</h2>
+                            <div className="swagger-profile-actions">
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={handleSecurityRefresh}
+                                    disabled={accountSecurityLoading || !hasToken}
+                                >
+                                    {accountSecurityLoading ? '...' : 'Обновить'}
+                                </button>
+                                <button
+                                    className="swagger-button ghost"
+                                    type="button"
+                                    onClick={handleLogoutAllSessions}
+                                    disabled={accountSecurityLoading || !hasToken || !accountSessions.length}
+                                >
+                                    Завершить все сессии
+                                </button>
+                            </div>
+                        </div>
+                        {accountSecurityError && (
+                            <p className="swagger-subtitle swagger-error">{accountSecurityError}</p>
+                        )}
+                        {!hasToken && (
+                            <p className="swagger-subtitle">Авторизуйтесь, чтобы видеть безопасность.</p>
+                        )}
+                        {accountSecurityLoading && hasToken && (
+                            <p className="swagger-subtitle swagger-loading">Загружаем безопасность Keycloak...</p>
+                        )}
+                        <div className="swagger-security-grid">
+                            <div className="swagger-security-block">
+                                <h3>Сессии</h3>
+                                {accountSessions.length ? (
+                                    <div className="swagger-security-list">
+                                        {accountSessions.map((session, index) => {
+                                            const sessionId = session?.id || session?.sessionId || session?.session || session?.uuid || '';
+                                            const sessionClients = normalizeSessionClients(session?.clients);
+                                            const startedAt = formatDateTime(
+                                                session?.started || session?.start || session?.createdTimestamp,
+                                            );
+                                            const lastAccessAt = formatDateTime(
+                                                session?.lastAccess || session?.lastAccessTime || session?.lastAccessed,
+                                            );
+                                            const sessionMeta = [
+                                                session?.ipAddress || session?.ip
+                                                    ? `IP: ${session.ipAddress || session.ip}`
+                                                    : '',
+                                                startedAt ? `Старт: ${startedAt}` : '',
+                                                lastAccessAt ? `Последний доступ: ${lastAccessAt}` : '',
+                                            ].filter(Boolean).join(' | ');
+
+                                            return (
+                                                <div key={sessionId || index} className="swagger-security-item">
+                                                    <div className="swagger-security-title">
+                                                        Сессия {index + 1}
+                                                    </div>
+                                                    {sessionMeta && (
+                                                        <div className="swagger-security-meta">{sessionMeta}</div>
+                                                    )}
+                                                    {sessionClients.length > 0 && (
+                                                        <div className="swagger-security-tags">
+                                                            {sessionClients.map((client) => (
+                                                                <span
+                                                                    key={`${sessionId || index}-${client}`}
+                                                                    className="swagger-security-tag"
+                                                                >
+                                                                    {client}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="swagger-security-actions">
+                                                        <button
+                                                            className="swagger-button ghost"
+                                                            type="button"
+                                                            onClick={() => handleLogoutSession(sessionId)}
+                                                            disabled={accountSecurityLoading || !sessionId}
+                                                        >
+                                                            Завершить
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="swagger-subtitle">Нет активных сессий.</p>
+                                )}
+                            </div>
+                            <div className="swagger-security-block">
+                                <h3>Учётные данные</h3>
+                                {accountCredentials.length ? (
+                                    <div className="swagger-security-list">
+                                        {accountCredentials.map((credential, index) => {
+                                            const credentialId = credential?.id || credential?.credentialId || '';
+                                            const credentialType = credential?.type || credential?.credentialType || '';
+                                            const credentialLabel = resolveCredentialLabel(credential);
+                                            const createdAt = formatDateTime(
+                                                credential?.createdDate ?? credential?.createdTimestamp,
+                                            );
+                                            const canRemove = credential?.removable ?? credential?.removableByUser
+                                                ?? (credentialType && credentialType !== 'password');
+
+                                            return (
+                                                <div key={credentialId || index} className="swagger-security-item">
+                                                    <div className="swagger-security-title">{credentialLabel}</div>
+                                                    <div className="swagger-security-meta">
+                                                        {credentialType && `Тип: ${credentialType}`}
+                                                        {createdAt && ` | Создано: ${createdAt}`}
+                                                    </div>
+                                                    {credentialId && (
+                                                        <div className="swagger-security-meta">ID: {credentialId}</div>
+                                                    )}
+                                                    {canRemove && (
+                                                        <div className="swagger-security-actions">
+                                                            <button
+                                                                className="swagger-button ghost"
+                                                                type="button"
+                                                                onClick={() => handleRemoveCredential(credentialId)}
+                                                                disabled={accountSecurityLoading || !credentialId}
+                                                            >
+                                                                Удалить
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="swagger-subtitle">Нет дополнительных учётных данных.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="swagger-security-block swagger-security-stack">
+                            <div className="swagger-profile-header">
+                                <h3>OTP</h3>
+                                <div className="swagger-profile-actions">
+                                    <button
+                                        className="swagger-button secondary"
+                                        type="button"
+                                        onClick={handleOtpLoad}
+                                        disabled={!hasToken || otpLoading}
+                                    >
+                                        {otpLoading ? '...' : 'Получить QR'}
+                                    </button>
+                                    <button
+                                        className="swagger-button ghost"
+                                        type="button"
+                                        onClick={handleOtpReset}
+                                        disabled={!otpData && !otpForm.code}
+                                    >
+                                        Сбросить
+                                    </button>
+                                    {keycloakSecurityUrl && (
+                                        <a
+                                            className="swagger-button ghost"
+                                            href={keycloakSecurityUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Открыть в Keycloak
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                            {otpCredentialsCount > 0 && (
+                                <p className="swagger-subtitle">Подключено OTP: {otpCredentialsCount}</p>
+                            )}
+                            {otpError && (
+                                <p className="swagger-subtitle swagger-error">{otpError}</p>
+                            )}
+                            {otpLoading && (
+                                <p className="swagger-subtitle swagger-loading">Получаем данные для OTP...</p>
+                            )}
+                            {otpData ? (
+                                <>
+                                    <div className="swagger-otp-grid">
+                                        <div className="swagger-otp-qr">
+                                            {otpQrSource ? (
+                                                <img
+                                                    src={otpQrSource}
+                                                    alt="QR для OTP"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="swagger-otp-placeholder">QR недоступен</div>
+                                            )}
+                                        </div>
+                                        <div className="swagger-otp-details">
+                                            <div className="swagger-otp-meta">
+                                                Отсканируйте QR или введите секрет вручную.
+                                            </div>
+                                            {otpSecret && (
+                                                <code className="swagger-otp-code">{otpSecret}</code>
+                                            )}
+                                            {otpPolicyText && (
+                                                <div className="swagger-otp-meta">{otpPolicyText}</div>
+                                            )}
+                                            {otpAppNames.length > 0 && (
+                                                <div className="swagger-otp-apps">
+                                                    {otpAppNames.map((name) => (
+                                                        <span key={name} className="swagger-security-tag">
+                                                            {name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="swagger-form-grid">
+                                        <div className="swagger-field">
+                                            <label htmlFor="otp-device">Название устройства</label>
+                                            <input
+                                                id="otp-device"
+                                                className="swagger-input"
+                                                type="text"
+                                                value={otpForm.deviceName}
+                                                onChange={handleOtpChange('deviceName')}
+                                                disabled={!hasToken || otpSaving}
+                                            />
+                                        </div>
+                                        <div className="swagger-field">
+                                            <label htmlFor="otp-code">Код из приложения</label>
+                                            <input
+                                                id="otp-code"
+                                                className="swagger-input"
+                                                type="text"
+                                                value={otpForm.code}
+                                                onChange={handleOtpChange('code')}
+                                                disabled={!hasToken || otpSaving}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="swagger-form-actions">
+                                        <button
+                                            className="swagger-button"
+                                            type="button"
+                                            onClick={handleOtpSave}
+                                            disabled={!hasToken || otpSaving}
+                                        >
+                                            {otpSaving ? '...' : 'Подключить OTP'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="swagger-subtitle">
+                                    Нажмите "Получить QR", чтобы подключить одноразовый пароль.
+                                </p>
+                            )}
+                        </div>
+                        <div className="swagger-security-block swagger-security-stack">
+                            <h3>Смена пароля</h3>
+                            <div className="swagger-form-grid">
+                                <div className="swagger-field">
+                                    <label htmlFor="password-current">Текущий пароль</label>
+                                    <input
+                                        id="password-current"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.currentPassword}
+                                        onChange={handlePasswordChange('currentPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                                <div className="swagger-field">
+                                    <label htmlFor="password-new">Новый пароль</label>
+                                    <input
+                                        id="password-new"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.newPassword}
+                                        onChange={handlePasswordChange('newPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                                <div className="swagger-field">
+                                    <label htmlFor="password-confirm">Подтверждение</label>
+                                    <input
+                                        id="password-confirm"
+                                        className="swagger-input"
+                                        type="password"
+                                        value={passwordForm.confirmPassword}
+                                        onChange={handlePasswordChange('confirmPassword')}
+                                        disabled={!hasToken || passwordSaving}
+                                    />
+                                </div>
+                            </div>
+                            <div className="swagger-form-actions">
+                                <button
+                                    className="swagger-button"
+                                    type="button"
+                                    onClick={handlePasswordSave}
+                                    disabled={!hasToken || passwordSaving}
+                                >
+                                    {passwordSaving ? '...' : 'Обновить пароль'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="swagger-panel">
+                        <div className="swagger-profile-header">
+                            <h2>Роли</h2>
+                            {sortedRoles.length > 0 && (
+                                <span className="swagger-hint">Всего: {sortedRoles.length}</span>
+                            )}
+                        </div>
+                        {sortedRoles.length ? (
+                            <div className="swagger-role-list">
+                                {sortedRoles.map((role) => (
+                                    <span key={role} className="swagger-role-pill">{role}</span>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="swagger-subtitle">Роли не найдены.</p>
                         )}
                     </div>
                 </section>
