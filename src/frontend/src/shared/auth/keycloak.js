@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
     tokens: 'swagger:tokens',
     pkceVerifier: 'swagger:pkce_verifier',
     pkceState: 'swagger:pkce_state',
+    pkceTimestamp: 'swagger:pkce_created_at',
 };
 
 const DEFAULT_CONFIG = {
@@ -12,7 +13,8 @@ const DEFAULT_CONFIG = {
     redirectPath: '/swagger/oauth2-redirect.html',
 };
 
-// ????????? ?????????? ??????? ?? ?????????.
+const PKCE_STORAGE_TTL_MS = 10 * 60_000;
+
 const DEFAULT_REFRESH_CONFIG = {
     intervalMs: 60_000,
     leewayMs: 120_000,
@@ -24,7 +26,6 @@ const parseEnvMs = (value, fallback) => {
     return parsed;
 };
 
-// ????????? Keycloak ?? ?????????.
 export const getKeycloakConfig = () => {
     const env = process.env;
     return {
@@ -37,7 +38,6 @@ export const getKeycloakConfig = () => {
     };
 };
 
-// РџР°СЂР°РјРµС‚СЂС‹ РґР»СЏ СЂРµРіСѓР»СЏСЂРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ С‚РѕРєРµРЅРѕРІ.
 export const getKeycloakRefreshConfig = () => {
     const env = process.env;
     return {
@@ -68,6 +68,57 @@ const createPkceChallenge = async (verifier) => {
     const data = new TextEncoder().encode(verifier);
     const digest = await crypto.subtle.digest('SHA-256', data);
     return base64UrlEncode(new Uint8Array(digest));
+};
+
+const persistPkceState = ({verifier, state}) => {
+    if (typeof window === 'undefined') return;
+    const timestamp = Date.now();
+
+    window.sessionStorage.setItem(STORAGE_KEYS.pkceVerifier, verifier);
+    window.sessionStorage.setItem(STORAGE_KEYS.pkceState, state);
+    window.localStorage.setItem(STORAGE_KEYS.pkceVerifier, verifier);
+    window.localStorage.setItem(STORAGE_KEYS.pkceState, state);
+    window.localStorage.setItem(STORAGE_KEYS.pkceTimestamp, String(timestamp));
+};
+
+const clearPkceState = () => {
+    if (typeof window === 'undefined') return;
+    window.sessionStorage.removeItem(STORAGE_KEYS.pkceState);
+    window.sessionStorage.removeItem(STORAGE_KEYS.pkceVerifier);
+    window.localStorage.removeItem(STORAGE_KEYS.pkceState);
+    window.localStorage.removeItem(STORAGE_KEYS.pkceVerifier);
+    window.localStorage.removeItem(STORAGE_KEYS.pkceTimestamp);
+};
+
+const readPkceState = () => {
+    if (typeof window === 'undefined') return {state: null, verifier: null};
+
+    const sessionState = window.sessionStorage.getItem(STORAGE_KEYS.pkceState);
+    const sessionVerifier = window.sessionStorage.getItem(STORAGE_KEYS.pkceVerifier);
+
+    if (sessionVerifier) {
+        return {state: sessionState, verifier: sessionVerifier};
+    }
+
+    const storedVerifier = window.localStorage.getItem(STORAGE_KEYS.pkceVerifier);
+    if (!storedVerifier) {
+        return {state: null, verifier: null};
+    }
+
+    const storedState = window.localStorage.getItem(STORAGE_KEYS.pkceState);
+    const storedTimestamp = Number(window.localStorage.getItem(STORAGE_KEYS.pkceTimestamp));
+
+    if (!Number.isFinite(storedTimestamp) || Date.now() - storedTimestamp > PKCE_STORAGE_TTL_MS) {
+        clearPkceState();
+        return {state: null, verifier: null};
+    }
+
+    window.sessionStorage.setItem(STORAGE_KEYS.pkceVerifier, storedVerifier);
+    if (storedState) {
+        window.sessionStorage.setItem(STORAGE_KEYS.pkceState, storedState);
+    }
+
+    return {state: storedState, verifier: storedVerifier};
 };
 
 export const getRedirectUri = () => {
@@ -132,8 +183,7 @@ export const startKeycloakLogin = async () => {
     const state = createRandomString(16);
     const challenge = await createPkceChallenge(verifier);
 
-    window.sessionStorage.setItem(STORAGE_KEYS.pkceVerifier, verifier);
-    window.sessionStorage.setItem(STORAGE_KEYS.pkceState, state);
+    persistPkceState({verifier, state});
 
     const params = new URLSearchParams({
         response_type: 'code',
@@ -150,7 +200,6 @@ export const startKeycloakLogin = async () => {
     window.location.assign(authUrl);
 };
 
-// РћР±РЅРѕРІР»СЏРµС‚ С‚РѕРєРµРЅС‹ РїРѕ refresh_token.
 export const refreshKeycloakTokens = async (refreshToken) => {
     if (!refreshToken) {
         throw new Error('РќРµ РЅР°Р№РґРµРЅ refresh_token.');
@@ -190,21 +239,24 @@ export const refreshKeycloakTokens = async (refreshToken) => {
     return response.json();
 };
 
-// ?????????? ??? ?? ??????.
 export const exchangeCodeForTokens = async ({code, state}) => {
     if (!code) {
         throw new Error('Код авторизации не найден.');
     }
 
     const config = getKeycloakConfig();
-    const savedState = window.sessionStorage.getItem(STORAGE_KEYS.pkceState);
-    const verifier = window.sessionStorage.getItem(STORAGE_KEYS.pkceVerifier);
+    const {state: savedState, verifier} = readPkceState();
 
     if (!verifier) {
-        throw new Error('Не найден verifier для PKCE.');
+        const error = new Error('Не найден verifier для PKCE.');
+        error.code = 'PKCE_VERIFIER_MISSING';
+        throw error;
     }
     if (savedState && state && savedState !== state) {
-        throw new Error('Некорректный параметр state.');
+        const error = new Error('Некорректный параметр state.');
+        error.code = 'PKCE_STATE_MISMATCH';
+        clearPkceState();
+        throw error;
     }
 
     const body = new URLSearchParams({
@@ -237,7 +289,6 @@ export const exchangeCodeForTokens = async ({code, state}) => {
     }
 
     const data = await response.json();
-    window.sessionStorage.removeItem(STORAGE_KEYS.pkceState);
-    window.sessionStorage.removeItem(STORAGE_KEYS.pkceVerifier);
+    clearPkceState();
     return data;
 };

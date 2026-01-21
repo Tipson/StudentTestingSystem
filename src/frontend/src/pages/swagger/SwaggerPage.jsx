@@ -190,7 +190,8 @@ const SCENARIO_STEP_MATCHERS = Object.freeze({
     ],
     'publish-without-questions': [
         {label: 'Создать тест', matchers: ['scenario-publish-create']},
-        {label: 'Попробовать опубликовать без вопросов (ожидаем отказ)', matchers: ['scenario-publish-publish']},
+        {label: 'Попробовать опубликовать без вопросов (ожидаем отказ)', matchers: ['scenario-publish-without-questions']},
+
         {label: 'Добавить вопрос', matchers: ['scenario-publish-question-*']},
         {label: 'Опубликовать тест', matchers: ['scenario-publish-success']},
         {label: 'Снять тест с публикации', matchers: ['scenario-publish-unpublish']},
@@ -600,7 +601,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalizeExpectedStatuses = (value) => {
     if (value === null || value === undefined) return [];
-    return Array.isArray(value) ? value : [value];
+    const arr = Array.isArray(value) ? value : [value];
+    return arr
+        .map((v) => (typeof v === 'string' ? Number(v) : v))
+        .filter((v) => Number.isFinite(v));
 };
 
 // Универсальный исполнитель шага с повтором и поддержкой ожидаемого статуса.

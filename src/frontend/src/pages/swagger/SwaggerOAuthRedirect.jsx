@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
-import {exchangeCodeForTokens, persistTokens} from '@shared/auth/keycloak.js';
+import {exchangeCodeForTokens, getStoredTokens, persistTokens} from '@shared/auth/keycloak.js';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
 import './SwaggerPage.css';
 
@@ -28,6 +28,12 @@ const buildErrorMessage = (error, description) => {
         return `${error}: ${description}`;
     }
     return error || description;
+};
+
+const isTokenUsable = (tokens) => {
+    if (!tokens?.accessToken) return false;
+    if (!tokens.expiresAt) return true;
+    return tokens.expiresAt > Date.now() + 10_000;
 };
 
 export default function SwaggerOAuthRedirect() {
@@ -168,6 +174,28 @@ export default function SwaggerOAuthRedirect() {
                 }, 800);
             } catch (error) {
                 window.sessionStorage.removeItem(inflightKey);
+                if (error?.code === 'PKCE_VERIFIER_MISSING') {
+                    const storedTokens = getStoredTokens();
+                    if (isTokenUsable(storedTokens)) {
+                        window.sessionStorage.setItem(doneKey, 'done');
+                        setStatus({
+                            state: 'success',
+                            title: 'Готово',
+                            message: storedTokens?.accessToken
+                                ? 'Токены сохранены. Перенаправляем в Swagger...'
+                                : 'Ответ получен. Перенаправляем в Swagger...',
+                        });
+                        notifyCustom({
+                            type: 'success',
+                            message: 'Авторизация завершена.',
+                            duration: 2500,
+                        });
+                        redirectTimer = window.setTimeout(() => {
+                            navigate('/swagger', {replace: true});
+                        }, 800);
+                        return;
+                    }
+                }
                 finishWithError(error?.message || 'Не удалось получить токены.');
             }
         };

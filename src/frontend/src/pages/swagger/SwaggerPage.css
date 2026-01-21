@@ -4,9 +4,9 @@
     min-height: 100vh;
     padding: 32px 24px 48px;
     background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 55%),
-        radial-gradient(circle at 80% 10%, rgba(251, 146, 60, 0.2), transparent 50%),
-        linear-gradient(135deg, #f7f5f2 0%, #f1f0ec 45%, #eef2f1 100%);
+            radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 55%),
+            radial-gradient(circle at 80% 10%, rgba(251, 146, 60, 0.2), transparent 50%),
+            linear-gradient(135deg, #f7f5f2 0%, #f1f0ec 45%, #eef2f1 100%);
     color: #1e293b;
     font-family: 'IBM Plex Sans', sans-serif;
 }
@@ -407,9 +407,9 @@
 
 .swagger-progress-bar.running::before {
     background: repeating-linear-gradient(
-        45deg,
-        rgba(15, 118, 110, 0.9) 0 16px,
-        rgba(56, 189, 248, 0.9) 16px 32px
+            45deg,
+            rgba(15, 118, 110, 0.9) 0 16px,
+            rgba(56, 189, 248, 0.9) 16px 32px
     );
     background-size: 60px 100%;
     animation: progressStripe 1.2s linear infinite;
@@ -508,9 +508,9 @@
     border: 1px solid rgba(148, 163, 184, 0.3);
     padding: 12px 14px;
     background: linear-gradient(
-        90deg,
-        var(--step-tint, rgba(148, 163, 184, 0.08)) var(--step-progress, 0%),
-        #ffffff var(--step-progress, 0%)
+            90deg,
+            var(--step-tint, rgba(148, 163, 184, 0.08)) var(--step-progress, 0%),
+            #ffffff var(--step-progress, 0%)
     );
     border-left: 4px solid var(--step-accent, #cbd5e1);
     position: relative;
