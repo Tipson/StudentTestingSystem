@@ -26,23 +26,34 @@ const parseEnvMs = (value, fallback) => {
     return parsed;
 };
 
+// Runtime config helper - читает из window._env_ или process.env
+const getRuntimeEnv = (key) => {
+    return window._env_?.[key] || process.env[key];
+};
+
 export const getKeycloakConfig = () => {
-    const env = process.env;
     return {
-        baseUrl: env.REACT_APP_KEYCLOAK_URL || env.REACT_APP_KEYCLOAK_BASE_URL || DEFAULT_CONFIG.baseUrl,
-        realm: env.REACT_APP_KEYCLOAK_REALM || DEFAULT_CONFIG.realm,
-        clientId: env.REACT_APP_KEYCLOAK_CLIENT_ID || DEFAULT_CONFIG.clientId,
-        scope: env.REACT_APP_KEYCLOAK_SCOPE || DEFAULT_CONFIG.scope,
-        redirectUri: env.REACT_APP_KEYCLOAK_REDIRECT_URI || '',
-        redirectPath: env.REACT_APP_KEYCLOAK_REDIRECT_PATH || DEFAULT_CONFIG.redirectPath,
+        baseUrl: getRuntimeEnv('REACT_APP_KEYCLOAK_URL') 
+            || getRuntimeEnv('REACT_APP_KEYCLOAK_BASE_URL') 
+            || DEFAULT_CONFIG.baseUrl,
+        realm: getRuntimeEnv('REACT_APP_KEYCLOAK_REALM') || DEFAULT_CONFIG.realm,
+        clientId: getRuntimeEnv('REACT_APP_KEYCLOAK_CLIENT_ID') || DEFAULT_CONFIG.clientId,
+        scope: getRuntimeEnv('REACT_APP_KEYCLOAK_SCOPE') || DEFAULT_CONFIG.scope,
+        redirectUri: getRuntimeEnv('REACT_APP_KEYCLOAK_REDIRECT_URI') || '',
+        redirectPath: getRuntimeEnv('REACT_APP_KEYCLOAK_REDIRECT_PATH') || DEFAULT_CONFIG.redirectPath,
     };
 };
 
 export const getKeycloakRefreshConfig = () => {
-    const env = process.env;
     return {
-        intervalMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS, DEFAULT_REFRESH_CONFIG.intervalMs),
-        leewayMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS, DEFAULT_REFRESH_CONFIG.leewayMs),
+        intervalMs: parseEnvMs(
+            getRuntimeEnv('REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS'), 
+            DEFAULT_REFRESH_CONFIG.intervalMs
+        ),
+        leewayMs: parseEnvMs(
+            getRuntimeEnv('REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS'), 
+            DEFAULT_REFRESH_CONFIG.leewayMs
+        ),
     };
 };
 
@@ -206,7 +217,7 @@ export const startKeycloakLogin = async () => {
 
 export const refreshKeycloakTokens = async (refreshToken) => {
     if (!refreshToken) {
-        throw new Error('РќРµ РЅР°Р№РґРµРЅ refresh_token.');
+        throw new Error('Не найден refresh_token.');
     }
 
     const config = getKeycloakConfig();
@@ -234,7 +245,7 @@ export const refreshKeycloakTokens = async (refreshToken) => {
             ? payload
             : payload?.error_description || payload?.error || payload?.message;
 
-        const error = new Error(message || 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅС‹.');
+        const error = new Error(message || 'Не удалось обновить токены.');
         error.status = response.status;
         error.payload = payload;
         throw error;
