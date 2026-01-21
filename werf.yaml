@@ -99,3 +99,9 @@ dependencies:
     imports:
       - type: ImageName
         targetBuildArg: SOLUTION_IMAGE_NAME
+
+---
+# Frontend React Application
+image: frontend
+dockerfile: Dockerfile
+context: ./src/frontend

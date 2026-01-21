@@ -84,3 +84,31 @@ identityApi:
     memoryLimits: "512Mi"
     cpuRequests: "100m"
     cpuLimits: "500m"
+
+# Frontend
+frontend:
+  environment: "Staging"
+  replicaCount: 2
+  service:
+    name: "frontend"
+    portHttp: 3000
+  ingress:
+    enabled: true
+    host: sts.oleg.agentik007.ru
+  api:
+    assessmentUrl: "http://assessment.oleg.agentik007.ru"
+    mediaUrl: "http://media.oleg.agentik007.ru"
+    identityUrl: "http://identity.oleg.agentik007.ru"
+  keycloak:
+    url: "http://keycloak.oleg.agentik007.ru"
+    realm: "lms"
+    clientId: "swagger"
+    redirectPath: "/swagger/oauth2-redirect.html"
+    scope: "openid profile email"
+    refreshIntervalMs: "60000"
+    refreshLeewayMs: "120000"
+  limits:
+    memoryRequests: "128Mi"
+    memoryLimits: "256Mi"
+    cpuRequests: "50m"
+    cpuLimits: "200m"

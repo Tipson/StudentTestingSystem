@@ -9,7 +9,8 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV REACT_APP_NAME="STS Mobile"
+
+# Создаём шаблон для runtime подстановки переменных
 RUN npm run build
 
 FROM node:18-alpine AS runner
@@ -21,5 +22,14 @@ ENV PORT=3000
 RUN npm i -g serve
 COPY --from=builder /app/build ./build
 
+# Копируем конфиг для serve
+COPY serve.json ./
+
+# Копируем скрипт для runtime подстановки ENV переменных
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 3000
-CMD ["serve", "-s", "build", "-l", "3000"]
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["serve", "-s", "build", "-l", "3000", "-c", "serve.json"]

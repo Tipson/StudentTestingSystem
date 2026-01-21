@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.service.name }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.service.name }}
+    spec:
+      containers:
+        - name: {{ .Values.frontend.service.name }}
+          image: {{ index .Values.werf.image "frontend" }}
+          ports:
+            - containerPort: {{ .Values.frontend.service.portHttp }}
+          resources:
+            requests:
+              cpu: {{ .Values.frontend.limits.cpuRequests }}
+              memory: {{ .Values.frontend.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.frontend.limits.cpuLimits }}
+              memory: {{ .Values.frontend.limits.memoryLimits }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.frontend.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.frontend.service.portHttp }}
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.frontend.environment | quote }}
+            - name: PORT
+              value: {{ .Values.frontend.service.portHttp | quote }}
+            
+            # API URLs
+            - name: REACT_APP_API_ASSESSMENT_URL
+              value: {{ .Values.frontend.api.assessmentUrl | quote }}
+            - name: REACT_APP_API_MEDIA_URL
+              value: {{ .Values.frontend.api.mediaUrl | quote }}
+            - name: REACT_APP_API_IDENTIFY_URL
+              value: {{ .Values.frontend.api.identityUrl | quote }}
+            
+            # Keycloak Configuration
+            - name: REACT_APP_KEYCLOAK_URL
+              value: {{ .Values.frontend.keycloak.url | quote }}
+            - name: REACT_APP_KEYCLOAK_REALM
+              value: {{ .Values.frontend.keycloak.realm | quote }}
+            - name: REACT_APP_KEYCLOAK_CLIENT_ID
+              value: {{ .Values.frontend.keycloak.clientId | quote }}
+            - name: REACT_APP_KEYCLOAK_REDIRECT_PATH
+              value: {{ .Values.frontend.keycloak.redirectPath | quote }}
+            - name: REACT_APP_KEYCLOAK_SCOPE
+              value: {{ .Values.frontend.keycloak.scope | quote }}
+            - name: REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS
+              value: {{ .Values.frontend.keycloak.refreshIntervalMs | quote }}
+            - name: REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS
+              value: {{ .Values.frontend.keycloak.refreshLeewayMs | quote }}

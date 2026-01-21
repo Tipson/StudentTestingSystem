@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     redirectPath: '/swagger/oauth2-redirect.html',
 };
 
-// ????????? ?????????? ??????? ?? ?????????.
+// Дефолтные значения таймеров из переменных.
 const DEFAULT_REFRESH_CONFIG = {
     intervalMs: 60_000,
     leewayMs: 120_000,
@@ -24,25 +24,36 @@ const parseEnvMs = (value, fallback) => {
     return parsed;
 };
 
-// ????????? Keycloak ?? ?????????.
+// Runtime config helper
+const getRuntimeEnv = (key) => {
+    return window._env_?.[key] || process.env[key];
+};
+
+// Конфигурация Keycloak из переменных.
 export const getKeycloakConfig = () => {
-    const env = process.env;
     return {
-        baseUrl: env.REACT_APP_KEYCLOAK_URL || env.REACT_APP_KEYCLOAK_BASE_URL || DEFAULT_CONFIG.baseUrl,
-        realm: env.REACT_APP_KEYCLOAK_REALM || DEFAULT_CONFIG.realm,
-        clientId: env.REACT_APP_KEYCLOAK_CLIENT_ID || DEFAULT_CONFIG.clientId,
-        scope: env.REACT_APP_KEYCLOAK_SCOPE || DEFAULT_CONFIG.scope,
-        redirectUri: env.REACT_APP_KEYCLOAK_REDIRECT_URI || '',
-        redirectPath: env.REACT_APP_KEYCLOAK_REDIRECT_PATH || DEFAULT_CONFIG.redirectPath,
+        baseUrl: getRuntimeEnv('REACT_APP_KEYCLOAK_URL') 
+            || getRuntimeEnv('REACT_APP_KEYCLOAK_BASE_URL') 
+            || DEFAULT_CONFIG.baseUrl,
+        realm: getRuntimeEnv('REACT_APP_KEYCLOAK_REALM') || DEFAULT_CONFIG.realm,
+        clientId: getRuntimeEnv('REACT_APP_KEYCLOAK_CLIENT_ID') || DEFAULT_CONFIG.clientId,
+        scope: getRuntimeEnv('REACT_APP_KEYCLOAK_SCOPE') || DEFAULT_CONFIG.scope,
+        redirectUri: getRuntimeEnv('REACT_APP_KEYCLOAK_REDIRECT_URI') || '',
+        redirectPath: getRuntimeEnv('REACT_APP_KEYCLOAK_REDIRECT_PATH') || DEFAULT_CONFIG.redirectPath,
     };
 };
 
-// РџР°СЂР°РјРµС‚СЂС‹ РґР»СЏ СЂРµРіСѓР»СЏСЂРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ С‚РѕРєРµРЅРѕРІ.
+// Параметры для регулярного обновления токенов.
 export const getKeycloakRefreshConfig = () => {
-    const env = process.env;
     return {
-        intervalMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS, DEFAULT_REFRESH_CONFIG.intervalMs),
-        leewayMs: parseEnvMs(env.REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS, DEFAULT_REFRESH_CONFIG.leewayMs),
+        intervalMs: parseEnvMs(
+            getRuntimeEnv('REACT_APP_KEYCLOAK_REFRESH_INTERVAL_MS'), 
+            DEFAULT_REFRESH_CONFIG.intervalMs
+        ),
+        leewayMs: parseEnvMs(
+            getRuntimeEnv('REACT_APP_KEYCLOAK_REFRESH_LEEWAY_MS'), 
+            DEFAULT_REFRESH_CONFIG.leewayMs
+        ),
     };
 };
 
@@ -150,10 +161,10 @@ export const startKeycloakLogin = async () => {
     window.location.assign(authUrl);
 };
 
-// РћР±РЅРѕРІР»СЏРµС‚ С‚РѕРєРµРЅС‹ РїРѕ refresh_token.
+// Обновляет токены по refresh_token.
 export const refreshKeycloakTokens = async (refreshToken) => {
     if (!refreshToken) {
-        throw new Error('РќРµ РЅР°Р№РґРµРЅ refresh_token.');
+        throw new Error('Не найден refresh_token.');
     }
 
     const config = getKeycloakConfig();
@@ -181,7 +192,7 @@ export const refreshKeycloakTokens = async (refreshToken) => {
             ? payload
             : payload?.error_description || payload?.error || payload?.message;
 
-        const error = new Error(message || 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅС‹.');
+        const error = new Error(message || 'Не удалось обновить токены.');
         error.status = response.status;
         error.payload = payload;
         throw error;
@@ -190,7 +201,7 @@ export const refreshKeycloakTokens = async (refreshToken) => {
     return response.json();
 };
 
-// ?????????? ??? ?? ??????.
+// Обменивает код на токены.
 export const exchangeCodeForTokens = async ({code, state}) => {
     if (!code) {
         throw new Error('Код авторизации не найден.');
