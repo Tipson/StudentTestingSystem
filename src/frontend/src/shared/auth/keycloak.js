@@ -144,14 +144,18 @@ export const persistTokens = (tokenResponse) => {
     if (typeof window === 'undefined') return null;
     if (!tokenResponse) return null;
 
+    const storedTokens = getStoredTokens();
+    const refreshToken = tokenResponse.refresh_token || storedTokens?.refreshToken || '';
+    const refreshExpiresAt = tokenResponse.refresh_expires_in
+        ? Date.now() + tokenResponse.refresh_expires_in * 1000
+        : (storedTokens?.refreshExpiresAt ?? null);
+
     const payload = {
         accessToken: tokenResponse.access_token || '',
-        refreshToken: tokenResponse.refresh_token || '',
+        refreshToken,
         idToken: tokenResponse.id_token || '',
         expiresAt: tokenResponse.expires_in ? Date.now() + tokenResponse.expires_in * 1000 : null,
-        refreshExpiresAt: tokenResponse.refresh_expires_in
-            ? Date.now() + tokenResponse.refresh_expires_in * 1000
-            : null,
+        refreshExpiresAt,
     };
 
     window.localStorage.setItem(STORAGE_KEYS.tokens, JSON.stringify(payload));
