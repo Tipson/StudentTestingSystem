@@ -2,8 +2,8 @@
  * Утилиты для выполнения автотестов
  */
 import testCatImage from '../testCat.png';
-import { QUESTION_TYPES, AUTO_TEST_RETRY_LIMIT, AUTO_TEST_RETRY_DELAY_MS } from '../constants/autotest.js';
-import { limitAutoTestMessage } from './formatters.js';
+import {QUESTION_TYPES, AUTO_TEST_RETRY_LIMIT, AUTO_TEST_RETRY_DELAY_MS} from '../constants/autotest.js';
+import {limitAutoTestMessage} from './formatters.js';
 
 /**
  * Пауза на указанное количество миллисекунд
@@ -194,7 +194,7 @@ export const createSampleImageFile = () => {
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+AL6Vb0ZsQAAAABJRU5ErkJggg==';
 
     const bytes = Uint8Array.from(atob(fallbackBase64), (char) => char.charCodeAt(0));
-    return new File([bytes], 'autotest.png', { type: 'image/png' });
+    return new File([bytes], 'autotest.png', {type: 'image/png'});
 };
 
 /**
@@ -215,7 +215,7 @@ export const buildQuestionPayload = (question) => {
         base.options = question.options;
     }
 
-    // Добавляем правильный ответ для true/false
+    // Добавляем правильный ответ для true/false и текстовых
     if (question.correctAnswer !== undefined) {
         base.correctAnswer = question.correctAnswer;
     }
@@ -229,54 +229,111 @@ export const buildQuestionPayload = (question) => {
 };
 
 /**
- * Собирает запись вопроса для трекинга
+ * Извлекает UUID опций из ответа API при создании вопроса
+ * @param {Object} responseData - Данные ответа API
+ * @returns {Array} Массив опций с id
+ */
+export const extractOptionsFromResponse = (responseData) => {
+    if (!responseData) return [];
+
+    // Опции могут быть в разных полях
+    const options = responseData.options || responseData.Options || [];
+
+    return options.map((opt, index) => ({
+        id: opt.id || opt.Id || opt.optionId || opt.OptionId || null,
+        text: opt.text || opt.Text || '',
+        isCorrect: opt.isCorrect ?? opt.IsCorrect ?? false,
+        order: opt.order ?? opt.Order ?? index,
+    }));
+};
+
+/**
+ * Собирает запись вопроса для трекинга (с UUID опций из ответа)
  * @param {Object} question - Шаблон вопроса
  * @param {string} questionId - ID созданного вопроса
+ * @param {Object} responseData - Данные ответа API (содержит опции с UUID)
  * @returns {Object} Запись вопроса
  */
-export const buildQuestionRecord = (question, questionId) => ({
-    id: questionId,
-    type: question.type ?? QUESTION_TYPES.SingleChoice,
-    label: question.label || question.text || 'Question',
-    options: question.options || [],
-    correctAnswer: question.correctAnswer,
-});
+export const buildQuestionRecord = (question, questionId, responseData = null) => {
+    // Извлекаем опции с UUID из ответа API
+    const optionsFromApi = extractOptionsFromResponse(responseData);
+
+    return {
+        id: questionId,
+        type: question.type ?? QUESTION_TYPES.SingleChoice,
+        label: question.label || question.text || 'Question',
+        // Используем опции из API (с UUID), если они есть
+        options: optionsFromApi.length > 0 ? optionsFromApi : (question.options || []),
+        correctAnswer: question.correctAnswer,
+        answerText: question.answerText,
+    };
+};
 
 /**
  * Собирает payload ответа в зависимости от типа вопроса
- * @param {Object} record - Запись вопроса
+ *
+ * Схема API:
+ * {
+ *   "optionId": "uuid",      // для SingleChoice/TrueFalse (один вариант)
+ *   "optionIds": ["uuid"],   // для MultipleChoice (несколько вариантов)
+ *   "text": "string"         // для текстовых ответов
+ * }
+ *
+ * @param {Object} record - Запись вопроса (должна содержать опции с UUID)
  * @returns {Object} Payload ответа
  */
 export const buildAnswerPayload = (record) => {
     if (!record) {
-        return { selectedOptionIds: [], text: 'Автотестовый ответ' };
+        return {text: 'Автотестовый ответ'};
     }
 
     const type = record.type;
     const options = record.options || [];
 
+    // SingleChoice и TrueFalse - используем optionId (UUID)
     if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
         const correctOption = options.find((o) => o.isCorrect);
-        const optionIndex = correctOption ? options.indexOf(correctOption) : 0;
-        return { selectedOptionIds: [optionIndex] };
+        if (correctOption?.id) {
+            return {optionId: correctOption.id};
+        }
+        // Fallback: если нет UUID, берём первую опцию
+        if (options[0]?.id) {
+            return {optionId: options[0].id};
+        }
+        return {text: 'Ответ по умолчанию'};
     }
 
-    if (type === QUESTION_TYPES.MultiChoice) {
-        const correctIndices = options
-            .map((o, i) => (o.isCorrect ? i : -1))
-            .filter((i) => i >= 0);
-        return { selectedOptionIds: correctIndices.length ? correctIndices : [0] };
+    // MultipleChoice - используем optionIds (массив UUID)
+    if (type === QUESTION_TYPES.MultipleChoice || type === QUESTION_TYPES.MultiChoice) {
+        const correctOptionIds = options
+            .filter((o) => o.isCorrect && o.id)
+            .map((o) => o.id);
+
+        if (correctOptionIds.length > 0) {
+            return {optionIds: correctOptionIds};
+        }
+        // Fallback: если нет корректных, берём первую опцию
+        if (options[0]?.id) {
+            return {optionIds: [options[0].id]};
+        }
+        return {text: 'Ответ по умолчанию'};
     }
 
-    if (type === QUESTION_TYPES.ShortText) {
-        return { text: 'Краткий ответ' };
+    // ShortAnswer и LongAnswer - используем text
+    if (
+        type === QUESTION_TYPES.ShortAnswer ||
+        type === QUESTION_TYPES.ShortText ||
+        type === QUESTION_TYPES.LongAnswer ||
+        type === QUESTION_TYPES.LongText
+    ) {
+        return {text: record.correctAnswer || record.answerText || 'Тестовый текстовый ответ'};
     }
 
-    if (type === QUESTION_TYPES.LongText) {
-        return { text: 'Развёрнутый ответ на тестовый вопрос' };
+    // Fallback для неизвестных типов
+    if (options[0]?.id) {
+        return {optionId: options[0].id};
     }
-
-    return { selectedOptionIds: [0] };
+    return {text: 'Ответ по умолчанию'};
 };
 
 /**
@@ -286,30 +343,53 @@ export const buildAnswerPayload = (record) => {
  */
 export const buildIncorrectAnswerPayload = (record) => {
     if (!record) {
-        return { selectedOptionIds: [], text: 'Неверный ответ' };
+        return {text: 'Неверный ответ'};
     }
 
     const type = record.type;
     const options = record.options || [];
 
+    // SingleChoice и TrueFalse - выбираем неправильный вариант
     if (type === QUESTION_TYPES.SingleChoice || type === QUESTION_TYPES.TrueFalse) {
-        const wrongOption = options.find((o) => !o.isCorrect);
-        const optionIndex = wrongOption ? options.indexOf(wrongOption) : options.length - 1;
-        return { selectedOptionIds: [Math.max(0, optionIndex)] };
+        const wrongOption = options.find((o) => !o.isCorrect && o.id);
+        if (wrongOption?.id) {
+            return {optionId: wrongOption.id};
+        }
+        // Fallback: если все правильные, берём последнюю опцию
+        const lastOption = options[options.length - 1];
+        if (lastOption?.id) {
+            return {optionId: lastOption.id};
+        }
+        return {text: 'Неверный ответ'};
     }
 
-    if (type === QUESTION_TYPES.MultiChoice) {
-        const wrongIndices = options
-            .map((o, i) => (!o.isCorrect ? i : -1))
-            .filter((i) => i >= 0);
-        return { selectedOptionIds: wrongIndices.length ? wrongIndices.slice(0, 1) : [0] };
+    // MultipleChoice - выбираем неправильные варианты
+    if (type === QUESTION_TYPES.MultipleChoice || type === QUESTION_TYPES.MultiChoice) {
+        const wrongOptionIds = options
+            .filter((o) => !o.isCorrect && o.id)
+            .map((o) => o.id);
+
+        if (wrongOptionIds.length > 0) {
+            return {optionIds: wrongOptionIds.slice(0, 1)};
+        }
+        // Fallback
+        if (options[0]?.id) {
+            return {optionIds: [options[0].id]};
+        }
+        return {text: 'Неверный ответ'};
     }
 
-    if (type === QUESTION_TYPES.ShortText || type === QUESTION_TYPES.LongText) {
-        return { text: 'Неверный ответ' };
+    // Текстовые ответы
+    if (
+        type === QUESTION_TYPES.ShortAnswer ||
+        type === QUESTION_TYPES.ShortText ||
+        type === QUESTION_TYPES.LongAnswer ||
+        type === QUESTION_TYPES.LongText
+    ) {
+        return {text: 'Неверный ответ'};
     }
 
-    return { selectedOptionIds: [0] };
+    return {text: 'Неверный ответ'};
 };
 
 /**

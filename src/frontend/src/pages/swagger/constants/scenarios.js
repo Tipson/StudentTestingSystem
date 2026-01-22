@@ -2,23 +2,32 @@
  * Константы и конфигурации, связанные со сценариями
  */
 
-// Ожидаемое количество шагов в сценариях
-// Обновляйте при изменении логики сценариев
+/**
+ * Ожидаемое количество шагов в сценариях
+ * Обновляйте при изменении логики сценариев
+ *
+ * Подсчёт:
+ * - full-cycle: create, question, publish, attempt, answer, hint, submit, result, unpublish, delete-q, delete-test = 11
+ * - test-create-flow: create, [media], 4*question, publish, unpublish, update-test, 2*update-q, 3*extra-q, publish-again, unpublish-again, 7*delete-q, delete-test = ~26
+ * - test-pass-flow: create, [media], 4*question, publish, attempt, 4*answer, hint, submit, grade, result, unpublish, 4*delete-q, delete-test = ~22
+ * - publish-without-questions: create, publish-fail, question, publish, unpublish, delete-q, delete-test = 7
+ * - draft-flow: create, update, 3*question, reorder, update-q, delete-q, delete-test = 9
+ */
 export const SCENARIO_EXPECTED_TOTALS = {
-    'full-cycle': 13,
+    'full-cycle': 11,
     'test-create-flow': 26,
     'test-pass-flow': 22,
     'publish-without-questions': 7,
-    'draft-flow': 8,
+    'draft-flow': 9,
 };
 
 export const SCENARIO_STEPS = Object.freeze({
     'full-cycle': [
         'Создать тест',
-        'Добавить вопросы',
+        'Добавить вопрос',
         'Опубликовать тест',
         'Создать попытку',
-        'Ответить на вопросы',
+        'Ответить на вопрос',
         'Запросить подсказку AI',
         'Завершить попытку',
         'Получить результат',
@@ -27,7 +36,8 @@ export const SCENARIO_STEPS = Object.freeze({
     ],
     'test-create-flow': [
         'Создать тест',
-        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Загрузить медиа',
+        'Добавить 4 вопроса разных типов',
         'Опубликовать тест',
         'Снять тест с публикации',
         'Обновить параметры теста',
@@ -40,15 +50,15 @@ export const SCENARIO_STEPS = Object.freeze({
     ],
     'test-pass-flow': [
         'Создать тест',
-        'Добавить 4 вопроса разных типов (один с картинкой)',
+        'Загрузить медиа',
+        'Добавить 4 вопроса разных типов',
         'Опубликовать тест',
         'Создать попытку',
-        'Ответить на вопрос верно',
-        'Ответить на вопрос неверно',
+        'Ответить на вопросы',
         'Запросить подсказку AI',
         'Завершить попытку',
-        'Оценить попытку через grade',
-        'Получить результат оценки',
+        'Оценить ответ вручную',
+        'Получить результат',
         'Снять тест с публикации',
         'Удалить вопросы',
         'Удалить тест',
@@ -76,77 +86,72 @@ export const SCENARIO_STEPS = Object.freeze({
 // Сопоставление шагов сценария с выполненными автотестами по идентификаторам
 export const SCENARIO_STEP_MATCHERS = Object.freeze({
     'full-cycle': [
-        { label: 'Создать тест', matchers: ['scenario-full-create'] },
-        { label: 'Добавить вопросы', matchers: ['scenario-full-question-*'] },
-        { label: 'Опубликовать тест', matchers: ['scenario-full-publish'] },
-        { label: 'Создать попытку', matchers: ['scenario-full-attempt'] },
-        { label: 'Ответить на вопросы', matchers: ['scenario-full-answer-*'] },
-        { label: 'Запросить подсказку AI', matchers: ['scenario-full-hint'] },
-        { label: 'Завершить попытку', matchers: ['scenario-full-submit'] },
-        { label: 'Получить результат', matchers: ['scenario-full-result'] },
-        { label: 'Снять с публикации', matchers: ['scenario-full-unpublish'] },
+        {label: 'Создать тест', matchers: ['scenario-full-create']},
+        {label: 'Добавить вопрос', matchers: ['scenario-full-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-full-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-full-attempt']},
+        {label: 'Ответить на вопрос', matchers: ['scenario-full-answer-*']},
+        {label: 'Запросить подсказку AI', matchers: ['scenario-full-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-full-submit']},
+        {label: 'Получить результат', matchers: ['scenario-full-result']},
+        {label: 'Снять с публикации', matchers: ['scenario-full-unpublish']},
         {
             label: 'Удалить вопросы и тест',
             matchers: ['scenario-full-delete-question-*', 'scenario-full-delete-test'],
         },
     ],
     'test-create-flow': [
-        { label: 'Создать тест', matchers: ['scenario-create-test'] },
-        {
-            label: 'Добавить 4 вопроса разных типов (один с картинкой)',
-            matchers: ['scenario-create-media', 'scenario-create-question-*'],
-        },
-        { label: 'Опубликовать тест', matchers: ['scenario-create-publish'] },
-        { label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish'] },
-        { label: 'Обновить параметры теста', matchers: ['scenario-create-update-test'] },
-        { label: 'Изменить старые вопросы', matchers: ['scenario-create-update-question-*'] },
-        { label: 'Добавить 3 новых вопроса', matchers: ['scenario-create-extra-question-*'] },
-        { label: 'Опубликовать тест повторно', matchers: ['scenario-create-publish-again'] },
-        { label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish-again'] },
-        { label: 'Удалить вопросы', matchers: ['scenario-create-delete-question-*'] },
-        { label: 'Удалить тест', matchers: ['scenario-create-delete-test'] },
+        {label: 'Создать тест', matchers: ['scenario-create-test']},
+        {label: 'Загрузить медиа', matchers: ['scenario-create-media']},
+        {label: 'Добавить 4 вопроса разных типов', matchers: ['scenario-create-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-create-publish']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-create-update-test']},
+        {label: 'Изменить старые вопросы', matchers: ['scenario-create-update-question-*']},
+        {label: 'Добавить 3 новых вопроса', matchers: ['scenario-create-extra-question-*']},
+        {label: 'Опубликовать тест повторно', matchers: ['scenario-create-publish-again']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-create-unpublish-again']},
+        {label: 'Удалить вопросы', matchers: ['scenario-create-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-create-delete-test']},
     ],
     'test-pass-flow': [
-        { label: 'Создать тест', matchers: ['scenario-pass-test'] },
+        {label: 'Создать тест', matchers: ['scenario-pass-test']},
+        {label: 'Загрузить медиа', matchers: ['scenario-pass-media']},
+        {label: 'Добавить 4 вопроса разных типов', matchers: ['scenario-pass-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-pass-publish']},
+        {label: 'Создать попытку', matchers: ['scenario-pass-attempt']},
         {
-            label: 'Добавить 4 вопроса разных типов (один с картинкой)',
-            matchers: ['scenario-pass-media', 'scenario-pass-question-*'],
+            label: 'Ответить на вопросы',
+            matchers: ['scenario-pass-answer-correct', 'scenario-pass-answer-wrong', 'scenario-pass-answer-*'],
         },
-        { label: 'Опубликовать тест', matchers: ['scenario-pass-publish'] },
-        { label: 'Создать попытку', matchers: ['scenario-pass-attempt'] },
-        { label: 'Ответить на вопрос верно', matchers: ['scenario-pass-answer-correct'] },
-        {
-            label: 'Ответить на вопрос неверно',
-            matchers: ['scenario-pass-answer-wrong', 'scenario-pass-answer-*'],
-        },
-        { label: 'Запросить подсказку AI', matchers: ['scenario-pass-ai-hint'] },
-        { label: 'Завершить попытку', matchers: ['scenario-pass-submit'] },
-        { label: 'Оценить попытку через grade', matchers: ['scenario-pass-grade'] },
-        { label: 'Получить результат оценки', matchers: ['scenario-pass-result'] },
-        { label: 'Снять тест с публикации', matchers: ['scenario-pass-unpublish'] },
-        { label: 'Удалить вопросы', matchers: ['scenario-pass-delete-question-*'] },
-        { label: 'Удалить тест', matchers: ['scenario-pass-delete-test'] },
+        {label: 'Запросить подсказку AI', matchers: ['scenario-pass-ai-hint']},
+        {label: 'Завершить попытку', matchers: ['scenario-pass-submit']},
+        {label: 'Оценить ответ вручную', matchers: ['scenario-pass-grade']},
+        {label: 'Получить результат', matchers: ['scenario-pass-result']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-pass-unpublish']},
+        {label: 'Удалить вопросы', matchers: ['scenario-pass-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-pass-delete-test']},
     ],
     'publish-without-questions': [
-        { label: 'Создать тест', matchers: ['scenario-publish-create'] },
+        {label: 'Создать тест', matchers: ['scenario-publish-create']},
         {
             label: 'Попробовать опубликовать без вопросов (ожидаем отказ)',
             matchers: ['scenario-publish-without-questions'],
         },
-        { label: 'Добавить вопрос', matchers: ['scenario-publish-question-*'] },
-        { label: 'Опубликовать тест', matchers: ['scenario-publish-success'] },
-        { label: 'Снять тест с публикации', matchers: ['scenario-publish-unpublish'] },
-        { label: 'Удалить вопрос', matchers: ['scenario-publish-delete-question-*'] },
-        { label: 'Удалить тест', matchers: ['scenario-publish-delete-test'] },
+        {label: 'Добавить вопрос', matchers: ['scenario-publish-question-*']},
+        {label: 'Опубликовать тест', matchers: ['scenario-publish-success']},
+        {label: 'Снять тест с публикации', matchers: ['scenario-publish-unpublish']},
+        {label: 'Удалить вопрос', matchers: ['scenario-publish-delete-question-*']},
+        {label: 'Удалить тест', matchers: ['scenario-publish-delete-test']},
     ],
     'draft-flow': [
-        { label: 'Создать тест', matchers: ['scenario-draft-create'] },
-        { label: 'Обновить параметры теста', matchers: ['scenario-draft-update'] },
-        { label: 'Добавить вопросы', matchers: ['scenario-draft-question-*'] },
-        { label: 'Переупорядочить вопросы', matchers: ['scenario-draft-reorder'] },
-        { label: 'Обновить один вопрос', matchers: ['scenario-draft-update-question'] },
-        { label: 'Удалить один вопрос', matchers: ['scenario-draft-delete-question'] },
-        { label: 'Удалить тест', matchers: ['scenario-draft-delete-test'] },
+        {label: 'Создать тест', matchers: ['scenario-draft-create']},
+        {label: 'Обновить параметры теста', matchers: ['scenario-draft-update']},
+        {label: 'Добавить вопросы', matchers: ['scenario-draft-question-*']},
+        {label: 'Переупорядочить вопросы', matchers: ['scenario-draft-reorder']},
+        {label: 'Обновить один вопрос', matchers: ['scenario-draft-update-question']},
+        {label: 'Удалить один вопрос', matchers: ['scenario-draft-delete-question']},
+        {label: 'Удалить тест', matchers: ['scenario-draft-delete-test']},
     ],
 });
 
@@ -228,18 +233,18 @@ export const SCENARIO_DEFINITIONS = [
         id: 'full-cycle',
         title: 'Полный цикл теста',
         tag: 'E2E',
-        description: 'Создание теста, вопросы, публикация, прохождение, результат и очистка.',
+        description: 'Создание теста, вопрос, публикация, прохождение, результат и очистка.',
     },
     {
         id: 'test-create-flow',
-        title: 'Сценарий создания теста',
+        title: 'Создание теста',
         tag: 'Создание',
         description:
-            'Создание теста, 4 вопроса разных типов с медиа-добавлениями, публикация, правки и повторная публикация.',
+            'Создание теста, 4 вопроса разных типов, публикация, правки и повторная публикация.',
     },
     {
         id: 'test-pass-flow',
-        title: 'Сценарий прохождения теста',
+        title: 'Прохождение теста',
         tag: 'Прохождение',
         description:
             'Создание теста, попытка и ответы (верные/неверные), подсказка AI, оценка, результат и очистка.',

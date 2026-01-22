@@ -1,11 +1,17 @@
 /**
  * Константы для автотестов
+ *
+ * ВАЖНО: Названия типов вопросов должны соответствовать API
  */
 
 export const QUESTION_TYPES = Object.freeze({
     SingleChoice: 0,
-    MultiChoice: 1,
+    MultipleChoice: 1,
     TrueFalse: 2,
+    ShortAnswer: 3,
+    LongAnswer: 4,
+    // Алиасы для совместимости
+    MultiChoice: 1,
     ShortText: 3,
     LongText: 4,
 });
@@ -39,24 +45,24 @@ export const buildAutoTestQuestions = (label) => ([
         isRequired: true,
         attachMediaToQuestion: true,
         options: [
-            { text: '201 Created', isCorrect: true, order: 1 },
-            { text: '200 OK', isCorrect: false, order: 2 },
-            { text: '204 No Content', isCorrect: false, order: 3 },
-            { text: '404 Not Found', isCorrect: false, order: 4 },
+            {text: '201 Created', isCorrect: true, order: 1},
+            {text: '200 OK', isCorrect: false, order: 2},
+            {text: '204 No Content', isCorrect: false, order: 3},
+            {text: '404 Not Found', isCorrect: false, order: 4},
         ],
     },
     {
-        label: 'MultiChoice',
+        label: 'MultipleChoice',
         text: `Выберите компоненты многофакторной аутентификации (${label})`,
-        type: QUESTION_TYPES.MultiChoice,
+        type: QUESTION_TYPES.MultipleChoice,
         points: 3,
         isRequired: true,
         attachMediaToOptionIndex: 0,
         options: [
-            { text: 'Пароль пользователя', isCorrect: true, order: 1 },
-            { text: 'Одноразовый код из приложения', isCorrect: true, order: 2 },
-            { text: 'HTTP заголовок User-Agent', isCorrect: false, order: 3 },
-            { text: 'Любимый цвет', isCorrect: false, order: 4 },
+            {text: 'Пароль пользователя', isCorrect: true, order: 1},
+            {text: 'Одноразовый код из приложения', isCorrect: true, order: 2},
+            {text: 'HTTP заголовок User-Agent', isCorrect: false, order: 3},
+            {text: 'Любимый цвет', isCorrect: false, order: 4},
         ],
     },
     {
@@ -66,28 +72,32 @@ export const buildAutoTestQuestions = (label) => ([
         points: 1,
         isRequired: true,
         options: [
-            { text: 'Да', isCorrect: true, order: 1 },
-            { text: 'Нет', isCorrect: false, order: 2 },
+            {text: 'Да', isCorrect: true, order: 1},
+            {text: 'Нет', isCorrect: false, order: 2},
         ],
     },
     {
-        label: 'ShortText',
+        label: 'ShortAnswer',
         text: `Укажите пример ISO-8601 времени в UTC (${label})`,
-        type: QUESTION_TYPES.ShortText,
+        type: QUESTION_TYPES.ShortAnswer,
         points: 2,
         isRequired: true,
         answerText: '2026-01-19T12:30:00Z',
+        correctAnswer: '2026-01-19T12:30:00Z',
         options: [
-            { text: '2026-01-19T12:30:00Z', isCorrect: true, order: 1 },
+            {text: '2026-01-19T12:30:00Z', isCorrect: true, order: 1},
         ],
     },
     {
-        label: 'LongText',
+        label: 'LongAnswer',
         text: `Опишите шаги подготовки теста перед публикацией (${label})`,
-        type: QUESTION_TYPES.LongText,
+        type: QUESTION_TYPES.LongAnswer,
         points: 4,
         isRequired: true,
         answerText:
+            'Сначала создаём тест и добавляем вопросы, затем настраиваем лимиты, ' +
+            'проверяем правильность ответов и только после этого публикуем.',
+        correctAnswer:
             'Сначала создаём тест и добавляем вопросы, затем настраиваем лимиты, ' +
             'проверяем правильность ответов и только после этого публикуем.',
         options: [

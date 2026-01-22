@@ -2464,3 +2464,104 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Auth status in tabs */
+.swagger-tabs-spacer {
+    flex: 1;
+    min-width: 20px;
+}
+
+.swagger-auth-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.swagger-token-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.15);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: help;
+    transition: background 0.2s ease, color 0.2s ease;
+    white-space: pre-line;
+}
+
+.swagger-token-indicator.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+}
+
+.swagger-token-indicator.active svg {
+    color: #22c55e;
+}
+
+.swagger-token-indicator:hover {
+    background: rgba(34, 197, 94, 0.25);
+}
+
+.swagger-token-time {
+    font-variant-numeric: tabular-nums;
+}
+
+.swagger-auth-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.swagger-auth-button.login {
+    background: #0f766e;
+    color: #ffffff;
+}
+
+.swagger-auth-button.login:hover {
+    background: #0d9488;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.25);
+}
+
+.swagger-auth-button.logout {
+    padding: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+}
+
+.swagger-auth-button.logout:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.swagger-auth-button svg {
+    flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+    .swagger-tabs {
+        flex-wrap: wrap;
+    }
+
+    .swagger-tabs-spacer {
+        display: none;
+    }
+
+    .swagger-auth-status {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+}

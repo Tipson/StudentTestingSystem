@@ -1,10 +1,22 @@
 /**
  * Сервис запуска автотестов
  * Отвечает за выполнение автоматизированных API-тестов
+ *
+ * ВАЖНО: HTTP методы должны соответствовать определениям в src/frontend/src/api/
+ * - publish/unpublish: PUT
+ * - удаление вопросов: DELETE /api/questions/{id}
+ * - ответы: PUT /api/attempts/{attemptId}/answers/{questionId}
+ * - переупорядочивание: PUT /api/tests/{testId}/questions/reorder
+ *
+ * Схема ответа на вопрос:
+ * {
+ *   "optionId": "uuid",      // для SingleChoice/TrueFalse
+ *   "optionIds": ["uuid"],   // для MultipleChoice
+ *   "text": "string"         // для текстовых ответов
+ * }
  */
-import { apiClients } from '@api/client.js';
-import { getAccessToken } from '@api/auth.js';
-import { notifyCustom } from '@shared/notifications/notificationCenter.js';
+import {apiClients} from '@api/client.js';
+import {getAccessToken} from '@api/auth.js';
 
 import {
     QUESTION_TYPES,
@@ -30,9 +42,9 @@ import {
  * @param {Object} options.stopRef - Ref с полем .current (boolean), чтобы сигнализировать остановку
  * @returns {Promise<void>}
  */
-export async function runAutoTestsSuite({ onResult, stopRef }) {
+export async function runAutoTestsSuite({onResult, stopRef}) {
     const token = await getAccessToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    const headers = token ? {Authorization: `Bearer ${token}`} : undefined;
 
     const assessmentClient = apiClients.assessment;
     const mediaClient = apiClients.media;
@@ -64,7 +76,9 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         return result;
     };
 
+    // ========================================================================
     // Health-check
+    // ========================================================================
     await runStep({
         id: 'health-assessment',
         client: assessmentClient,
@@ -82,6 +96,10 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         expectedStatuses: [200],
         message: 'Проверка здоровья Media',
     });
+
+    // ========================================================================
+    // Создание и настройка теста
+    // ========================================================================
 
     // Создание теста
     const createTestResult = await runStep({
@@ -138,7 +156,9 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Обновление теста',
     });
 
+    // ========================================================================
     // Создание вопросов
+    // ========================================================================
     const questions = buildAutoTestQuestions(testId);
 
     for (const q of questions) {
@@ -158,7 +178,8 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         const questionId = getQuestionId(createQuestionResult?.responseData);
         if (questionId) {
             questionIds.push(questionId);
-            questionRecords.push(buildQuestionRecord(q, questionId));
+            // Передаём responseData для извлечения UUID опций
+            questionRecords.push(buildQuestionRecord(q, questionId, createQuestionResult?.responseData));
         }
     }
 
@@ -172,38 +193,44 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Получение списка вопросов',
     });
 
-    // Переупорядочивание вопросов
+    // Переупорядочивание вопросов (PUT /api/tests/{testId}/questions/reorder)
     if (questionIds.length >= 2) {
         await runStep({
             id: 'reorder-questions',
             client: assessmentClient,
             method: 'PUT',
-            path: `/api/tests/${testId}/questions/order`,
-            data: { questionIds: [...questionIds].reverse() },
+            path: `/api/tests/${testId}/questions/reorder`,
+            data: [...questionIds].reverse(),
             expectedStatuses: [200, 204],
             message: 'Переупорядочивание вопросов',
         });
     }
 
-    // Публикация теста
+    // ========================================================================
+    // Публикация теста (PUT!)
+    // ========================================================================
     await runStep({
         id: 'publish-test',
         client: assessmentClient,
-        method: 'POST',
+        method: 'PUT',
         path: `/api/tests/${testId}/publish`,
         expectedStatuses: [200, 204],
         message: 'Публикация теста',
     });
 
-    // Список опубликованных тестов
+    // Список всех тестов
     await runStep({
-        id: 'get-published',
+        id: 'get-all-tests',
         client: assessmentClient,
         method: 'GET',
-        path: '/api/tests/published',
+        path: '/api/tests',
         expectedStatuses: [200],
-        message: 'Список опубликованных тестов',
+        message: 'Список всех тестов',
     });
+
+    // ========================================================================
+    // Прохождение теста
+    // ========================================================================
 
     // Создание попытки
     const attemptResult = await runStep({
@@ -238,21 +265,22 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Получение попытки',
     });
 
-    // Ответы на вопросы
+    // Ответы на вопросы (PUT /api/attempts/{attemptId}/answers/{questionId})
     for (let i = 0; i < questionRecords.length; i++) {
         if (stopRef?.current) break;
 
         const record = questionRecords[i];
+        // buildAnswerPayload теперь формирует правильный payload с optionId/optionIds/text
         const answerPayload = buildAnswerPayload(record);
 
         await runStep({
             id: `answer-question-${i}`,
             client: assessmentClient,
-            method: 'POST',
-            path: `/api/attempts/${attemptId}/questions/${record.id}/answer`,
+            method: 'PUT',
+            path: `/api/attempts/${attemptId}/answers/${record.id}`,
             data: answerPayload,
             expectedStatuses: [200, 201, 204],
-            message: `Ответ на вопрос: ${record.type}`,
+            message: `Ответ на вопрос: ${record.label || record.type}`,
         });
     }
 
@@ -288,27 +316,53 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Получение результата',
     });
 
+    // ========================================================================
+    // Дополнительные эндпоинты попыток
+    // ========================================================================
+
+    // Получить попытки по тесту
+    await runStep({
+        id: 'get-test-attempts',
+        client: assessmentClient,
+        method: 'GET',
+        path: `/api/tests/${testId}/attempts`,
+        expectedStatuses: [200],
+        message: 'Попытки по тесту',
+    });
+
     // Мои попытки
     await runStep({
         id: 'get-my-attempts',
         client: assessmentClient,
         method: 'GET',
-        path: `/api/tests/${testId}/my-attempts`,
+        path: '/api/attempts/my',
         expectedStatuses: [200],
         message: 'Мои попытки',
     });
 
-    // Снятие теста с публикации
+    // Результаты теста
+    await runStep({
+        id: 'get-test-results',
+        client: assessmentClient,
+        method: 'GET',
+        path: `/api/tests/${testId}/results`,
+        expectedStatuses: [200],
+        message: 'Результаты теста',
+    });
+
+    // ========================================================================
+    // Снятие с публикации и очистка (PUT!)
+    // ========================================================================
     await runStep({
         id: 'unpublish-test',
         client: assessmentClient,
-        method: 'POST',
+        method: 'PUT',
         path: `/api/tests/${testId}/unpublish`,
         expectedStatuses: [200, 204],
         message: 'Снятие теста с публикации',
     });
 
-    // Удаление вопросов
+    // Удаление вопросов (DELETE /api/questions/{id})
     for (let i = 0; i < questionIds.length; i++) {
         if (stopRef?.current) break;
 
@@ -316,7 +370,7 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
             id: `delete-question-${i}`,
             client: assessmentClient,
             method: 'DELETE',
-            path: `/api/tests/${testId}/questions/${questionIds[i]}`,
+            path: `/api/questions/${questionIds[i]}`,
             expectedStatuses: [200, 204],
             message: `Удаление вопроса ${i + 1}`,
         });
@@ -332,7 +386,9 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Удаление теста',
     });
 
-    // Дополнительные эндпоинты
+    // ========================================================================
+    // Дополнительные эндпоинты тестов
+    // ========================================================================
     await runStep({
         id: 'get-my-tests',
         client: assessmentClient,
@@ -342,23 +398,26 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         message: 'Мои тесты',
     });
 
+    // Попытки на проверку
     await runStep({
-        id: 'get-all-tests',
+        id: 'get-pending-review',
         client: assessmentClient,
         method: 'GET',
-        path: '/api/tests',
+        path: '/api/attempts/pending-review',
         expectedStatuses: [200],
-        message: 'Все тесты',
+        message: 'Попытки на проверку',
     });
 
+    // ========================================================================
     // Тесты Media сервиса
+    // ========================================================================
     await runStep({
-        id: 'get-media-list',
+        id: 'get-my-files',
         client: mediaClient,
         method: 'GET',
-        path: '/api/media',
+        path: '/api/files/my',
         expectedStatuses: [200],
-        message: 'Список медиа',
+        message: 'Мои файлы',
     });
 
     // Загрузка тестового изображения
@@ -370,7 +429,7 @@ export async function runAutoTestsSuite({ onResult, stopRef }) {
         id: 'upload-media',
         client: mediaClient,
         method: 'POST',
-        path: '/api/media/upload',
+        path: '/api/files/upload',
         data: formData,
         expectedStatuses: [200, 201],
         message: 'Загрузка медиа',

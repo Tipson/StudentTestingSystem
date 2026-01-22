@@ -50,6 +50,7 @@ export {
     runStepWithRetries,
     createSampleImageFile,
     buildQuestionPayload,
+    extractOptionsFromResponse,
     buildQuestionRecord,
     buildAnswerPayload,
     buildIncorrectAnswerPayload,

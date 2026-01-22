@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getAccessToken} from '@api/auth.js';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
 import {clearStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
@@ -35,8 +35,33 @@ const TABS = [
     {key: 'profile', label: 'Профиль'},
 ];
 
+/**
+ * Вычисляет оставшееся время до истечения токена
+ */
+function formatTimeRemaining(expiresAt) {
+    if (!expiresAt) return null;
+
+    const now = Date.now();
+    const expiresMs = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
+    const remainingMs = expiresMs - now;
+
+    if (remainingMs <= 0) return 'Истёк';
+
+    const seconds = Math.floor(remainingMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+        return `${hours}ч ${minutes % 60}м`;
+    }
+    if (minutes > 0) {
+        return `${minutes}м ${seconds % 60}с`;
+    }
+    return `${seconds}с`;
+}
+
 export default function SwaggerPage() {
-    const {profile, roles, source, refreshProfile} = useUser();
+    const {profile, roles, source, refreshUser} = useUser();
     const [activeTab, setActiveTab] = useState('console');
 
     const {
@@ -155,6 +180,35 @@ export default function SwaggerPage() {
     const autoTestStopRef = useRef(false);
     const scenarioStopRef = useRef(false);
 
+    // Вычисляем оставшееся время токена (обновляется каждую секунду)
+    const [tokenTimeRemaining, setTokenTimeRemaining] = useState(() =>
+        formatTimeRemaining(tokens?.expiresAt),
+    );
+
+    // Tooltip текст для иконки токена
+    const tokenTooltip = useMemo(() => {
+        if (!hasToken) return 'Не авторизован';
+        const lines = ['Токен активен'];
+        if (tokenExpiresAt) lines.push(`Истекает: ${tokenExpiresAt}`);
+        if (tokenTimeRemaining) lines.push(`Осталось: ${tokenTimeRemaining}`);
+        if (profile?.username) lines.push(`Пользователь: ${profile.username}`);
+        return lines.join('\n');
+    }, [hasToken, tokenExpiresAt, tokenTimeRemaining, profile]);
+
+    // Обновление оставшегося времени каждую секунду
+    useEffect(() => {
+        if (!tokens?.expiresAt) {
+            setTokenTimeRemaining(null);
+            return undefined;
+        }
+
+        const update = () => setTokenTimeRemaining(formatTimeRemaining(tokens.expiresAt));
+        update();
+
+        const timerId = setInterval(update, 1000);
+        return () => clearInterval(timerId);
+    }, [tokens?.expiresAt]);
+
     // загрузка сваггера
     useEffect(() => {
         loadSwagger();
@@ -177,9 +231,9 @@ export default function SwaggerPage() {
     const handleLogout = useCallback(() => {
         clearStoredTokens();
         refreshTokens();
-        refreshProfile();
+        refreshUser();
         notifyCustom({type: 'info', message: 'Выход выполнен'});
-    }, [refreshTokens, refreshProfile]);
+    }, [refreshTokens, refreshUser]);
 
     const handleRefreshToken = useCallback(async () => {
         try {
@@ -303,6 +357,72 @@ export default function SwaggerPage() {
                                 {tab.label}
                             </button>
                         ))}
+
+                        <div className="swagger-tabs-spacer" />
+
+                        <div className="swagger-auth-status">
+                            {hasToken ? (
+                                <>
+                                    <div
+                                        className="swagger-token-indicator active"
+                                        title={tokenTooltip}
+                                    >
+                                        <svg
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                        >
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        </svg>
+                                        {tokenTimeRemaining && (
+                                            <span className="swagger-token-time">{tokenTimeRemaining}</span>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="swagger-auth-button logout"
+                                        onClick={handleLogout}
+                                        title="Выйти"
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                        >
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                            <polyline points="16 17 21 12 16 7" />
+                                            <line x1="21" y1="12" x2="9" y2="12" />
+                                        </svg>
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="swagger-auth-button login"
+                                    onClick={handleLogin}
+                                >
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                                        <polyline points="10 17 15 12 10 7" />
+                                        <line x1="15" y1="12" x2="3" y2="12" />
+                                    </svg>
+                                    Войти
+                                </button>
+                            )}
+                        </div>
                     </nav>
                 </div>
             </section>
