@@ -131,7 +131,7 @@ frontend:
     url: "https://keycloak.lmscloud.ru"
     realm: "lms"
     clientId: "swagger"
-    redirectPath: "/swagger/oauth2-redirect.html"
+    redirectPath: "/swagger/oauth2-redirect"
     scope: "openid profile email"
     refreshIntervalMs: "60000"
     refreshLeewayMs: "120000"
