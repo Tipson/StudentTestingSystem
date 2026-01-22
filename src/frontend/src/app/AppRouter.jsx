@@ -14,7 +14,6 @@ export default function AppRouter() {
                     <Route path="/" element={<Navigate to="/swagger" replace/>}/>
                     <Route path="/swagger" element={<SwaggerPage/>}/>
                     <Route path="/swagger/oauth2-redirect" element={<SwaggerOAuthRedirect/>}/>
-                    <Route path="/swagger/oauth2-redirect.html" element={<SwaggerOAuthRedirect/>}/>
                 </Route>
 
                 <Route element={<ProtectedRoute/>}></Route>

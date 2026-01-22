@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     realm: 'lms',
     clientId: 'swagger',
     scope: 'openid profile email',
-    redirectPath: '/swagger/oauth2-redirect.html',
+    redirectPath: '/swagger/oauth2-redirect',
 };
 
 const PKCE_STORAGE_TTL_MS = 10 * 60_000;
