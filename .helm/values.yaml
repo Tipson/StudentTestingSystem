@@ -9,7 +9,7 @@ assessmentApi:
     enabled: true
     host: assessment.lmscloud.ru
   auth:
-    issuer: "http://keycloak.lmscloud.ru/realms/lms"
+    issuer: "https://keycloak.lmscloud.ru/realms/lms"
     clientId: "assessment-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
@@ -39,7 +39,7 @@ mediaApi:
     enabled: true
     host: media.lmscloud.ru
   auth:
-    issuer: "http://keycloak.lmscloud.ru/realms/lms"
+    issuer: "https://keycloak.lmscloud.ru/realms/lms"
     clientId: "media-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
@@ -70,7 +70,7 @@ identityApi:
     enabled: true
     host: identity.lmscloud.ru
   auth:
-    issuer: "http://keycloak.lmscloud.ru/realms/lms"
+    issuer: "https://keycloak.lmscloud.ru/realms/lms"
     clientId: "identity-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
@@ -96,11 +96,11 @@ frontend:
     enabled: true
     host: lmscloud.ru
   api:
-    assessmentUrl: "http://assessment.lmscloud.ru"
-    mediaUrl: "http://media.lmscloud.ru"
-    identityUrl: "http://identity.lmscloud.ru"
+    assessmentUrl: "https://assessment.lmscloud.ru"
+    mediaUrl: "https://media.lmscloud.ru"
+    identityUrl: "https://identity.lmscloud.ru"
   keycloak:
-    url: "http://keycloak.lmscloud.ru"
+    url: "https://keycloak.lmscloud.ru"
     realm: "lms"
     clientId: "swagger"
     redirectPath: "/swagger/oauth2-redirect.html"

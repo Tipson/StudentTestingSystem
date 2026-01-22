@@ -45,7 +45,7 @@ spec:
           value: "Production"
         
         - name: Keycloak__Authority
-          value: "http://keycloak.lmscloud.ru/realms/lms"
+          value: "https://keycloak.lmscloud.ru/realms/lms"
         - name: Keycloak__RequireHttpsMetadata
           value: "false"
         
