@@ -73,7 +73,7 @@ spec:
                   name: gemini-secrets
                   key: Gemini__ApiKey
             - name: Gemini__BaseUrl
-              value: "https://gemini-proxy.tipson-510.workers.dev/"
+              value: {{ .Values.assessmentApi.gemini.baseUrl | quote }}
             - name: Gemini__Model
               value: {{ .Values.assessmentApi.gemini.model | quote }}
             - name: Gemini__Temperature
@@ -83,7 +83,7 @@ spec:
             
             # RabbitMQ Configuration
             - name: RabbitMQ__Host
-              value: "rabbitmq.lms.svc.cluster.local"
+              value: {{ .Values.assessmentApi.rabbitmq.host | quote }}
             - name: RabbitMQ__Username
               valueFrom:
                 secretKeyRef:
@@ -97,6 +97,6 @@ spec:
 
             # Grading Service Configuration
             - name: GradingService__UseMessageBus
-              value: "true"
+              value: {{ .Values.assessmentApi.grading.useMessageBus | quote }}
             - name: GradingService__Url
-              value: "http://grading-api:8080"
+              value: {{ .Values.assessmentApi.grading.serviceUrl | quote }}

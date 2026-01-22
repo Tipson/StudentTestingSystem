@@ -1,25 +1,32 @@
+# Пример конфигурации для StudentTestingSystem
+# Скопируй этот файл в values.yaml и измени значения под свою инфраструктуру
+
+# Общие настройки домена
+domain:
+  base: "lmscloud.ru"  # Базовый домен
+  
 # Assessment API
 assessmentApi:
-  environment: "Staging"
+  environment: "Staging"  # или "Production"
   replicaCount: 2
   service:
     name: "assessment-api"
     portHttp: 8080
   ingress:
     enabled: true
-    host: assessment.lmscloud.ru
+    host: assessment.lmscloud.ru  # Поддомен для Assessment API
   auth:
-    issuer: "https://keycloak.lmscloud.ru/realms/lms"
+    issuer: "https://keycloak.lmscloud.ru/realms/lms"  # URL Keycloak
     clientId: "assessment-api"
   database:
-    host: "postgres-postgresql.lms.svc.cluster.local"
+    host: "postgres-postgresql.lms.svc.cluster.local"  # Хост PostgreSQL
     port: "5432"
-    name: "assessment"
+    name: "assessment"  # Имя БД
   redis:
-    host: "redis-master.lms.svc.cluster.local"
+    host: "redis-master.lms.svc.cluster.local"  # Хост Redis
     port: "6379"
   rabbitmq:
-    host: "rabbitmq.lms.svc.cluster.local"
+    host: "rabbitmq.lms.svc.cluster.local"  # Хост RabbitMQ
   grading:
     useMessageBus: "true"
     serviceUrl: "http://grading-api:8080"
@@ -29,7 +36,7 @@ assessmentApi:
     cpuRequests: "100m"
     cpuLimits: "500m"
   gemini:
-    baseUrl: "https://gemini-proxy.tipson-510.workers.dev/"
+    baseUrl: "https://gemini-proxy.tipson-510.workers.dev/"  # URL прокси для Gemini
     model: "gemini-2.5-flash"
     temperature: "0.3"
     maxOutputTokens: "2048"
@@ -52,10 +59,10 @@ mediaApi:
     port: "5432"
     name: "media"
   s3:
-    serviceUrl: "s3.lmscloud.ru"
+    serviceUrl: "s3.lmscloud.ru"  # URL MinIO
     port: "80"
     defaultBucketName: "assessment"
-    withSsl: false
+    withSsl: false  # true если используешь HTTPS для S3
   redis:
     host: "redis-master.lms.svc.cluster.local"
     port: "6379"
@@ -122,7 +129,7 @@ frontend:
     portHttp: 3000
   ingress:
     enabled: true
-    host: lmscloud.ru
+    host: lmscloud.ru  # Корневой домен для фронтенда
   api:
     assessmentUrl: "https://assessment.lmscloud.ru"
     mediaUrl: "https://media.lmscloud.ru"
