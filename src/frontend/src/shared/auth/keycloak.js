@@ -5,6 +5,8 @@ const STORAGE_KEYS = {
     pkceTimestamp: 'swagger:pkce_created_at',
 };
 
+export const TOKENS_UPDATED_EVENT = 'swagger:tokens_updated';
+
 const DEFAULT_CONFIG = {
     baseUrl: 'http://keycloak.lmscloud.ru',
     realm: 'lms',
@@ -29,6 +31,11 @@ const parseEnvMs = (value, fallback) => {
 // Runtime config helper - читает из window._env_ или process.env
 const getRuntimeEnv = (key) => {
     return window._env_?.[key] || process.env[key];
+};
+
+const notifyTokensUpdated = (payload) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent(TOKENS_UPDATED_EVENT, {detail: payload}));
 };
 
 export const getKeycloakConfig = () => {
@@ -156,16 +163,32 @@ export const persistTokens = (tokenResponse) => {
     if (!tokenResponse) return null;
 
     const storedTokens = getStoredTokens();
-    const refreshToken = tokenResponse.refresh_token || storedTokens?.refreshToken || '';
-    const refreshExpiresAt = tokenResponse.refresh_expires_in
-        ? Date.now() + tokenResponse.refresh_expires_in * 1000
+    const accessToken = tokenResponse.access_token
+        || tokenResponse.accessToken
+        || storedTokens?.accessToken
+        || '';
+    const refreshToken = tokenResponse.refresh_token
+        || tokenResponse.refreshToken
+        || storedTokens?.refreshToken
+        || '';
+    const idToken = tokenResponse.id_token
+        || tokenResponse.idToken
+        || storedTokens?.idToken
+        || '';
+    const expiresIn = Number(tokenResponse.expires_in ?? tokenResponse.expiresIn);
+    const refreshExpiresIn = Number(tokenResponse.refresh_expires_in ?? tokenResponse.refreshExpiresIn);
+    const refreshExpiresAt = Number.isFinite(refreshExpiresIn)
+        ? Date.now() + refreshExpiresIn * 1000
         : (storedTokens?.refreshExpiresAt ?? null);
+    const expiresAt = Number.isFinite(expiresIn)
+        ? Date.now() + expiresIn * 1000
+        : (storedTokens?.expiresAt ?? null);
 
     const payload = {
-        accessToken: tokenResponse.access_token || '',
+        accessToken,
         refreshToken,
-        idToken: tokenResponse.id_token || '',
-        expiresAt: tokenResponse.expires_in ? Date.now() + tokenResponse.expires_in * 1000 : null,
+        idToken,
+        expiresAt,
         refreshExpiresAt,
     };
 
@@ -176,6 +199,7 @@ export const persistTokens = (tokenResponse) => {
         window.localStorage.removeItem('accessToken');
     }
 
+    notifyTokensUpdated(payload);
     return payload;
 };
 
@@ -183,6 +207,7 @@ export const clearStoredTokens = () => {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(STORAGE_KEYS.tokens);
     window.localStorage.removeItem('accessToken');
+    notifyTokensUpdated(null);
 };
 
 // Стартует авторизацию через Keycloak.
@@ -202,6 +227,7 @@ export const startKeycloakLogin = async () => {
 
     const params = new URLSearchParams({
         response_type: 'code',
+        response_mode: 'query',
         client_id: config.clientId,
         redirect_uri: getRedirectUri(),
         scope: config.scope,
