@@ -6,7 +6,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_CONFIG = {
-    baseUrl: 'http://keycloak.oleg.agentik007.ru',
+    baseUrl: 'http://keycloak.lmscloud.ru',
     realm: 'lms',
     clientId: 'swagger',
     scope: 'openid profile email',

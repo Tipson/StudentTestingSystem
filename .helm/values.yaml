@@ -7,9 +7,9 @@ assessmentApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: assessment.oleg.agentik007.ru
+    host: assessment.lmscloud.ru
   auth:
-    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    issuer: "http://keycloak.lmscloud.ru/realms/lms"
     clientId: "assessment-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
@@ -37,16 +37,16 @@ mediaApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: media.oleg.agentik007.ru
+    host: media.lmscloud.ru
   auth:
-    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    issuer: "http://keycloak.lmscloud.ru/realms/lms"
     clientId: "media-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
     port: "5432"
     name: "media"
   s3:
-    serviceUrl: "s3.oleg.agentik007.ru"
+    serviceUrl: "s3.lmscloud.ru"
     port: "80"
     defaultBucketName: "assessment"
     withSsl: false
@@ -68,9 +68,9 @@ identityApi:
     portHttp: 8080
   ingress:
     enabled: true
-    host: identity.oleg.agentik007.ru
+    host: identity.lmscloud.ru
   auth:
-    issuer: "http://keycloak.oleg.agentik007.ru/realms/lms"
+    issuer: "http://keycloak.lmscloud.ru/realms/lms"
     clientId: "identity-api"
   database:
     host: "postgres-postgresql.lms.svc.cluster.local"
@@ -94,13 +94,13 @@ frontend:
     portHttp: 3000
   ingress:
     enabled: true
-    host: sts.oleg.agentik007.ru
+    host: lmscloud.ru
   api:
-    assessmentUrl: "http://assessment.oleg.agentik007.ru"
-    mediaUrl: "http://media.oleg.agentik007.ru"
-    identityUrl: "http://identity.oleg.agentik007.ru"
+    assessmentUrl: "http://assessment.lmscloud.ru"
+    mediaUrl: "http://media.lmscloud.ru"
+    identityUrl: "http://identity.lmscloud.ru"
   keycloak:
-    url: "http://keycloak.oleg.agentik007.ru"
+    url: "http://keycloak.lmscloud.ru"
     realm: "lms"
     clientId: "swagger"
     redirectPath: "/swagger/oauth2-redirect.html"
