@@ -9,7 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: s3.oleg.agentik007.ru
+    - host: s3.lmscloud.ru
       http:
         paths:
           - path: /
