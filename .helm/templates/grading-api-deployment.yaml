@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: grading-api
 spec:
-  replicas: 2
+  replicas: {{ .Values.gradingApi.replicaCount }}
   selector:
     matchLabels:
       app: grading-api
@@ -16,18 +16,18 @@ spec:
       - name: grading-api
         image: {{ index .Values.werf.image "grading-api" }}
         ports:
-        - containerPort: 8080
+        - containerPort: {{ .Values.gradingApi.service.portHttp }}
         resources:
           requests:
-            cpu: "200m"
-            memory: "512Mi"
+            cpu: {{ .Values.gradingApi.limits.cpuRequests }}
+            memory: {{ .Values.gradingApi.limits.memoryRequests }}
           limits:
-            cpu: "1000m"
-            memory: "1Gi"
+            cpu: {{ .Values.gradingApi.limits.cpuLimits }}
+            memory: {{ .Values.gradingApi.limits.memoryLimits }}
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8080
+            port: {{ .Values.gradingApi.service.portHttp }}
             scheme: HTTP
           failureThreshold: 3
           initialDelaySeconds: 15
@@ -35,22 +35,22 @@ spec:
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 8080
+            port: {{ .Values.gradingApi.service.portHttp }}
             scheme: HTTP
           failureThreshold: 3
           initialDelaySeconds: 10
           periodSeconds: 5
         env:
         - name: ASPNETCORE_ENVIRONMENT
-          value: "Production"
+          value: {{ .Values.gradingApi.environment | quote }}
         
         - name: Keycloak__Authority
-          value: "https://keycloak.lmscloud.ru/realms/lms"
+          value: {{ .Values.gradingApi.auth.issuer | quote }}
         - name: Keycloak__RequireHttpsMetadata
           value: "false"
         
         - name: RabbitMQ__Host
-          value: "rabbitmq.lms.svc.cluster.local"
+          value: {{ .Values.gradingApi.rabbitmq.host | quote }}
         - name: RabbitMQ__Username
           valueFrom:
             secretKeyRef:
@@ -68,13 +68,10 @@ spec:
               name: gemini-secrets
               key: Gemini__ApiKey
         - name: Gemini__BaseUrl
-          value: "https://gemini-proxy.tipson-510.workers.dev/"
+          value: {{ .Values.gradingApi.gemini.baseUrl | quote }}
         - name: Gemini__Model
-          value: "gemini-2.5-flash"
-        
-        - name: AI__Enabled
-          value: "true"
-        - name: AI__GradingEnabled
-          value: "true"
-        - name: AI__MinimumConfidenceThreshold
-          value: "0.7"
+          value: {{ .Values.gradingApi.gemini.model | quote }}
+        - name: Gemini__Temperature
+          value: {{ .Values.gradingApi.gemini.temperature | quote }}
+        - name: Gemini__MaxOutputTokens
+          value: {{ .Values.gradingApi.gemini.maxOutputTokens | quote }}
