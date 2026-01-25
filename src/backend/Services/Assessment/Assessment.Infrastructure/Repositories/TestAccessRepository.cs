@@ -61,9 +61,9 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
     public Task UpdateAsync(TestAccess access, CancellationToken ct) =>
         db.SaveChangesAsync(ct);
 
-    public async Task DeleteAsync(TestAccess access, CancellationToken ct)
+    public Task DeleteAsync(TestAccess access, CancellationToken ct)
     {
         db.TestAccesses.Remove(access);
-        await db.SaveChangesAsync(ct);
+        return db.SaveChangesAsync(ct);
     }
 }

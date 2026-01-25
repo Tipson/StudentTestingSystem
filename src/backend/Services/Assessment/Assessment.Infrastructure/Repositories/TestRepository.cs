@@ -1,4 +1,4 @@
-﻿using Assessment.Application.Interfaces;
+using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
 using Assessment.Domain.Tests.Enums;
 using Assessment.Infrastructure.Data;
@@ -15,6 +15,7 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
     public Task<Test?> GetWithQuestionsAsync(Guid id, CancellationToken ct) =>
         db.Tests
             .Include(t => t.Questions)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
     
     public Task<List<Test>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>
@@ -53,15 +54,15 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task UpdateAsync(Test test, CancellationToken ct)
+    public Task UpdateAsync(Test test, CancellationToken ct)
     {
         db.Tests.Update(test);
-        await db.SaveChangesAsync(ct);
+        return db.SaveChangesAsync(ct);
     }
 
-    public async Task DeleteAsync(Test test, CancellationToken ct)
+    public Task DeleteAsync(Test test, CancellationToken ct)
     {
         db.Tests.Remove(test);
-        await db.SaveChangesAsync(ct);
+        return db.SaveChangesAsync(ct);
     }
 }

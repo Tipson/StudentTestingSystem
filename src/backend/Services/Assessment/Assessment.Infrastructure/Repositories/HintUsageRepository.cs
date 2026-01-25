@@ -7,12 +7,10 @@ namespace Assessment.Infrastructure.Repositories;
 
 public sealed class HintUsageRepository(AssessmentDbContext context) : IHintUsageRepository
 {
-    public async Task<int> CountByAttemptAsync(Guid attemptId, CancellationToken ct = default)
-    {
-        return await context.HintUsages
+    public Task<int> CountByAttemptAsync(Guid attemptId, CancellationToken ct = default) =>
+        context.HintUsages
             .Where(h => h.AttemptId == attemptId)
             .CountAsync(ct);
-    }
 
     public async Task AddAsync(HintUsage hintUsage, CancellationToken ct = default)
     {
@@ -20,11 +18,9 @@ public sealed class HintUsageRepository(AssessmentDbContext context) : IHintUsag
         await context.SaveChangesAsync(ct);
     }
 
-    public async Task<List<HintUsage>> GetByAttemptAsync(Guid attemptId, CancellationToken ct = default)
-    {
-        return await context.HintUsages
+    public Task<List<HintUsage>> GetByAttemptAsync(Guid attemptId, CancellationToken ct = default) =>
+        context.HintUsages
             .Where(h => h.AttemptId == attemptId)
             .OrderBy(h => h.RequestedAt)
             .ToListAsync(ct);
-    }
 }

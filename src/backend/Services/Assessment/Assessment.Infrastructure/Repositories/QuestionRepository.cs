@@ -1,4 +1,4 @@
-﻿using Assessment.Application.Interfaces;
+using Assessment.Application.Interfaces;
 using Assessment.Domain.Questions;
 using Assessment.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +12,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<List<Question>> ListByTestIdAsync(Guid testId, CancellationToken ct) =>
@@ -19,6 +20,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
+            .AsSplitQuery()
             .Where(x => x.TestId == testId)
             .OrderBy(x => x.Order)
             .ToListAsync(ct);
@@ -72,9 +74,9 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
         });
     }
 
-    public async Task DeleteAsync(Question question, CancellationToken ct)
+    public Task DeleteAsync(Question question, CancellationToken ct)
     {
         db.Questions.Remove(question);
-        await db.SaveChangesAsync(ct);
+        return db.SaveChangesAsync(ct);
     }
 }
