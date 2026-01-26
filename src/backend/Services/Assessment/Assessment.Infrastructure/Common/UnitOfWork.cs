@@ -1,10 +1,10 @@
 using Application;
-using Identity.Infrastructure.Data;
+using Assessment.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace Identity.Infrastructure.Common;
+namespace Assessment.Infrastructure.Common;
 
-public sealed class UnitOfWork(IdentityDbContext db) : IUnitOfWork
+public sealed class UnitOfWork(AssessmentDbContext db) : IUnitOfWork
 {
     public async Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct)
     {

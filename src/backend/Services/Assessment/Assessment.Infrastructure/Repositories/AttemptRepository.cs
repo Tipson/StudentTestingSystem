@@ -54,9 +54,9 @@ public class AttemptRepository(AssessmentDbContext db) : IAttemptRepository
         await db.SaveChangesAsync(ct);
     }
 
-    public Task UpdateAsync(Attempt attempt, CancellationToken ct)
+    public async Task UpdateAsync(Attempt attempt, CancellationToken ct)
     {
         db.Attempts.Update(attempt);
-        return db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 }

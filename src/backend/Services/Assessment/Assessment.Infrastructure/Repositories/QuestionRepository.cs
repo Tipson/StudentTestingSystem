@@ -42,13 +42,11 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateAsync(Question question, CancellationToken ct)
     {
-        // Удаляем старые медиа записи
         var existingMedia = await db.QuestionMedia
             .Where(m => m.QuestionId == question.Id)
             .ToListAsync(ct);
         db.QuestionMedia.RemoveRange(existingMedia);
 
-        // Удаляем старые медиа записи вариантов
         var optionIds = question.Options.Select(o => o.Id).ToList();
         var existingOptionMedia = await db.QuestionOptionMedia
             .Where(m => optionIds.Contains(m.QuestionOptionId))
@@ -61,22 +59,13 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateRangeAsync(IEnumerable<Question> questions, CancellationToken ct)
     {
-        var strategy = db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-            db.Questions.UpdateRange(questions);
-            await db.SaveChangesAsync(ct);
-
-            await transaction.CommitAsync(ct);
-        });
+        db.Questions.UpdateRange(questions);
+        await db.SaveChangesAsync(ct);
     }
 
-    public Task DeleteAsync(Question question, CancellationToken ct)
+    public async Task DeleteAsync(Question question, CancellationToken ct)
     {
         db.Questions.Remove(question);
-        return db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 }

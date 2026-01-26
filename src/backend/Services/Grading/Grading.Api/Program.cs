@@ -89,7 +89,7 @@ app.UseAuthorization();
 
 /*if (app.Environment.IsDevelopment()) */ // Todo Не забыть раскомментировать после стабильной версии прода
 {
-    IdentityModelEventSource.ShowPII = true;
+    IdentityModelEventSource.ShowPII = false;
 
     app.UseSwaggerUiWithOAuth(builder.Configuration,
         "/swagger/v1/swagger.json",

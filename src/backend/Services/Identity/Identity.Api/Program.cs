@@ -61,7 +61,7 @@ app.UseMiddleware<UserSyncMiddleware>();
 
 /*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
 {
-    IdentityModelEventSource.ShowPII = true;
+    IdentityModelEventSource.ShowPII = false;
 
     app.UseSwaggerUiWithOAuth(builder.Configuration, 
         "/swagger/v1/swagger.json", 

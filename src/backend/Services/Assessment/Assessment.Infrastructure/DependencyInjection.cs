@@ -1,4 +1,6 @@
+using Application;
 using Assessment.Application.Interfaces;
+using Assessment.Infrastructure.Common;
 using Assessment.Infrastructure.Data;
 using Assessment.Infrastructure.Grading.Clients;
 using Assessment.Infrastructure.Grading.Options;
@@ -27,6 +29,10 @@ public static class DependencyInjection
             o.UseNpgsql(dataSource);
         });
         
+        // Unit of Work
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        
+        // Repositories
         services.AddScoped<IQuestionRepository, QuestionRepository>();
         services.AddScoped<ITestRepository, TestRepository>();
         services.AddScoped<IAttemptRepository, AttemptRepository>();

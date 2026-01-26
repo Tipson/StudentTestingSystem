@@ -54,15 +54,15 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
         await db.SaveChangesAsync(ct);
     }
 
-    public Task UpdateAsync(Test test, CancellationToken ct)
+    public async Task UpdateAsync(Test test, CancellationToken ct)
     {
         db.Tests.Update(test);
-        return db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 
-    public Task DeleteAsync(Test test, CancellationToken ct)
+    public async Task DeleteAsync(Test test, CancellationToken ct)
     {
         db.Tests.Remove(test);
-        return db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 }
