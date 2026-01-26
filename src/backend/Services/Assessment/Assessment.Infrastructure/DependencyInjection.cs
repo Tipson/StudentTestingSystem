@@ -33,17 +33,19 @@ public static class DependencyInjection
         services.AddScoped<ITestAccessRepository, TestAccessRepository>();
         services.AddScoped<IHintUsageRepository, HintUsageRepository>();
         
-        // Grading Service Client
+        // Grading Service Client Configuration
+        services.Configure<GradingServiceOptions>(
+            cfg.GetSection(GradingServiceOptions.SectionName));
+
         var useMessageBus = cfg.GetValue<bool>("GradingService:UseMessageBus");
 
         if (useMessageBus)
         {
-            // Message Bus (RabbitMQ)
+            // RabbitMQ для автоматической проверки (долгие операции с AI)
             services.AddMassTransit(x =>
             {
                 x.UsingRabbitMq((context, rabbitCfg) =>
                 {
-                    // Получаем конфигурацию из контекста
                     var configuration = context.GetService<IConfiguration>()!;
                     
                     var rabbitMqHost = configuration["RabbitMQ:Host"] ?? "localhost";
@@ -56,19 +58,27 @@ public static class DependencyInjection
                         h.Password(rabbitMqPass);
                     });
 
-                    // настройка endpoints для Request-Response
                     rabbitCfg.ConfigureEndpoints(context);
                 });
             });
 
+            // HTTP клиент для ручной проверки (всегда нужен)
+            services.AddHttpClient<HttpGradingClient>((serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<GradingServiceOptions>>()
+                    .Value;
+
+                client.BaseAddress = new Uri(options.Url);
+                client.Timeout = TimeSpan.FromSeconds(30); // Ручная проверка быстрая
+            });
+            
+            // MessageBus клиент использует HTTP для ручной проверки
             services.AddScoped<IGradingClient, MessageBusGradingClient>();
         }
         else
         {
-            // HTTP
-            services.Configure<GradingServiceOptions>(
-                cfg.GetSection(GradingServiceOptions.SectionName));
-
+            // HTTP для всех операций
             services.AddHttpClient<IGradingClient, HttpGradingClient>((serviceProvider, client) =>
             {
                 var options = serviceProvider

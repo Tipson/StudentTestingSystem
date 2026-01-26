@@ -22,7 +22,6 @@
     <ProjectReference Include="..\Assessment.Application\Assessment.Application.csproj" />
     <ProjectReference Include="..\Assessment.Infrastructure\Assessment.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Api\BuildingBlocks.Api.csproj" />
-    <ProjectReference Include="..\..\Grading\Grading.Application\Grading.Application.csproj" />
   </ItemGroup>
 
 </Project>

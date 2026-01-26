@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Mapster;
 
 namespace Assessment.Application;
@@ -11,6 +11,7 @@ public static class DependencyInjection
             cfg.RegisterServicesFromAssembly(typeof(AssessmentApplicationMarker).Assembly));
         
         services.AddMapster();
+        
         return services;
     }
 

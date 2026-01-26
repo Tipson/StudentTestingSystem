@@ -76,4 +76,48 @@ public sealed class HttpGradingClient : IGradingClient
             throw;
         }
     }
+
+    public async Task<ManualGradeResponse> GradeAnswerManuallyAsync(
+        ManualGradeRequest request,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Отправка запроса на ручную проверку вопроса {QuestionId} в попытке {AttemptId} в Grading Service",
+            request.QuestionId, request.AttemptId);
+
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("/api/grading/manual-grade", content, ct);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<ManualGradeResponse>(responseJson, _jsonOptions);
+
+            if (result is null)
+                throw new InvalidOperationException("Не удалось десериализовать ответ от Grading Service");
+
+            _logger.LogInformation(
+                "Вопрос {QuestionId} успешно проверен вручную: {Points} баллов. Общий балл попытки: {EarnedPoints}/{TotalPoints}",
+                result.QuestionId, result.PointsAwarded, result.TotalEarnedPoints, result.TotalMaxPoints);
+
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex,
+                "Ошибка HTTP при ручной проверке вопроса {QuestionId} в Grading Service",
+                request.QuestionId);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Неожиданная ошибка при ручной проверке вопроса {QuestionId} через Grading Service",
+                request.QuestionId);
+            throw;
+        }
+    }
 }

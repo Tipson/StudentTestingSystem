@@ -6,7 +6,6 @@ using BuildingBlocks.AI;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
-using Grading.Application;
 using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,8 +32,6 @@ builder.Services.AddAssessmentApplication();
 builder.Services.AddAssessmentInfrastructure(builder.Configuration);
 
 builder.Services.AddAIServices(builder.Configuration);
-
-builder.Services.AddGradingApplication();
 
 builder.Services.AddKeycloakAuth(builder.Configuration);
 builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");

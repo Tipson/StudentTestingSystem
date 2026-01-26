@@ -1,6 +1,7 @@
 using Contracts.Grading.Messages;
-using Grading.Application.Services;
+using Grading.Application.CQRS.Commands;
 using MassTransit;
+using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Grading.Application.Consumers;
@@ -8,8 +9,10 @@ namespace Grading.Application.Consumers;
 /// <summary>
 /// Consumer для обработки запросов на проверку попытки через RabbitMQ.
 /// </summary>
-public sealed class GradeAttemptConsumer(IGradingOrchestrator orchestrator, 
-    ILogger<GradeAttemptConsumer> logger) : IConsumer<GradeAttemptRequest>
+public sealed class GradeAttemptConsumer(
+    IMediator mediator,
+    ILogger<GradeAttemptConsumer> logger) 
+    : IConsumer<GradeAttemptRequest>
 {
     public async Task Consume(ConsumeContext<GradeAttemptRequest> context)
     {
@@ -21,7 +24,7 @@ public sealed class GradeAttemptConsumer(IGradingOrchestrator orchestrator,
 
         try
         {
-            var response = await orchestrator.GradeAttemptAsync(request, context.CancellationToken);
+            var response = await mediator.Send(new GradeAttempt(request), context.CancellationToken);
             
             // Отправляем ответ обратно
             await context.RespondAsync(response);

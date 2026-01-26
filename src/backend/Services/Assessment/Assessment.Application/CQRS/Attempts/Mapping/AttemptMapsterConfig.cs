@@ -4,6 +4,7 @@ using Assessment.Domain.Questions;
 using Contracts.Assessment;
 using Contracts.Assessment.Enums;
 using Contracts.Grading.Enums;
+using Contracts.Grading.Messages;
 using Contracts.Grading.Models;
 using Mapster;
 
@@ -60,6 +61,16 @@ public sealed class AttemptMapsterConfig : IRegister
                     Text = o.Text 
                 })
                 .ToList());
+        
+        // Маппинг AttemptAnswer -> AnswerResult
+        config.NewConfig<AttemptAnswer, AnswerResult>()
+            .Map(dest => dest.QuestionId, src => src.QuestionId)
+            .Map(dest => dest.PointsAwarded, src => src.PointsAwarded ?? 0);
+        
+        // Маппинг Question -> QuestionInfo
+        config.NewConfig<Question, QuestionInfo>()
+            .Map(dest => dest.QuestionId, src => src.Id)
+            .Map(dest => dest.MaxPoints, src => src.Points);
     }
 
     private static AnswerPayloadDto? MapUserAnswer(AttemptAnswer? answer)

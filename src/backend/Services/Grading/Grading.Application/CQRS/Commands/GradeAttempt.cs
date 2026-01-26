@@ -1,29 +1,35 @@
 using Application;
 using Contracts.Grading.Messages;
 using Contracts.Grading.Models;
+using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace Grading.Application.Services;
+namespace Grading.Application.CQRS.Commands;
 
-public sealed class GradingOrchestrator(
+/// <summary>
+/// Автоматически проверяет все ответы в попытке.
+/// </summary>
+public sealed record GradeAttempt(GradeAttemptRequest Request) : IRequest<GradeAttemptResponse>;
+
+public sealed class GradeAttemptHandler(
     IGradingService gradingService,
-    ILogger<GradingOrchestrator> logger)
-    : IGradingOrchestrator
+    ILogger<GradeAttemptHandler> logger)
+    : IRequestHandler<GradeAttempt, GradeAttemptResponse>
 {
-    public async Task<GradeAttemptResponse> GradeAttemptAsync(GradeAttemptRequest request, CancellationToken ct = default)
+    public Task<GradeAttemptResponse> Handle(GradeAttempt request, CancellationToken ct)
     {
-        logger.LogInformation("Начало проверки попытки {AttemptId}", request.AttemptId);
+        logger.LogInformation("Начало проверки попытки {AttemptId}", request.Request.AttemptId);
 
         var results = new List<QuestionGradingResult>();
 
         // Проверяем каждый ответ
-        foreach (var answer in request.Answers)
+        foreach (var answer in request.Request.Answers)
         {
-            var question = request.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
+            var question = request.Request.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
             if (question is null)
             {
                 logger.LogWarning("Вопрос {QuestionId} не найден для попытки {AttemptId}", 
-                    answer.QuestionId, request.AttemptId);
+                    answer.QuestionId, request.Request.AttemptId);
                 continue;
             }
 
@@ -35,8 +41,8 @@ public sealed class GradingOrchestrator(
         }
 
         // Обрабатываем вопросы без ответов
-        var answeredQuestionIds = request.Answers.Select(a => a.QuestionId).ToHashSet();
-        foreach (var question in request.Questions.Where(q => !answeredQuestionIds.Contains(q.Id)))
+        var answeredQuestionIds = request.Request.Answers.Select(a => a.QuestionId).ToHashSet();
+        foreach (var question in request.Request.Questions.Where(q => !answeredQuestionIds.Contains(q.Id)))
         {
             results.Add(new QuestionGradingResult(question.Id, GradingResult.Incorrect()));
         }
@@ -45,17 +51,17 @@ public sealed class GradingOrchestrator(
         var gradingResults = results.Select(r => r.Result).ToList();
         var (score, totalPoints, earnedPoints) = gradingService.CalculateScore(
             gradingResults, 
-            request.Questions);
+            request.Request.Questions);
 
         logger.LogInformation(
             "Проверка попытки {AttemptId} завершена: {EarnedPoints}/{TotalPoints} ({Score}%)",
-            request.AttemptId, earnedPoints, totalPoints, score);
+            request.Request.AttemptId, earnedPoints, totalPoints, score);
 
-        return new GradeAttemptResponse(
-            request.AttemptId,
+        return Task.FromResult(new GradeAttemptResponse(
+            request.Request.AttemptId,
             results,
             totalPoints,
             earnedPoints,
-            score);
+            score));
     }
 }

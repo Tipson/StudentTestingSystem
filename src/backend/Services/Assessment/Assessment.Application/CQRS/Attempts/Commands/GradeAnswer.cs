@@ -4,7 +4,7 @@ using Assessment.Application.Interfaces;
 using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Assessment.Enums;
-using Contracts.Grading.Models;
+using Contracts.Grading.Messages;
 using MapsterMapper;
 using MediatR;
 
@@ -24,7 +24,7 @@ public sealed class GradeAnswerHandler(
     IAttemptRepository attempts,
     ITestRepository tests,
     IQuestionRepository questions,
-    IGradingService? grading,
+    IGradingClient gradingClient,
     IMapper mapper)
     : IRequestHandler<GradeAnswer, AttemptScoreDto>
 {
@@ -63,32 +63,34 @@ public sealed class GradeAnswerHandler(
         if (request.Dto.Points > question.Points)
             throw new BadRequestApiException($"Максимум за этот вопрос: {question.Points}.");
 
-        var gradingService = grading ?? throw new InvalidOperationException("Grading service is not available");
-
-        var gradingResult = gradingService.GradeManually(request.Dto.Points, question.Points, request.Dto.Comment);
-
-        answer.SetManualGrade(gradingResult.PointsAwarded, gradingResult.Feedback);
-
         var testQuestions = await questions.ListByTestIdAsync(attempt.TestId, ct);
 
-        var gradingResults = attempt.Answers
-            .Select(mapper.Map<GradingResult>)
-            .ToList();
+        // Формируем запрос на ручную проверку в Grading Service
+        var gradingRequest = new ManualGradeRequest(
+            AttemptId: request.AttemptId,
+            QuestionId: request.QuestionId,
+            Points: request.Dto.Points,
+            MaxPoints: question.Points,
+            Comment: request.Dto.Comment,
+            AllAnswers: mapper.Map<List<AnswerResult>>(attempt.Answers),
+            AllQuestions: mapper.Map<List<QuestionInfo>>(testQuestions)
+        );
 
-        var questionsData = testQuestions
-            .Select(mapper.Map<QuestionData>)
-            .ToList();
+        // Отправляем в Grading Service
+        var gradingResponse = await gradingClient.GradeAnswerManuallyAsync(gradingRequest, ct);
 
-        var (_, _, earnedPoints) = gradingService.CalculateScore(gradingResults, questionsData);
+        // Сохраняем результат проверки
+        answer.SetManualGrade(gradingResponse.PointsAwarded, gradingResponse.Feedback);
 
-        attempt.UpdateScore(earnedPoints, test.PassScore);
+        // Обновляем общий балл попытки
+        attempt.UpdateScore(gradingResponse.TotalEarnedPoints, test.PassScore);
 
         await attempts.UpdateAsync(attempt, ct);
 
         return new AttemptScoreDto(
             attempt.Id,
             attempt.TestId,
-            earnedPoints,
+            gradingResponse.TotalEarnedPoints,
             test.PassScore,
             attempt.IsPassed ?? false
         );

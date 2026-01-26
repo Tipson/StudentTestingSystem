@@ -42,7 +42,7 @@ builder.Services.AddMassTransit(x =>
             h.Password(rabbitMqPass);
         });
 
-        // Настройка очереди для GradeAttemptConsumer
+        // Настройка очереди для автоматической проверки
         cfg.ReceiveEndpoint("grade-attempt-queue", e =>
         {
             // Retry политика: 3 попытки с интервалом 5 секунд
@@ -54,7 +54,6 @@ builder.Services.AddMassTransit(x =>
             // Timeout для обработки сообщения
             e.UseTimeout(t => t.Timeout = TimeSpan.FromMinutes(2));
 
-            // Регистрируем Consumer
             e.ConfigureConsumer<GradeAttemptConsumer>(context);
         });
     });
