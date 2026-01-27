@@ -8,8 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Keycloak.AuthServices.Common" Version="2.8.0" />
     <PackageReference Include="Keycloak.AuthServices.Sdk.Kiota" Version="26.3.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.2" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
   </ItemGroup>
 

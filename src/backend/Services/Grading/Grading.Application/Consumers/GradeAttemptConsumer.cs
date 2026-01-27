@@ -26,20 +26,18 @@ public sealed class GradeAttemptConsumer(
         {
             var response = await mediator.Send(new GradeAttempt(request), context.CancellationToken);
             
-            // Отправляем ответ обратно
             await context.RespondAsync(response);
             
             logger.LogInformation(
-                "Попытка {AttemptId} успешно проверена через RabbitMQ: {EarnedPoints}/{TotalPoints}",
+                "Попытка {AttemptId} успешно проверена: {EarnedPoints}/{TotalPoints} баллов",
                 response.AttemptId, response.EarnedPoints, response.TotalPoints);
         }
         catch (Exception ex)
         {
             logger.LogError(ex,
-                "Ошибка при проверке попытки {AttemptId} через RabbitMQ",
+                "Ошибка при проверке попытки {AttemptId}",
                 request.AttemptId);
             
-            // MassTransit автоматически отправит в retry/DLQ
             throw;
         }
     }

@@ -30,7 +30,6 @@ public sealed class LongTextGrader(
 
         try
         {
-            // Пытаемся проверить через AI
             var aiRequest = new GradingRequest(
                 QuestionText: question.Text ?? string.Empty,
                 ExpectedAnswer: question.CorrectOptions.FirstOrDefault()?.Text,
@@ -57,16 +56,17 @@ public sealed class LongTextGrader(
                 }
                 
                 logger.LogWarning(
-                    "AI недостаточно уверен ({Confidence:P0} < {Threshold:P0}), требуется ручная проверка",
-                    aiResponse.Confidence, _options.MinimumConfidenceThreshold);
+                    "AI недостаточно уверен в проверке вопроса {QuestionId}: {Confidence:P0} < {Threshold:P0}, требуется ручная проверка",
+                    question.Id, aiResponse.Confidence, _options.MinimumConfidenceThreshold);
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "AI проверка не удалась для вопроса {QuestionId}, требуется ручная проверка", question.Id);
+            logger.LogWarning(ex, 
+                "Ошибка при AI проверке вопроса {QuestionId}, требуется ручная проверка", 
+                question.Id);
         }
 
-        // Если AI не смог проверить - требуется ручная проверка
         return GradingResult.ManualReviewRequired();
     }
 }

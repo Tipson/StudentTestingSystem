@@ -11,18 +11,18 @@ namespace BuildingBlocks.AI.Services.Grading;
 public sealed class GradingService : IAIGradingService
 {
     private readonly IGeminiClient _gemini;
-    private readonly IMediaHelper _mediaHelper;  // НОВОЕ
+    private readonly IMediaHelper _mediaHelper;
     private readonly AIOptions _options;
     private readonly ILogger<GradingService> _logger;
 
     public GradingService(
         IGeminiClient gemini,
-        IMediaHelper mediaHelper,  // НОВОЕ
+        IMediaHelper mediaHelper,
         IOptions<AIOptions> options,
         ILogger<GradingService> logger)
     {
         _gemini = gemini;
-        _mediaHelper = mediaHelper;  // НОВОЕ
+        _mediaHelper = mediaHelper;
         _options = options.Value;
         _logger = logger;
     }
@@ -33,27 +33,24 @@ public sealed class GradingService : IAIGradingService
     {
         if (!_options.Enabled || !_options.GradingEnabled)
         {
-            _logger.LogWarning("AI проверка отключена");
+            _logger.LogWarning("AI проверка отключена в конфигурации");
             return null;
         }
 
         try
         {
-            // НОВОЕ: Собираем все MediaIds
             var allMediaIds = new List<Guid>();
             if (request.QuestionMediaIds?.Count > 0)
                 allMediaIds.AddRange(request.QuestionMediaIds);
             if (request.AnswerMediaIds?.Count > 0)
                 allMediaIds.AddRange(request.AnswerMediaIds);
 
-            // НОВОЕ: Загружаем медиа-файлы параллельно
             var mediaContents = await _mediaHelper.GetMediaContentsAsync(allMediaIds, ct);
 
             _logger.LogInformation(
-                "Проверка ответа: {MediaCount} медиа-файлов загружено",
+                "Начата AI проверка ответа с {MediaCount} медиа-файлами",
                 mediaContents.Count);
 
-            // Формируем промпт
             var prompt = GradingPrompts.BuildGradingPrompt(
                 request.QuestionText,
                 request.ExpectedAnswer,
@@ -62,14 +59,19 @@ public sealed class GradingService : IAIGradingService
                 hasMedia: mediaContents.Count > 0 
             );
 
-            // НОВОЕ: Отправляем с медиа
             var response = await _gemini.SendPromptAsync(prompt, mediaContents, ct);
 
-            return ParseGradingResponse(response, request.MaxPoints);
+            var result = ParseGradingResponse(response, request.MaxPoints);
+            
+            _logger.LogInformation(
+                "AI проверка завершена: {Points}/{MaxPoints} баллов, уверенность {Confidence:P0}",
+                result.Points, request.MaxPoints, result.Confidence);
+
+            return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при AI проверке");
+            _logger.LogError(ex, "Ошибка при выполнении AI проверки ответа");
             return null;
         }
     }
@@ -81,7 +83,7 @@ public sealed class GradingService : IAIGradingService
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         if (data is null)
-            throw new InvalidOperationException("Не удалось распарсить ответ Gemini");
+            throw new InvalidOperationException("Не удалось распарсить ответ AI");
 
         return new GradingResponse(
             Math.Clamp(data.Points, 0, maxPoints),
