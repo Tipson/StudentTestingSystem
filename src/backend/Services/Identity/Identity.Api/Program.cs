@@ -6,78 +6,97 @@ using Identity.Api.Middleware;
 using Identity.Api.Security;
 using Identity.Application;
 using Identity.Infrastructure;
+using Logging;
 using Microsoft.IdentityModel.Logging;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.ConfigureSerilog("Identity.API");
 
-builder.Services.AddHttpContextAccessor();
-
-var redisHost = builder.Configuration["RedisOptions:Host"];
-var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
-
-if (string.IsNullOrWhiteSpace(redisHost))
-    throw new Exception("RedisOptions:Host не задан.");
-
-builder.Services.AddStackExchangeRedisCache(options =>
+try
 {
-    options.Configuration = $"{redisHost}:{redisPort}";
-    options.InstanceName = "Idempotency:";
-});
+    Log.Information("Запуск Identity API");
 
-builder.Services.AddScoped<IUserContext, UserContext>();
+    builder.Services.AddControllers();
 
-builder.Services.AddIdentityApplication();
-builder.Services.AddIdentityInfrastructure(builder.Configuration);
+    builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddKeycloakAuth(builder.Configuration);
-builder.Services.AddKeycloakAdmin(builder.Configuration);
-builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Identity API");
+    var redisHost = builder.Configuration["RedisOptions:Host"];
+    var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-// CORS (опционально - если нужен доступ с frontend)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
+    if (string.IsNullOrWhiteSpace(redisHost))
+        throw new Exception("RedisOptions:Host не задан.");
+
+    builder.Services.AddStackExchangeRedisCache(options =>
     {
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        options.Configuration = $"{redisHost}:{redisPort}";
+        options.InstanceName = "Idempotency:";
     });
-});
 
-var app = builder.Build();
+    builder.Services.AddScoped<IUserContext, UserContext>();
 
-if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
+    builder.Services.AddIdentityApplication();
+    builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
-app.UseCors();
+    builder.Services.AddKeycloakAuth(builder.Configuration);
+    builder.Services.AddKeycloakAdmin(builder.Configuration);
+    builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Identity API");
 
-app.UseAuthentication();
-app.UseAuthorization();
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+    });
 
-app.UseMiddleware<IdempotencyMiddleware>();
-app.UseMiddleware<UserSyncMiddleware>();
+    var app = builder.Build();
 
-/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
-{
-    IdentityModelEventSource.ShowPII = false;
+    app.UseSerilogRequestLogging();
 
-    app.UseSwaggerUiWithOAuth(builder.Configuration, 
-        "/swagger/v1/swagger.json", 
-        "Identity API v1");
+    if (!app.Environment.IsDevelopment())
+        app.UseHttpsRedirection();
+
+    app.UseCors();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseMiddleware<IdempotencyMiddleware>();
+    app.UseMiddleware<UserSyncMiddleware>();
+
+    {
+        IdentityModelEventSource.ShowPII = false;
+
+        app.UseSwaggerUiWithOAuth(builder.Configuration, 
+            "/swagger/v1/swagger.json", 
+            "Identity API v1");
+    }
+
+    app.UseAppExceptionHandling();
+    app.MapControllers();
+
+    app.MapGet("/healthz", () => Results.Ok(new
+    {
+        status = "healthy",
+        service = "identity-api",
+        timestamp = DateTimeOffset.UtcNow
+    }))
+    .AllowAnonymous();
+
+    Log.Information("Identity API успешно запущен");
+
+    app.Run();
 }
-
-app.UseAppExceptionHandling();
-app.MapControllers();
-
-// Health checks
-app.MapGet("/healthz", () => Results.Ok(new
+catch (Exception ex)
 {
-    status = "healthy",
-    service = "identity-api",
-    timestamp = DateTimeOffset.UtcNow
-}))
-.AllowAnonymous();
-
-app.Run();
+    Log.Fatal(ex, "Ошибка при запуске Identity API");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

@@ -220,6 +220,10 @@ target
 # Ignore minio data folder
 /docker/MinIO/data/
 
+# Serilog log files
+logs/
+**/logs/
+
 # misc
 .DS_Store
 *.pem

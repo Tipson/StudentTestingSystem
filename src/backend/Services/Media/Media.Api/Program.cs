@@ -2,81 +2,99 @@ using Application;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
+using Logging;
 using Media.Application;
 using Media.Infrastructure;
-using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.IdentityModel.Logging;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.ConfigureSerilog("Media.API");
 
-builder.Services.AddHttpContextAccessor();
-
-var redisHost = builder.Configuration["RedisOptions:Host"];
-var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
-
-if (string.IsNullOrWhiteSpace(redisHost))
-    throw new Exception("RedisOptions:Host не задан.");
-
-builder.Services.AddStackExchangeRedisCache(options =>
+try
 {
-    options.Configuration = $"{redisHost}:{redisPort}";
-    options.InstanceName = "Idempotency:";
-});
+    Log.Information("Запуск Media API");
 
-builder.Services.AddScoped<IUserContext, UserContext>();
+    builder.Services.AddControllers();
 
-builder.Services.AddMediaApplication();
-builder.Services.AddMediaInfrastructure(builder.Configuration);
+    builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddKeycloakBearerAuth(builder.Configuration);
-builder.Services.AddAuthorization();
-builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Storage API");
+    var redisHost = builder.Configuration["RedisOptions:Host"];
+    var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-// CORS (опционально - если нужен доступ с frontend)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
+    if (string.IsNullOrWhiteSpace(redisHost))
+        throw new Exception("RedisOptions:Host не задан.");
+
+    builder.Services.AddStackExchangeRedisCache(options =>
     {
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        options.Configuration = $"{redisHost}:{redisPort}";
+        options.InstanceName = "Idempotency:";
     });
-});
 
-var app = builder.Build();
+    builder.Services.AddScoped<IUserContext, UserContext>();
 
-if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
+    builder.Services.AddMediaApplication();
+    builder.Services.AddMediaInfrastructure(builder.Configuration);
 
-app.UseCors();
+    builder.Services.AddKeycloakBearerAuth(builder.Configuration);
+    builder.Services.AddAuthorization();
+    builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Storage API");
 
-app.UseAuthentication();
-app.UseAuthorization();
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+    });
 
-app.UseMiddleware<IdempotencyMiddleware>();
+    var app = builder.Build();
 
-/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
-{
-    IdentityModelEventSource.ShowPII = false;
+    app.UseSerilogRequestLogging();
 
-    app.UseSwaggerUiWithOAuth(builder.Configuration, 
-        "/swagger/v1/swagger.json", 
-        "Media API v1");
+    if (!app.Environment.IsDevelopment())
+        app.UseHttpsRedirection();
+
+    app.UseCors();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseMiddleware<IdempotencyMiddleware>();
+
+    {
+        IdentityModelEventSource.ShowPII = false;
+
+        app.UseSwaggerUiWithOAuth(builder.Configuration, 
+            "/swagger/v1/swagger.json", 
+            "Media API v1");
+    }
+
+    app.UseAppExceptionHandling();
+
+    app.MapGet("/healthz", () => Results.Ok(new
+    {
+        status = "healthy",
+        service = "media-api",
+        timestamp = DateTimeOffset.UtcNow
+    }))
+    .AllowAnonymous();
+
+    app.MapControllers();
+
+    Log.Information("Media API успешно запущен");
+
+    app.Run();
 }
-
-app.UseAppExceptionHandling();
-
-// Health checks
-app.MapGet("/healthz", () => Results.Ok(new
+catch (Exception ex)
 {
-    status = "healthy",
-    service = "media-api",
-    timestamp = DateTimeOffset.UtcNow
-}))
-.AllowAnonymous();
-
-app.MapControllers();
-
-app.Run();
+    Log.Fatal(ex, "Ошибка при запуске Media API");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
