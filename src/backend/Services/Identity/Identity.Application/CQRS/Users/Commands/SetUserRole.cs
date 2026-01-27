@@ -1,4 +1,3 @@
-using Application;
 using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;

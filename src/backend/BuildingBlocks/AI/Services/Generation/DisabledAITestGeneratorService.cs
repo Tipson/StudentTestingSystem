@@ -1,5 +1,4 @@
 using BuildingBlocks.AI.Models;
-using BuildingBlocks.AI.Services.Hints;
 using Microsoft.Extensions.Logging;
 
 namespace BuildingBlocks.AI.Services.Generation;

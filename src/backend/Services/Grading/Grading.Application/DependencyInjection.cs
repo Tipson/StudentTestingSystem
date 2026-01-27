@@ -1,6 +1,5 @@
 using Application;
 using Grading.Application.Strategies;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Grading.Application;

@@ -1,4 +1,3 @@
-using Application;
 using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
