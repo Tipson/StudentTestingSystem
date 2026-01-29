@@ -36,5 +36,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ .Values.prometheus.service.name }}
-    namespace: lms
+    namespace: {{ .Release.Namespace }}
 {{- end }}
