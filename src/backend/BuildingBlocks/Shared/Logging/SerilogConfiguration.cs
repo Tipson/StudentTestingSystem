@@ -60,7 +60,13 @@ public static class SerilogConfiguration
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} ответил {StatusCode} за {Elapsed:0.0000} мс";
-            
+
+            // Не логировать запросы к health check
+            options.GetLevel = (httpContext, _, _) =>
+                httpContext.Request.Path.StartsWithSegments("/healthz", StringComparison.OrdinalIgnoreCase)
+                    ? LogEventLevel.Fatal
+                    : LogEventLevel.Information;
+
             options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
             {
                 diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
