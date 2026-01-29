@@ -74,9 +74,8 @@ public static class DependencyInjection
                 var options = serviceProvider
                     .GetRequiredService<IOptions<GradingServiceOptions>>()
                     .Value;
-
                 client.BaseAddress = new Uri(options.Url);
-                client.Timeout = TimeSpan.FromSeconds(30); // Ручная проверка быстрая
+                client.Timeout = TimeSpan.FromSeconds(30);
             });
             
             // MessageBus клиент использует HTTP для ручной проверки
@@ -90,7 +89,6 @@ public static class DependencyInjection
                 var options = serviceProvider
                     .GetRequiredService<IOptions<GradingServiceOptions>>()
                     .Value;
-
                 client.BaseAddress = new Uri(options.Url);
                 client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             });
