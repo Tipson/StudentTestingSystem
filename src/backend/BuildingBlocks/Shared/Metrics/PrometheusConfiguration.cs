@@ -33,10 +33,7 @@ public static class PrometheusConfiguration
 
         // Middleware для трекинга жизненного цикла (start/success/error)
         app.UseMiddleware<RequestLifecycleMiddleware>(service);
-
-        // Endpoint для экспорта метрик
-        app.MapMetrics();
-
+        
         return app;
     }
 }

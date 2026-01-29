@@ -7,6 +7,7 @@ using Media.Application;
 using Media.Infrastructure;
 using Metrics;
 using Microsoft.IdentityModel.Logging;
+using Prometheus;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,8 +26,8 @@ try
     var redisHost = builder.Configuration["RedisOptions:Host"];
     var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-    if (string.IsNullOrWhiteSpace(redisHost))
-        throw new Exception("RedisOptions:Host не задан.");
+    /*if (string.IsNullOrWhiteSpace(redisHost))
+        throw new Exception("RedisOptions:Host не задан.");*/
 
     builder.Services.AddStackExchangeRedisCache(options =>
     {
@@ -57,12 +58,13 @@ try
 
     app.UseSerilogRequestLogging();
     
-    // Prometheus с автоматическим трекингом start/success/error
-    app.UsePrometheusMetrics("Media.API");
-
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
-
+    
+    app.UseRouting();
+    
+    app.UsePrometheusMetrics("Media.API");
+    
     app.UseCors();
 
     app.UseAuthentication();
@@ -82,6 +84,7 @@ try
 
     app.MapControllers();
 
+    app.MapMetrics().AllowAnonymous();
     app.MapGet("/healthz", () => Results.Ok(new
     {
         status = "healthy",

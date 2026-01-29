@@ -9,6 +9,7 @@ using Logging;
 using MassTransit;
 using Metrics;
 using Microsoft.IdentityModel.Logging;
+using Prometheus;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -76,12 +77,14 @@ try
 
     app.UseSerilogRequestLogging();
     
-    // Prometheus с автоматическим трекингом start/success/error
-    app.UsePrometheusMetrics("Grading.API");
 
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
 
+    app.UseRouting();
+
+    app.UsePrometheusMetrics("Grading.API");
+    
     app.UseCors();
 
     app.UseAuthentication();
@@ -99,6 +102,7 @@ try
 
     app.MapControllers();
 
+    app.MapMetrics().AllowAnonymous();
     app.MapGet("/healthz", () => Results.Ok(new
         {
             status = "healthy",
