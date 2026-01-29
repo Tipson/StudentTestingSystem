@@ -4,7 +4,9 @@ kind: Deployment
 metadata:
   name: {{ .Values.grafana.service.name }}
 spec:
-  replicas: {{ .Values.grafana.replicaCount }}
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ .Values.grafana.service.name }}

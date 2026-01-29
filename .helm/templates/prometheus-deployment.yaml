@@ -4,7 +4,9 @@ kind: Deployment
 metadata:
   name: {{ .Values.prometheus.service.name }}
 spec:
-  replicas: {{ .Values.prometheus.replicaCount }}
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ .Values.prometheus.service.name }}
