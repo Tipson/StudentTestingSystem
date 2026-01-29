@@ -2,6 +2,7 @@ using Contracts.Grading.Messages;
 using Grading.Application.CQRS.Commands;
 using MassTransit;
 using MediatR;
+using Metrics;
 using Microsoft.Extensions.Logging;
 
 namespace Grading.Application.Consumers;
@@ -31,6 +32,9 @@ public sealed class GradeAttemptConsumer(
             logger.LogInformation(
                 "Попытка {AttemptId} успешно проверена: {EarnedPoints}/{TotalPoints} баллов",
                 response.AttemptId, response.EarnedPoints, response.TotalPoints);
+
+            // Метрики: попытка проверена
+            GradingMetrics.AttemptsGraded.Inc();
         }
         catch (Exception ex)
         {

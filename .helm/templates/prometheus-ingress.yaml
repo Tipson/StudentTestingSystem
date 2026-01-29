@@ -1,0 +1,25 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.prometheus.service.name }}
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.prometheus.ingress.host }}
+      secretName: {{ .Values.prometheus.service.name }}-tls
+  rules:
+    - host: {{ .Values.prometheus.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.prometheus.service.name }}
+                port:
+                  number: {{ .Values.prometheus.service.port }}
+{{- end }}

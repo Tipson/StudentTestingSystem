@@ -5,12 +5,14 @@ using BuildingBlocks.Api.Security;
 using Logging;
 using Media.Application;
 using Media.Infrastructure;
+using Metrics;
 using Microsoft.IdentityModel.Logging;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigureSerilog("Media.API");
+builder.AddPrometheusMetrics();
 
 try
 {
@@ -54,6 +56,9 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    
+    // Prometheus с автоматическим трекингом start/success/error
+    app.UsePrometheusMetrics("Media.API");
 
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
@@ -75,6 +80,8 @@ try
 
     app.UseAppExceptionHandling();
 
+    app.MapControllers();
+
     app.MapGet("/healthz", () => Results.Ok(new
     {
         status = "healthy",
@@ -82,8 +89,6 @@ try
         timestamp = DateTimeOffset.UtcNow
     }))
     .AllowAnonymous();
-
-    app.MapControllers();
 
     Log.Information("Media API успешно запущен");
 

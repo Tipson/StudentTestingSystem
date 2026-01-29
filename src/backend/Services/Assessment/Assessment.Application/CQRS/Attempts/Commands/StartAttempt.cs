@@ -8,6 +8,7 @@ using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Assessment.Enums;
 using MediatR;
+using Metrics;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
@@ -62,6 +63,10 @@ public sealed class StartAttemptHandler(
         try
         {
             await attempts.AddAsync(newAttempt, ct);
+            
+            // Метрики: попытка успешно начата
+            AssessmentMetrics.AttemptsStarted.Inc();
+            AssessmentMetrics.ActiveAttempts.Inc();
         }
         catch (Exception ex) when (ex.InnerException?.Message?.Contains("23505") == true)
         {

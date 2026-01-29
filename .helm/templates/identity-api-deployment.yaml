@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: {{ .Values.identityApi.service.name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.identityApi.service.portHttp }}"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: {{ .Values.identityApi.service.name }}

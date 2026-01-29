@@ -1,0 +1,16 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.grafana.service.name }}-datasources
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ .Values.prometheus.service.name }}:{{ .Values.prometheus.service.port }}
+        isDefault: true
+        editable: true
+{{- end }}

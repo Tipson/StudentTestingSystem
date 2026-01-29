@@ -2,6 +2,7 @@ using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
 using MediatR;
+using Metrics;
 
 namespace Identity.Application.CQRS.Users.Commands;
 
@@ -24,5 +25,9 @@ public sealed class SetUserRoleHandler(
 
         user.SetRole(request.Role);
         await users.UpdateAsync(user, ct);
+
+        // Метрики: роль изменена
+        var roleLabel = request.Role.ToString().ToLower();
+        IdentityMetrics.UserRoleChanges.WithLabels(roleLabel).Inc();
     }
 }

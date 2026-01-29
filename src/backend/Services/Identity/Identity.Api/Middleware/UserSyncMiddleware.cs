@@ -3,6 +3,7 @@ using System.Text.Json;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
 using Identity.Domain.Users;
+using Metrics;
 
 namespace Identity.Api.Middleware;
 
@@ -51,6 +52,9 @@ public sealed class UserSyncMiddleware(
                 userId);
 
             user = await CreateOrGetUserFromClaimsAsync(context, users, userId, context.RequestAborted);
+            
+            // Метрики: новый пользователь создан
+            IdentityMetrics.UsersCreated.Inc();
         }
         else
         {

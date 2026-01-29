@@ -7,12 +7,14 @@ using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
 using Logging;
+using Metrics;
 using Microsoft.IdentityModel.Logging;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigureSerilog("Assessment.API");
+builder.AddPrometheusMetrics();
 
 try
 {
@@ -57,6 +59,9 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    
+    // Prometheus с автоматическим трекингом start/success/error
+    app.UsePrometheusMetrics("Assessment.API");
 
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();

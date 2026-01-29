@@ -4,6 +4,7 @@ using BuildingBlocks.AI.Prompts;
 using BuildingBlocks.Integrations.Gemini;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Metrics;
 using System.Text.Json;
 
 namespace BuildingBlocks.AI.Services.Grading;
@@ -67,11 +68,27 @@ public sealed class GradingService : IAIGradingService
                 "AI проверка завершена: {Points}/{MaxPoints} баллов, уверенность {Confidence:P0}",
                 result.Points, request.MaxPoints, result.Confidence);
 
+            // Метрики: AI проверка выполнена
+            if (result.Confidence >= _options.MinimumConfidenceThreshold)
+            {
+                GradingMetrics.AIGradingsPerformed.WithLabels("success").Inc();
+            }
+            else
+            {
+                GradingMetrics.AIGradingsPerformed.WithLabels("low_confidence").Inc();
+            }
+            
+            GradingMetrics.AIConfidence.Observe(result.Confidence);
+
             return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка при выполнении AI проверки ответа");
+            
+            // Метрики: AI проверка не удалась
+            GradingMetrics.AIGradingsPerformed.WithLabels("failed").Inc();
+            
             return null;
         }
     }

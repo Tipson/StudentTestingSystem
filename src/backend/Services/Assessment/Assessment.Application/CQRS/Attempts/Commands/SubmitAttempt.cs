@@ -8,6 +8,7 @@ using Contracts.Grading.Messages;
 using Contracts.Grading.Models;
 using MapsterMapper;
 using MediatR;
+using Metrics;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
@@ -84,6 +85,10 @@ public sealed class SubmitAttemptHandler(
             // Сохраняем результат
             attempt.Submit(gradingResponse.EarnedPoints, test.PassScore);
             await attempts.UpdateAsync(attempt, cancellationToken);
+
+            // Метрики: попытка завершена
+            AssessmentMetrics.AttemptsCompleted.Inc();
+            AssessmentMetrics.ActiveAttempts.Dec();
 
             var requiresManualReview = gradingResponse.Results
                 .Any(r => r.Result.RequiresManualReview);

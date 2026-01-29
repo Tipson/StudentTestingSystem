@@ -12,8 +12,8 @@
         <PackageReference Include="MassTransit" Version="8.5.7" />
         <PackageReference Include="MassTransit.Abstractions" Version="8.5.7" />
         <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.7" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
-        <PackageReference Include="Microsoft.OpenApi" Version="3.3.1" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
+        <PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
     </ItemGroup>
 
@@ -23,6 +23,7 @@
         <ProjectReference Include="..\..\..\BuildingBlocks\Integrations\Gemini\Gemini.csproj" />
         <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
         <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Logging\Logging.csproj" />
+        <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Metrics\Metrics.csproj" />
         <ProjectReference Include="..\Grading.Application\Grading.Application.csproj" />
     </ItemGroup>
 

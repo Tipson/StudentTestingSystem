@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Api\BuildingBlocks.Api.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Application\Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Metrics\Metrics.csproj" />
     <ProjectReference Include="..\Identity.Domain\Identity.Domain.csproj" />
   </ItemGroup>
 
@@ -11,6 +12,7 @@
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="Mapster.DependencyInjection" Version="1.0.1" />
     <PackageReference Include="MediatR" Version="14.0.0" />
+    <PackageReference Include="prometheus-net" Version="8.2.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,4 +28,3 @@
   </PropertyGroup>
 
 </Project>
-

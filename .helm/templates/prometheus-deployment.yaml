@@ -1,0 +1,48 @@
+{{- if .Values.prometheus.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.prometheus.service.name }}
+spec:
+  replicas: {{ .Values.prometheus.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.prometheus.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.prometheus.service.name }}
+    spec:
+      serviceAccountName: {{ .Values.prometheus.service.name }}
+      containers:
+        - name: {{ .Values.prometheus.service.name }}
+          image: prom/prometheus:v2.48.1
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--storage.tsdb.retention.time={{ .Values.prometheus.retention }}'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--web.enable-lifecycle'
+          ports:
+            - containerPort: {{ .Values.prometheus.service.port }}
+          resources:
+            requests:
+              cpu: {{ .Values.prometheus.limits.cpuRequests }}
+              memory: {{ .Values.prometheus.limits.memoryRequests }}
+            limits:
+              cpu: {{ .Values.prometheus.limits.cpuLimits }}
+              memory: {{ .Values.prometheus.limits.memoryLimits }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.prometheus.service.name }}-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.prometheus.service.name }}-storage
+{{- end }}

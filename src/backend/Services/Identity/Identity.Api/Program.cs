@@ -7,12 +7,14 @@ using Identity.Api.Security;
 using Identity.Application;
 using Identity.Infrastructure;
 using Logging;
+using Metrics;
 using Microsoft.IdentityModel.Logging;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigureSerilog("Identity.API");
+builder.AddPrometheusMetrics();
 
 try
 {
@@ -56,6 +58,9 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    
+    // Prometheus с автоматическим трекингом start/success/error
+    app.UsePrometheusMetrics("Identity.API");
 
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
