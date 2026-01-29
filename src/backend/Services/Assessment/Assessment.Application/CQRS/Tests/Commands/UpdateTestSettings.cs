@@ -34,7 +34,8 @@ public sealed class UpdateTestSettingsHandler(
             request.Dto.Description,
             request.Dto.TimeLimitSeconds,
             request.Dto.PassScore,
-            request.Dto.AttemptsLimit
+            request.Dto.AttemptsLimit,
+            request.Dto.AllowAiHints
         );
 
         await tests.UpdateAsync(test, ct);

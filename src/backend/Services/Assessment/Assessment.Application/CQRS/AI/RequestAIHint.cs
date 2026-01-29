@@ -20,6 +20,7 @@ public sealed class RequestAIHintHandler(
     IUserContext userContext,
     IAttemptRepository attempts,
     IQuestionRepository questions,
+    ITestRepository tests,
     IHintUsageRepository hintUsages,
     IAIHintService aiHintService) : IRequestHandler<RequestAIHint, HintResponseDto>
 {
@@ -38,6 +39,12 @@ public sealed class RequestAIHintHandler(
 
         if (attempt.Status != AttemptStatus.InProgress)
             throw new InvalidOperationApiException("Попытка не активна.");
+
+        var test = await tests.GetByIdAsync(attempt.TestId, cancellationToken)
+                   ?? throw new EntityNotFoundException("���� �� ������.");
+
+        if (!test.AllowAiHints)
+            throw new InvalidOperationApiException("AI-�������� ��� ���� ���������.");
 
         var usedCount = await hintUsages.CountByAttemptAsync(request.AttemptId, cancellationToken);
         if (usedCount >= MAX_HINTS_PER_ATTEMPT)

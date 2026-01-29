@@ -17,5 +17,7 @@ public sealed record UpdateTestSettingsDto(
     int PassScore,
 
     [Range(1, 20)]
-    int AttemptsLimit
+    int AttemptsLimit,
+
+    bool AllowAiHints
 );

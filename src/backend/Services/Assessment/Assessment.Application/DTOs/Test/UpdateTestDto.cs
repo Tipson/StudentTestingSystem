@@ -5,5 +5,6 @@ public sealed record UpdateTestDto(
     string? Description,
     int PassScore,
     int AttemptsLimit,
-    int? TimeLimitSeconds
+    int? TimeLimitSeconds,
+    bool AllowAiHints
 );
