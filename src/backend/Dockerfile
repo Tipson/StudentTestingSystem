@@ -13,6 +13,8 @@ COPY BuildingBlocks/Shared/Contracts/*.csproj BuildingBlocks/Shared/Contracts/
 COPY BuildingBlocks/Shared/Application/*.csproj BuildingBlocks/Shared/Application/
 COPY BuildingBlocks/Integrations/Gemini/*.csproj BuildingBlocks/Integrations/Gemini/
 COPY BuildingBlocks/AI/*.csproj BuildingBlocks/AI/
+COPY BuildingBlocks/Shared/Logging/*.csproj BuildingBlocks/Shared/Logging/
+COPY BuildingBlocks/Shared/Metrics/*.csproj BuildingBlocks/Shared/Metrics/
 
 # Identity
 COPY Services/Identity/Identity.Domain/*.csproj Services/Identity/Identity.Domain/
@@ -62,7 +64,7 @@ FROM restore AS publish
 COPY BuildingBlocks/ BuildingBlocks/
 COPY Services/ Services/
 
-# Точечный restore для publish-проектов (иначе словишь NETSDK1064 на analyzers)
+# Точечный restore для publish-проектов
 RUN dotnet restore Services/Identity/Identity.Api/Identity.Api.csproj --disable-parallel
 RUN dotnet restore Services/Identity/Identity.Migrator/Identity.Migrator.csproj --disable-parallel
 
