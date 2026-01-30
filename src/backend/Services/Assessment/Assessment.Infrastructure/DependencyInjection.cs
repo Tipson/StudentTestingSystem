@@ -5,6 +5,7 @@ using Assessment.Infrastructure.Data;
 using Assessment.Infrastructure.Grading.Clients;
 using Assessment.Infrastructure.Grading.Options;
 using Assessment.Infrastructure.Repositories;
+using BuildingBlocks.Api.Http;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -43,6 +44,16 @@ public static class DependencyInjection
         services.Configure<GradingServiceOptions>(
             cfg.GetSection(GradingServiceOptions.SectionName));
 
+        // HTTP клиент к Grading Service (ручная проверка при MessageBus или все операции без MessageBus). Токен подкладывает BearerTokenDelegatingHandler.
+        services.AddHttpClient<HttpGradingClient>()
+            .AddHttpMessageHandler<BearerTokenDelegatingHandler>()
+            .ConfigureHttpClient((serviceProvider, client) =>
+            {
+                var options = serviceProvider.GetRequiredService<IOptions<GradingServiceOptions>>().Value;
+                client.BaseAddress = new Uri(options.Url);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            });
+
         var useMessageBus = cfg.GetValue<bool>("GradingService:UseMessageBus");
 
         if (useMessageBus)
@@ -53,7 +64,7 @@ public static class DependencyInjection
                 x.UsingRabbitMq((context, rabbitCfg) =>
                 {
                     var configuration = context.GetService<IConfiguration>()!;
-                    
+
                     var rabbitMqHost = configuration["RabbitMQ:Host"] ?? "localhost";
                     var rabbitMqUser = configuration["RabbitMQ:Username"] ?? "admin";
                     var rabbitMqPass = configuration["RabbitMQ:Password"] ?? "admin123";
@@ -68,30 +79,11 @@ public static class DependencyInjection
                 });
             });
 
-            // HTTP клиент для ручной проверки (всегда нужен)
-            services.AddHttpClient<HttpGradingClient>((serviceProvider, client) =>
-            {
-                var options = serviceProvider
-                    .GetRequiredService<IOptions<GradingServiceOptions>>()
-                    .Value;
-                client.BaseAddress = new Uri(options.Url);
-                client.Timeout = TimeSpan.FromSeconds(30);
-            });
-            
-            // MessageBus клиент использует HTTP для ручной проверки
             services.AddScoped<IGradingClient, MessageBusGradingClient>();
         }
         else
         {
-            // HTTP для всех операций
-            services.AddHttpClient<IGradingClient, HttpGradingClient>((serviceProvider, client) =>
-            {
-                var options = serviceProvider
-                    .GetRequiredService<IOptions<GradingServiceOptions>>()
-                    .Value;
-                client.BaseAddress = new Uri(options.Url);
-                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            });
+            services.AddScoped<IGradingClient, HttpGradingClient>();
         }
 
         return services;

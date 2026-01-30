@@ -13,16 +13,20 @@ public sealed class UserContext : IUserContext
     public string? FullName { get; private set; }
     public UserRole Role { get; private set; }
     public Guid? GroupId { get; private set; }
+    public string? BearerToken { get; private set; }
 
     /// <summary>
     /// Создает UserContext из HttpContext (для HTTP запросов).
     /// </summary>
     public UserContext(IHttpContextAccessor httpContextAccessor)
     {
-        var principal = httpContextAccessor.HttpContext?.User;
-        if (principal?.Identity?.IsAuthenticated == true)
+        var context = httpContextAccessor.HttpContext;
+        if (context is not null)
         {
-            InitializeFromClaims(principal.Claims);
+            BearerToken = context.Request.Headers.Authorization.FirstOrDefault();
+            var principal = context.User;
+            if (principal?.Identity?.IsAuthenticated == true)
+                InitializeFromClaims(principal.Claims);
         }
     }
 
@@ -34,15 +38,19 @@ public sealed class UserContext : IUserContext
         if (string.IsNullOrWhiteSpace(jwtToken))
             return;
 
+        var token = jwtToken.Trim();
+        if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            token = token["Bearer ".Length..].Trim();
+        BearerToken = "Bearer " + token;
         try
         {
             var handler = new JwtSecurityTokenHandler();
-            var jsonToken = handler.ReadJwtToken(jwtToken);
+            var jsonToken = handler.ReadJwtToken(token);
             InitializeFromClaims(jsonToken.Claims);
         }
         catch
         {
-            // Если токен невалидный или не удалось распарсить, оставляем значения по умолчанию
+            // ignored
         }
     }
 

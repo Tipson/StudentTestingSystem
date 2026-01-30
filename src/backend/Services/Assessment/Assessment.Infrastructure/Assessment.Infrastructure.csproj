@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Api\BuildingBlocks.Api.csproj" />
     <ProjectReference Include="..\Assessment.Application\Assessment.Application.csproj" />
   </ItemGroup>
 
