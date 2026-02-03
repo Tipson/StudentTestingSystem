@@ -1,4 +1,4 @@
-﻿using Assessment.Application.Interfaces;
+using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
 using Assessment.Domain.Tests.Enums;
 using Assessment.Infrastructure.Data;
@@ -15,6 +15,7 @@ public sealed class TestRepository(AssessmentDbContext db) : ITestRepository
     public Task<Test?> GetWithQuestionsAsync(Guid id, CancellationToken ct) =>
         db.Tests
             .Include(t => t.Questions)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
     
     public Task<List<Test>> ListByOwnerAsync(string ownerId, CancellationToken ct) =>

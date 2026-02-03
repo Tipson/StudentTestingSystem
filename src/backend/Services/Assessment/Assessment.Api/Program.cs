@@ -6,85 +6,107 @@ using BuildingBlocks.AI;
 using BuildingBlocks.Api.Extensions;
 using BuildingBlocks.Api.Middlewares;
 using BuildingBlocks.Api.Security;
-using Grading.Application;
+using Logging;
+using Metrics;
 using Microsoft.IdentityModel.Logging;
+using Prometheus;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.ConfigureSerilog("Assessment.API");
+builder.AddPrometheusMetrics();
 
-builder.Services.AddHttpContextAccessor();
-
-var redisHost = builder.Configuration["RedisOptions:Host"];
-var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
-
-if (string.IsNullOrWhiteSpace(redisHost))
-    throw new Exception("RedisOptions:Host не задан.");
-
-builder.Services.AddStackExchangeRedisCache(options =>
+try
 {
-    options.Configuration = $"{redisHost}:{redisPort}";
-    options.InstanceName = "Idempotency:";
-});
+    Log.Information("Запуск Assessment API");
 
-builder.Services.AddScoped<IUserContext, UserContext>();
+    builder.Services.AddControllers();
 
-builder.Services.AddAssessmentApplication();
-builder.Services.AddAssessmentInfrastructure(builder.Configuration);
+    builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddAIServices(builder.Configuration);
+    var redisHost = builder.Configuration["RedisOptions:Host"];
+    var redisPort = builder.Configuration["RedisOptions:Port"] ?? "6379";
 
-builder.Services.AddGradingApplication();
+    if (string.IsNullOrWhiteSpace(redisHost))
+        throw new Exception("RedisOptions:Host не задан.");
 
-builder.Services.AddKeycloakAuth(builder.Configuration);
-builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");
-
-// CORS (опционально - если нужен доступ с frontend)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
+    builder.Services.AddStackExchangeRedisCache(options =>
     {
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        options.Configuration = $"{redisHost}:{redisPort}";
+        options.InstanceName = "Idempotency:";
     });
-});
 
-var app = builder.Build();
+    builder.Services.AddScoped<IUserContext, UserContext>();
 
-if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
+    builder.Services.AddAssessmentApplication();
+    builder.Services.AddAssessmentInfrastructure(builder.Configuration);
 
-app.UseCors();
+    builder.Services.AddAIServices(builder.Configuration);
 
-app.UseAuthentication();
-app.UseAuthorization();
+    builder.Services.AddKeycloakAuth(builder.Configuration);
+    builder.Services.AddSwaggerWithKeycloak(builder.Configuration, "Assessment API");
 
-app.UseMiddleware<IdempotencyMiddleware>();
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+    });
 
-/*if (app.Environment.IsDevelopment()) */ //Todo Не забыть раскоментировать после стабильной версии прода
-{
-    IdentityModelEventSource.ShowPII = true;
+    var app = builder.Build();
 
-    app.UseSwaggerUiWithOAuth(builder.Configuration, 
-        "/swagger/v1/swagger.json", 
-        "Assessment API v1");
+    app.UseSerilogRequestLogging();
+    
+    if (!app.Environment.IsDevelopment())
+        app.UseHttpsRedirection();
+
+    app.UseRouting();
+    
+    app.UsePrometheusMetrics("Assessment.API");
+    
+    app.UseCors();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseMiddleware<IdempotencyMiddleware>();
+
+    {
+        IdentityModelEventSource.ShowPII = false;
+
+        app.UseSwaggerUiWithOAuth(builder.Configuration, 
+            "/swagger/v1/swagger.json", 
+            "Assessment API v1");
+    }
+
+    app.UseAppExceptionHandling();
+
+    app.MapControllers();
+
+    app.MapMetrics().AllowAnonymous();
+    
+    app.MapGet("/healthz", () => Results.Ok(new
+    {
+        status = "healthy",
+        service = "assessment-api",
+        timestamp = DateTimeOffset.UtcNow
+    }))
+    .AllowAnonymous();
+
+    Log.Information("Assessment API успешно запущен");
+
+    app.Run();
 }
-
-app.UseAppExceptionHandling();
-
-app.MapControllers();
-
-// Health checks
-app.MapGet("/healthz", () => Results.Ok(new
+catch (Exception ex)
 {
-    status = "healthy",
-    service = "assessment-api",
-    timestamp = DateTimeOffset.UtcNow
-}))
-.AllowAnonymous();
-
-
-app.Run();
-
-
+    Log.Fatal(ex, "Ошибка при запуске Assessment API");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

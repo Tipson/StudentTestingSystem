@@ -140,3 +140,38 @@ frontend:
     memoryLimits: "256Mi"
     cpuRequests: "50m"
     cpuLimits: "200m"
+
+# Prometheus
+prometheus:
+  enabled: true
+  replicaCount: 1
+  service:
+    name: "prometheus"
+    port: 9090
+  retention: "15d"
+  scrapeInterval: "15s"
+  ingress:
+    enabled: true
+    host: prometheus.lmscloud.ru
+  limits:
+    memoryRequests: "512Mi"
+    memoryLimits: "1Gi"
+    cpuRequests: "200m"
+    cpuLimits: "500m"
+
+# Grafana
+grafana:
+  enabled: true
+  replicaCount: 1
+  service:
+    name: "grafana"
+    port: 3000
+  adminUser: "admin"
+  ingress:
+    enabled: true
+    host: grafana.lmscloud.ru
+  limits:
+    memoryRequests: "256Mi"
+    memoryLimits: "512Mi"
+    cpuRequests: "100m"
+    cpuLimits: "500m"

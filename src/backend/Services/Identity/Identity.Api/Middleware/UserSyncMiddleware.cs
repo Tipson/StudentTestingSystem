@@ -3,12 +3,13 @@ using System.Text.Json;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
 using Identity.Domain.Users;
-using Microsoft.Extensions.Caching.Distributed;
+using Metrics;
 
 namespace Identity.Api.Middleware;
 
 public sealed class UserSyncMiddleware(
-    RequestDelegate next)
+    RequestDelegate next,
+    ILogger<UserSyncMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context, IUserRepository users)
     {
@@ -27,15 +28,14 @@ public sealed class UserSyncMiddleware(
             return;
         }
 
-        // Кеш не хранит User. Только флаг "created/known"
-        var cacheKey = $"user_known:{userId}";
-
-        // Всегда читаем из БД, чтобы GroupId и Role были актуальными
         var user = await users.GetById(userId, context.RequestAborted);
 
-        // UserSyncMiddleware.cs — добавить после получения user
         if (user is not null && !user.IsActive)
         {
+            logger.LogWarning(
+                "Попытка доступа деактивированного пользователя {UserId}",
+                userId);
+
             context.Response.StatusCode = 403;
             await context.Response.WriteAsJsonAsync(new 
             { 
@@ -47,7 +47,14 @@ public sealed class UserSyncMiddleware(
         
         if (user is null)
         {
+            logger.LogInformation(
+                "Создание нового пользователя {UserId} из токена Keycloak",
+                userId);
+
             user = await CreateOrGetUserFromClaimsAsync(context, users, userId, context.RequestAborted);
+            
+            // Метрики: новый пользователь создан
+            IdentityMetrics.UsersCreated.Inc();
         }
         else
         {
@@ -61,30 +68,30 @@ public sealed class UserSyncMiddleware(
 
             if (user.ApplyIdentity(email, fullName, role))
             {
+                logger.LogDebug(
+                    "Обновление данных пользователя {UserId}: Email={Email}, Role={Role}",
+                    userId, email, role);
+
                 await users.UpdateAsync(user, context.RequestAborted);
             }
         }
 
-        if (true)
-        {
-            var identity = new ClaimsIdentity();
+        var identity = new ClaimsIdentity();
+        identity.AddClaim(new Claim("user_id_verified", user.Id));
 
-            identity.AddClaim(new Claim("user_id_verified", user.Id));
+        if (user.Email is not null)
+            identity.AddClaim(new Claim("email_verified", user.Email));
 
-            if (user.Email is not null)
-                identity.AddClaim(new Claim("email_verified", user.Email));
+        if (user.FullName is not null)
+            identity.AddClaim(new Claim("full_name_verified", user.FullName));
 
-            if (user.FullName is not null)
-                identity.AddClaim(new Claim("full_name_verified", user.FullName));
+        identity.AddClaim(new Claim("role_verified", user.Role.ToString()));
 
-            identity.AddClaim(new Claim("role_verified", user.Role.ToString()));
+        if (user.GroupId.HasValue)
+            identity.AddClaim(new Claim("group_id_verified", user.GroupId.Value.ToString()));
 
-            if (user.GroupId.HasValue)
-                identity.AddClaim(new Claim("group_id_verified", user.GroupId.Value.ToString()));
-
-            context.User.AddIdentity(identity);
-            context.Items["SyncedUser"] = user;
-        }
+        context.User.AddIdentity(identity);
+        context.Items["SyncedUser"] = user;
 
         await next(context);
     }
@@ -111,7 +118,6 @@ public sealed class UserSyncMiddleware(
     
         candidate.SetRole(role);
     
-        // Решает race condition
         return await users.GetOrCreateAsync(candidate, ct);
     }
 

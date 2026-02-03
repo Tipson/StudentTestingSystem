@@ -18,7 +18,7 @@ namespace Assessment.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -243,6 +243,9 @@ namespace Assessment.Infrastructure.Data.Migrations
 
                     b.Property<int>("AccessType")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("AllowAiHints")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("AttemptsLimit")
                         .HasColumnType("integer");

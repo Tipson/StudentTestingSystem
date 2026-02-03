@@ -6,5 +6,6 @@ public sealed record CreateTestDto(
     [Required, MaxLength(200)] 
     string Title,
     [MaxLength(2000)] 
-    string? Description
+    string? Description,
+    bool AllowAiHints = true
 );

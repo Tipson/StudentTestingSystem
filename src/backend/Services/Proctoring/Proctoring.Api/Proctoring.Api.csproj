@@ -7,13 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-rc.2.25502.107" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Logging\Logging.csproj" />
     <ProjectReference Include="..\Proctoring.Application\Proctoring.Application.csproj" />
     <ProjectReference Include="..\Proctoring.Infrastructure\Proctoring.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
-

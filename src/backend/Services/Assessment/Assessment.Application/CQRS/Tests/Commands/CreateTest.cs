@@ -19,7 +19,11 @@ public sealed class CreateTestHandler(
 {
     public async Task<TestDto> Handle(CreateTest request, CancellationToken ct)
     {
-        var test = new Test(userContext.UserId, request.Dto.Title, request.Dto.Description);
+        var test = new Test(
+            userContext.UserId,
+            request.Dto.Title,
+            request.Dto.Description,
+            request.Dto.AllowAiHints);
 
         await tests.AddAsync(test, ct);
 

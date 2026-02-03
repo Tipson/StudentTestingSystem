@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: grading-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.gradingApi.service.portHttp }}"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: grading-api

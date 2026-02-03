@@ -8,9 +8,16 @@ namespace Assessment.Application.Interfaces;
 public interface IGradingClient
 {
     /// <summary>
-    /// Отправить запрос на проверку попытки.
+    /// Автоматически проверяет всю попытку.
     /// </summary>
     Task<GradeAttemptResponse> GradeAttemptAsync(
         GradeAttemptRequest request,
+        CancellationToken ct = default);
+    
+    /// <summary>
+    /// Вручную проверяет один ответ.
+    /// </summary>
+    Task<ManualGradeResponse> GradeAnswerManuallyAsync(
+        ManualGradeRequest request,
         CancellationToken ct = default);
 }

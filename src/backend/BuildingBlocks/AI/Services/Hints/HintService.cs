@@ -23,19 +23,18 @@ public sealed class HintService(
     {
         if (!_options.Enabled || !_options.HintsEnabled)
         {
-            logger.LogWarning("AI подсказки отключены");
+            logger.LogWarning("AI подсказки отключены в конфигурации");
             return null;
         }
 
         try
         {
-            // НОВОЕ: Загружаем медиа если есть
             var mediaContents = request.QuestionMediaIds?.Count > 0
                 ? await mediaHelper.GetMediaContentsAsync(request.QuestionMediaIds, ct)
                 : new List<MediaContent>();
 
             logger.LogInformation(
-                "Генерация подсказки уровня {Level}: {MediaCount} медиа",
+                "Генерация AI подсказки уровня {HintLevel} с {MediaCount} медиа-файлами",
                 request.HintLevel, mediaContents.Count);
 
             var prompt = HintPrompts.BuildHintPrompt(
@@ -47,11 +46,15 @@ public sealed class HintService(
 
             var response = await gemini.SendPromptAsync(prompt, mediaContents, ct);
 
+            logger.LogInformation(
+                "AI подсказка уровня {HintLevel} успешно сгенерирована",
+                request.HintLevel);
+
             return new HintResponse(response.Trim(), request.HintLevel);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Ошибка генерации подсказки");
+            logger.LogError(ex, "Ошибка при генерации AI подсказки уровня {HintLevel}", request.HintLevel);
             return null;
         }
     }

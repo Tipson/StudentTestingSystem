@@ -1,5 +1,5 @@
+using Application;
 using Identity.Application.Interfaces;
-using Identity.Domain;
 using Identity.Infrastructure.Common;
 using Identity.Infrastructure.Data;
 using Identity.Infrastructure.Repositories;
@@ -19,11 +19,12 @@ public static class DependencyInjection
 
         services.AddDbContext<IdentityDbContext>(o => o.UseNpgsql(cs));
 
+        // Unit of Work для массовых операций
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IGroupRepository, GroupRepository>();
 
         return services;
     }
 }
-

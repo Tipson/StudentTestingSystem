@@ -35,7 +35,8 @@ public sealed class UpdateTestHandler(
             request.Dto.Description,
             request.Dto.PassScore,
             request.Dto.AttemptsLimit,
-            request.Dto.TimeLimitSeconds
+            request.Dto.TimeLimitSeconds,
+            request.Dto.AllowAiHints
         );
 
         await tests.UpdateAsync(test, ct);

@@ -4,6 +4,7 @@ using Assessment.Domain.Questions;
 using Contracts.Assessment;
 using Contracts.Assessment.Enums;
 using Contracts.Grading.Enums;
+using Contracts.Grading.Messages;
 using Contracts.Grading.Models;
 using Mapster;
 
@@ -23,7 +24,27 @@ public sealed class AttemptMapsterConfig : IRegister
         config.NewConfig<AttemptAnswer, AttemptAnswerDto>();
 
         config.NewConfig<AnswerPayload, AnswerPayloadDto>();
-
+        
+        // AttemptAnswer -> AnswerData для запроса к Grading Service
+        config.NewConfig<AttemptAnswer, AnswerData>()
+            .Map(dest => dest.QuestionId, src => src.QuestionId)
+            .Map(dest => dest.Payload, src => src.Answer);
+        
+        // Question -> QuestionData для запроса к Grading Service
+        config.NewConfig<Question, QuestionData>()
+            .Map(dest => dest.Id, src => src.Id)
+            .Map(dest => dest.Type, src => src.Type)
+            .Map(dest => dest.Text, src => src.Text)
+            .Map(dest => dest.MaxPoints, src => src.Points)
+            .Map(dest => dest.CorrectOptions, src => src.Options
+                .Where(o => o.IsCorrect)
+                .Adapt<List<CorrectOptionData>>());
+        
+        // QuestionOption -> CorrectOptionData
+        config.NewConfig<QuestionOption, CorrectOptionData>()
+            .Map(dest => dest.Id, src => src.Id)
+            .Map(dest => dest.Text, src => src.Text);
+        
         // Маппинг (Question, AttemptAnswer?) -> QuestionResultDto
         config.NewConfig<(Question Question, AttemptAnswer? Answer), QuestionResultDto>()
             .MapWith(src => new QuestionResultDto(
@@ -47,19 +68,15 @@ public sealed class AttemptMapsterConfig : IRegister
                 Feedback = src.Feedback
             });
         
-        // Маппинг Question -> QuestionData (для CalculateScore)
-        config.NewConfig<Question, QuestionData>()
-            .Map(dest => dest.Id, src => src.Id)
-            .Map(dest => dest.Type, src => src.Type)
-            .Map(dest => dest.MaxPoints, src => src.Points)
-            .Map(dest => dest.CorrectOptions, src => src.Options
-                .Where(o => o.IsCorrect)
-                .Select(o => new CorrectOptionData 
-                { 
-                    Id = o.Id, 
-                    Text = o.Text 
-                })
-                .ToList());
+        // Маппинг AttemptAnswer -> AnswerResult
+        config.NewConfig<AttemptAnswer, AnswerResult>()
+            .Map(dest => dest.QuestionId, src => src.QuestionId)
+            .Map(dest => dest.PointsAwarded, src => src.PointsAwarded ?? 0);
+        
+        // Маппинг Question -> QuestionInfo
+        config.NewConfig<Question, QuestionInfo>()
+            .Map(dest => dest.QuestionId, src => src.Id)
+            .Map(dest => dest.MaxPoints, src => src.Points);
     }
 
     private static AnswerPayloadDto? MapUserAnswer(AttemptAnswer? answer)

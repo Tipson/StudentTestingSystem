@@ -9,6 +9,7 @@ public sealed record TestDto(
     int? TimeLimitSeconds,
     int PassScore,
     int AttemptsLimit,
+    bool AllowAiHints,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PublishedAt
 );

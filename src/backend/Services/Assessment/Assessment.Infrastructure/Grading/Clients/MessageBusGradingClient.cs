@@ -7,10 +7,12 @@ namespace Assessment.Infrastructure.Grading.Clients;
 
 /// <summary>
 /// Клиент для взаимодействия с Grading Service через Message Bus (RabbitMQ).
-/// Использует MassTransit для Request-Response паттерна.
+/// Автоматическая проверка → RabbitMQ (долгие операции с AI).
+/// Ручная проверка → HTTP (быстрая синхронная операция).
 /// </summary>
 public sealed class MessageBusGradingClient(
-    IRequestClient<GradeAttemptRequest> requestClient,
+    IRequestClient<GradeAttemptRequest> gradeAttemptClient,
+    HttpGradingClient httpClient,
     ILogger<MessageBusGradingClient> logger)
     : IGradingClient
 {
@@ -22,7 +24,7 @@ public sealed class MessageBusGradingClient(
 
         try
         {
-            var response = await requestClient.GetResponse<GradeAttemptResponse>(
+            var response = await gradeAttemptClient.GetResponse<GradeAttemptResponse>(
                 request,
                 ct,
                 RequestTimeout.After(m: 2));
@@ -49,5 +51,18 @@ public sealed class MessageBusGradingClient(
                 request.AttemptId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Ручная проверка всегда через HTTP (быстрая синхронная операция).
+    /// </summary>
+    public async Task<ManualGradeResponse> GradeAnswerManuallyAsync(
+        ManualGradeRequest request,
+        CancellationToken ct = default)
+    {
+        logger.LogDebug(
+            "Ручная проверка делегируется в HTTP клиент (быстрая операция)");
+        
+        return await httpClient.GradeAnswerManuallyAsync(request, ct);
     }
 }

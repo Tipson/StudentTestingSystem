@@ -8,6 +8,7 @@ using BuildingBlocks.Api.Exceptions;
 using BuildingBlocks.Api.Exceptions.Base;
 using Contracts.Assessment.Enums;
 using MediatR;
+using Metrics;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
@@ -31,7 +32,6 @@ public sealed class StartAttemptHandler(
         if (test.Status != TestStatus.Published)
             throw new BadRequestApiException("Тест ещё не опубликован.");
         
-        // Проверка временного окна доступности
         if (!test.IsAvailable())
         {
             if (test.AvailableFrom.HasValue && DateTimeOffset.UtcNow < test.AvailableFrom.Value)
@@ -41,7 +41,6 @@ public sealed class StartAttemptHandler(
                 throw new BadRequestApiException("Срок прохождения теста истек");
         }
 
-        // Проверка доступа (по владельцу / public / персональный / групповой)
         var hasAccess = await CheckAccess(test, userId, userContext.GroupId, ct);
         if (!hasAccess)
             throw new ForbiddenException("У вас нет доступа к этому тесту.");
@@ -64,9 +63,12 @@ public sealed class StartAttemptHandler(
         try
         {
             await attempts.AddAsync(newAttempt, ct);
+            
+            // Метрики: попытка успешно начата
+            AssessmentMetrics.AttemptsStarted.Inc();
+            AssessmentMetrics.ActiveAttempts.Inc();
         }
-        catch (Exception ex) when (
-            ex.InnerException?.Message?.Contains("23505") == true)
+        catch (Exception ex) when (ex.InnerException?.Message?.Contains("23505") == true)
         {
             var existingAttempt = await attempts.GetActiveAsync(userId, request.TestId, ct)
                                   ?? throw new EntityNotFoundException("Попытка не найдена.");
@@ -78,20 +80,16 @@ public sealed class StartAttemptHandler(
 
     private async Task<bool> CheckAccess(Test test, string userId, Guid? userGroupId, CancellationToken ct)
     {
-        // Владелец имеет доступ всегда
         if (test.OwnerUserId == userId)
             return true;
 
-        // Публичный тест — доступен всем
         if (test.AccessType == TestAccessType.Public)
             return true;
 
-        // Личный доступ
         var personalAccess = await testAccesses.GetByTestAndUserAsync(test.Id, userId, ct);
         if (personalAccess is not null && personalAccess.CanBeUsed())
             return true;
 
-        // Доступ через группу
         if (userGroupId.HasValue)
         {
             var groupAccess = await testAccesses.GetByTestAndGroupAsync(test.Id, userGroupId.Value, ct);

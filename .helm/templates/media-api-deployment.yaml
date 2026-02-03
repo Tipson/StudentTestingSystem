@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: {{ .Values.mediaApi.service.name }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.mediaApi.service.portHttp }}"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: {{ .Values.mediaApi.service.name }}

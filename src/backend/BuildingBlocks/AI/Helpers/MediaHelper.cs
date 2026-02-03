@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using BuildingBlocks.Integrations.Gemini;
 using BuildingBlocks.Integrations.Gemini.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;

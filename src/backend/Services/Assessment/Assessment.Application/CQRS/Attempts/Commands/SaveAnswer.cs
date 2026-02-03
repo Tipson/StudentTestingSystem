@@ -1,4 +1,4 @@
-﻿using Application;
+using Application;
 using Assessment.Application.DTOs.Attempt;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Questions;
@@ -12,9 +12,6 @@ using QuestionType = Contracts.Assessment.Enums.QuestionType;
 
 namespace Assessment.Application.CQRS.Attempts.Commands;
 
-/// <summary>
-/// Сохранить ответ на вопрос в рамках попытки.
-/// </summary>
 public sealed record SaveAnswer(Guid AttemptId, Guid QuestionId, SaveAnswerDto Dto) : IRequest<AttemptAnswerDto>;
 
 public sealed class SaveAnswerHandler(
@@ -28,8 +25,6 @@ public sealed class SaveAnswerHandler(
         var userId = userContext.UserId 
                      ?? throw new UnauthorizedApiException("Пользователь не аутентифицирован.");
 
-            
-        // Загружаем попытку с ответами
         var attempt = await attempts.GetWithAnswersAsync(request.AttemptId, cancellationToken)
                       ?? throw new EntityNotFoundException("Попытка не найдена");
 
@@ -39,15 +34,12 @@ public sealed class SaveAnswerHandler(
         if (attempt.Status != AttemptStatus.InProgress)
             throw new BadRequestApiException("Попытка уже завершена");
 
-        // Загружаем тест для проверки времени
         var test = await tests.GetByIdAsync(attempt.TestId, cancellationToken)
                    ?? throw new EntityNotFoundException("Тест не найден");
 
-        // Проверка времени
         if (attempt.IsTimeExpired(test.TimeLimitSeconds))
             throw new BadRequestApiException("Время на прохождение теста истекло");
 
-        // Проверяем, что вопрос принадлежит тесту
         var question = await questions.GetByIdAsync(request.QuestionId, cancellationToken)
                        ?? throw new EntityNotFoundException("Вопрос не найден");
 
@@ -56,7 +48,6 @@ public sealed class SaveAnswerHandler(
 
         ValidateAnswerPayload(question, request.Dto);
         
-        // Создаём payload
         var payload = new AnswerPayload
         {
             OptionId = request.Dto.OptionId,
@@ -64,7 +55,6 @@ public sealed class SaveAnswerHandler(
             Text = request.Dto.Text
         };
 
-        // Сохраняем ответ
         var saved = attempt.SetAnswer(request.QuestionId, payload);
         await attempts.UpdateAsync(attempt, cancellationToken);
 
@@ -93,7 +83,6 @@ public sealed class SaveAnswerHandler(
                 break;
         }
 
-        // Проверка принадлежности вариантов к вопросу
         var questionOptionIds = question.Options.Select(o => o.Id).ToHashSet();
 
         if (dto.OptionId is not null && !questionOptionIds.Contains(dto.OptionId.Value))

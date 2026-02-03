@@ -1,4 +1,4 @@
-﻿using Assessment.Application.Interfaces;
+using Assessment.Application.Interfaces;
 using Assessment.Domain.Attempts;
 using Assessment.Infrastructure.Data;
 using Contracts.Assessment.Enums;
@@ -15,6 +15,7 @@ public class AttemptRepository(AssessmentDbContext db) : IAttemptRepository
     public Task<Attempt?> GetWithAnswersAsync(Guid id, CancellationToken ct) =>
         db.Attempts
             .Include(a => a.Answers)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<int> CountByUserAndTestAsync(string userId, Guid testId, CancellationToken ct) =>

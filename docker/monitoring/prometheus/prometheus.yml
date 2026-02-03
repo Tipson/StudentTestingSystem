@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'student-testing-system'
+    environment: 'development'
+
+scrape_configs:
+  # Assessment API
+  - job_name: 'assessment-api'
+    static_configs:
+      - targets: ['host.docker.internal:5001']
+        labels:
+          service: 'assessment'
+          app: 'StudentTestingSystem'
+
+  # Identity API
+  - job_name: 'identity-api'
+    static_configs:
+      - targets: ['host.docker.internal:5002']
+        labels:
+          service: 'identity'
+          app: 'StudentTestingSystem'
+
+  # Grading API
+  - job_name: 'grading-api'
+    static_configs:
+      - targets: ['host.docker.internal:5003']
+        labels:
+          service: 'grading'
+          app: 'StudentTestingSystem'
+
+  # Media API
+  - job_name: 'media-api'
+    static_configs:
+      - targets: ['host.docker.internal:5025']
+        labels:
+          service: 'media'
+          app: 'StudentTestingSystem'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

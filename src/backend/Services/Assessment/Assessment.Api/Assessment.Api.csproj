@@ -9,9 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
-    <PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.2" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
   </ItemGroup>
 
@@ -19,10 +21,11 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\AI\AI.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Application\Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Logging\Logging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Shared\Metrics\Metrics.csproj" />
     <ProjectReference Include="..\Assessment.Application\Assessment.Application.csproj" />
     <ProjectReference Include="..\Assessment.Infrastructure\Assessment.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Api\BuildingBlocks.Api.csproj" />
-    <ProjectReference Include="..\..\Grading\Grading.Application\Grading.Application.csproj" />
   </ItemGroup>
 
 </Project>

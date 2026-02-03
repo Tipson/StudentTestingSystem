@@ -8,7 +8,7 @@ public partial class Test
     /// <summary>
     /// Обновить тест (только для черновиков).
     /// </summary>
-    public void Update(string title, string? description, int passScore, int attemptsLimit, int? timeLimitSeconds)
+    public void Update(string title, string? description, int passScore, int attemptsLimit, int? timeLimitSeconds, bool allowAiHints)
     {
         if (Status == TestStatus.Published)
             throw new InvalidOperationException("Нельзя обновлять опубликованный тест.");
@@ -30,6 +30,7 @@ public partial class Test
         PassScore = passScore;
         AttemptsLimit = attemptsLimit;
         TimeLimitSeconds = timeLimitSeconds;
+        AllowAiHints = allowAiHints;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
     
@@ -59,7 +60,8 @@ public partial class Test
         string? description, 
         int? timeLimitSeconds, 
         int passScore, 
-        int attemptsLimit)
+        int attemptsLimit,
+        bool allowAiHints)
     {
         if (Status != TestStatus.Draft)
             throw new InvalidOperationException("Редактировать можно только черновик");
@@ -75,6 +77,7 @@ public partial class Test
         TimeLimitSeconds = timeLimitSeconds;
         PassScore = passScore;
         AttemptsLimit = attemptsLimit;
+        AllowAiHints = allowAiHints;
     }
     
     public void SetAccessType(TestAccessType accessType)

@@ -1,4 +1,4 @@
-﻿using Contracts.Identity;
+using Contracts.Identity;
 using Identity.Application.Interfaces;
 using Identity.Domain.Users;
 using Identity.Infrastructure.Data;
@@ -30,10 +30,10 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
         await db.SaveChangesAsync(ct);
     }
     
-    public Task RemoveAsync(User user, CancellationToken ct)
+    public async Task RemoveAsync(User user, CancellationToken ct)
     {
         db.Users.Remove(user);
-        return db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
     
     public Task<List<User>> GetListAsync(CancellationToken ct) =>
@@ -71,7 +71,6 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // кто-то создал параллельно
             db.ChangeTracker.Clear();
 
             var createdByOther = await db.Users.FindAsync([candidate.Id], ct);

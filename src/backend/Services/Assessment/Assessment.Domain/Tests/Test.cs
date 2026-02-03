@@ -62,6 +62,11 @@ public partial class Test
     public int AttemptsLimit { get; set; } = 1;
 
     /// <summary>
+    ///     Включить подсказки через AI
+    /// </summary>
+    public bool AllowAiHints { get; private set; } = true;
+
+    /// <summary>
     ///     Дата и время создания теста.
     /// </summary>
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
@@ -84,7 +89,7 @@ public partial class Test
 
     public IList<Question> Questions { get; init; } = new List<Question>();
     
-    public Test(string ownerUserId, string title, string? description = null)
+    public Test(string ownerUserId, string title, string? description = null, bool allowAiHints = false)
     {
         if (string.IsNullOrWhiteSpace(ownerUserId))
             throw new ArgumentException("OwnerId не должен быть пустым.", nameof(ownerUserId));
@@ -98,6 +103,7 @@ public partial class Test
 
         Status = TestStatus.Draft;
         CreatedAt = DateTimeOffset.UtcNow;
+        AllowAiHints = allowAiHints;
         AttemptsLimit = 1;
         PassScore = 0;
     }

@@ -1,4 +1,4 @@
-﻿using Assessment.Application.Interfaces;
+using Assessment.Application.Interfaces;
 using Assessment.Domain.Questions;
 using Assessment.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +12,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<List<Question>> ListByTestIdAsync(Guid testId, CancellationToken ct) =>
@@ -19,6 +20,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
+            .AsSplitQuery()
             .Where(x => x.TestId == testId)
             .OrderBy(x => x.Order)
             .ToListAsync(ct);
@@ -40,13 +42,11 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateAsync(Question question, CancellationToken ct)
     {
-        // Удаляем старые медиа записи
         var existingMedia = await db.QuestionMedia
             .Where(m => m.QuestionId == question.Id)
             .ToListAsync(ct);
         db.QuestionMedia.RemoveRange(existingMedia);
 
-        // Удаляем старые медиа записи вариантов
         var optionIds = question.Options.Select(o => o.Id).ToList();
         var existingOptionMedia = await db.QuestionOptionMedia
             .Where(m => optionIds.Contains(m.QuestionOptionId))
@@ -59,17 +59,8 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public async Task UpdateRangeAsync(IEnumerable<Question> questions, CancellationToken ct)
     {
-        var strategy = db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-            db.Questions.UpdateRange(questions);
-            await db.SaveChangesAsync(ct);
-
-            await transaction.CommitAsync(ct);
-        });
+        db.Questions.UpdateRange(questions);
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(Question question, CancellationToken ct)
