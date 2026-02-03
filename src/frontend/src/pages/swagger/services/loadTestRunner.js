@@ -1,59 +1,15 @@
-﻿/**
+/**
  * Service for running load tests against API endpoints
+ * Использует Web Workers и Token Bucket Rate Limiter для точного контроля нагрузки
  */
 import { getAccessToken } from '@api/auth.js';
 import { getApiBaseUrl } from '@api/config.js';
 import { QUESTION_TYPES } from '../constants/autotest.js';
+import { WorkerPool } from '../utils/workerPool.js';
+import { TokenBucketRateLimiter } from '../utils/rateLimiter.js';
+import { MetricsAggregator } from '../utils/metricsAggregator.js';
 
-// Replace {{var}} placeholders in strings
-function replaceVariables(str, context) {
-    let result = str;
-
-    result = result.replace(/\{\{timestamp\}\}/g, String(context.timestamp || Date.now()));
-    result = result.replace(/\{\{index\}\}/g, String(context.index || 0));
-    result = result.replace(/\{\{randomId\}\}/g, context.randomId || crypto.randomUUID());
-
-    Object.keys(context).forEach((key) => {
-        const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-        result = result.replace(regex, String(context[key]));
-    });
-
-    return result;
-}
-
-
-const ABSOLUTE_URL = /^https?:\/\//i;
-
-function resolveUrl(endpoint, baseUrl) {
-    if (!endpoint) return endpoint;
-    if (ABSOLUTE_URL.test(endpoint)) return endpoint;
-    if (!baseUrl) return endpoint;
-
-    try {
-        return new URL(endpoint, baseUrl).toString();
-    } catch (error) {
-        const trimmedBase = String(baseUrl).replace(/\/$/, '');
-        const path = String(endpoint).startsWith('/') ? endpoint : `/${endpoint}`;
-        return `${trimmedBase}${path}`;
-    }
-}
-
-// Extract value by path (path.to.value or arr[0].id)
-function getValueByPath(data, path) {
-    if (!data || !path) return undefined;
-    const normalized = String(path).replace(/\[(\d+)\]/g, '.$1');
-    const parts = normalized.split('.').filter(Boolean);
-    let current = data;
-
-    for (const part of parts) {
-        if (current == null) return undefined;
-        const key = /^\d+$/.test(part) ? Number(part) : part;
-        current = current[key];
-    }
-
-    return current;
-}
-
+// Извлечение ID-подобных значений
 function extractIdLike(data) {
     if (!data) return null;
     if (Array.isArray(data)) {
@@ -66,198 +22,18 @@ function extractIdLike(data) {
     return data.id ?? data.Id ?? data.ID ?? null;
 }
 
+// Извлечение attemptId
 function extractAttemptId(data) {
     if (!data) return null;
     return data.attemptId ?? data.id ?? data.Id ?? data.ID ?? null;
 }
 
-function resolveCaptureValue(extractor, responseData, context) {
-    if (!extractor) return null;
-    if (typeof extractor === 'function') return extractor(responseData, context);
-    if (Array.isArray(extractor)) {
-        for (const item of extractor) {
-            const value = resolveCaptureValue(item, responseData, context);
-            if (value !== null && value !== undefined) return value;
-        }
-        return null;
-    }
-    if (typeof extractor === 'string') return getValueByPath(responseData, extractor);
-    return null;
-}
-
-function applyCapture(capture, responseData, context) {
-    if (!capture || !responseData) return;
-
-    Object.entries(capture).forEach(([key, extractor]) => {
-        const value = resolveCaptureValue(extractor, responseData, context);
-        if (value !== null && value !== undefined && value !== '') {
-            context[key] = value;
-        }
-    });
-}
-
-// Execute a single HTTP request
-async function executeRequest(method, url, body, headers, options = {}) {
-    const startTime = performance.now();
-    const {signal, parseResponse} = options;
-
+function parseJsonOrThrow(value, label) {
+    if (value === null || value === undefined || value === '') return {};
     try {
-        const token = await getAccessToken(false);
-
-        const requestHeaders = {
-            'Content-Type': 'application/json',
-            ...headers,
-        };
-
-        if (token) {
-            requestHeaders.Authorization = `Bearer ${token}`;
-        }
-
-        const response = await fetch(url, {
-            method,
-            headers: requestHeaders,
-            body: body && (method !== 'GET' && method !== 'DELETE') ? body : undefined,
-            signal,
-        });
-
-        let responseData = null;
-        if (parseResponse) {
-            try {
-                const contentType = response.headers.get('content-type') || '';
-                if (contentType.includes('application/json')) {
-                    responseData = await response.json();
-                } else {
-                    responseData = await response.text();
-                }
-            } catch (error) {
-                responseData = null;
-            }
-        }
-
-        const endTime = performance.now();
-        const responseTime = endTime - startTime;
-
-        return {
-            success: response.ok,
-            responseTime,
-            statusCode: response.status,
-            timestamp: new Date(),
-            responseData,
-        };
+        return JSON.parse(value);
     } catch (error) {
-        const endTime = performance.now();
-        const responseTime = endTime - startTime;
-
-        return {
-            success: false,
-            responseTime,
-            error: error?.name === 'AbortError' ? 'Request aborted' : (error.message || 'Unknown error'),
-            timestamp: new Date(),
-        };
-    }
-}
-
-// Execute a scenario (sequence of steps)
-async function executeScenario(scenario, context, baseUrl, signal) {
-    const results = [];
-    const scenarioContext = { ...context };
-
-    for (const step of scenario.steps) {
-        if (signal?.aborted) break;
-
-        if (step.delay && step.delay > 0) {
-            await new Promise((resolve) => setTimeout(resolve, step.delay));
-            if (signal?.aborted) break;
-        }
-
-        const url = resolveUrl(replaceVariables(step.endpoint, scenarioContext), baseUrl);
-        const body = step.body ? replaceVariables(step.body, scenarioContext) : undefined;
-
-        const result = await executeRequest(step.method, url, body, step.headers, {
-            signal,
-            parseResponse: Boolean(step.capture),
-        });
-        results.push(result);
-
-        if (step.capture && result.responseData) {
-            applyCapture(step.capture, result.responseData, scenarioContext);
-        }
-
-        if (!result.success) {
-            break;
-        }
-    }
-
-    return results;
-}
-
-// Rate limiter for RPS mode
-function createRateLimiter(rps) {
-    const interval = 1000 / rps;
-    let lastExecutionTime = 0;
-
-    return async () => {
-        const now = performance.now();
-        const timeSinceLastExecution = now - lastExecutionTime;
-
-        if (timeSinceLastExecution < interval) {
-            await new Promise((resolve) =>
-                setTimeout(resolve, interval - timeSinceLastExecution)
-            );
-        }
-
-        lastExecutionTime = performance.now();
-    };
-}
-
-// Metrics tracker
-class MetricsTracker {
-    constructor() {
-        this.results = [];
-        this.startTime = Date.now();
-        this.lastUpdateTime = 0;
-        this.updateInterval = 100;
-    }
-
-    addResult(result) {
-        this.results.push(result);
-    }
-
-    shouldUpdate() {
-        const now = Date.now();
-        if (now - this.lastUpdateTime >= this.updateInterval) {
-            this.lastUpdateTime = now;
-            return true;
-        }
-        return false;
-    }
-
-    getMetrics() {
-        const now = Date.now();
-        const elapsedTime = now - this.startTime;
-        const elapsedSeconds = elapsedTime / 1000;
-
-        const successfulRequests = this.results.filter((r) => r.success).length;
-        const failedRequests = this.results.length - successfulRequests;
-
-        const responseTimes = this.results.map((r) => r.responseTime);
-        const averageResponseTime =
-            responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length || 0;
-
-        const currentRPS = elapsedSeconds > 0 ? this.results.length / elapsedSeconds : 0;
-
-        return {
-            totalRequests: this.results.length,
-            successfulRequests,
-            failedRequests,
-            averageResponseTime,
-            currentRPS,
-            elapsedTime,
-        };
-    }
-
-    getResults() {
-        return this.results;
+        throw new Error(`Invalid JSON in field "${label}"`);
     }
 }
 
@@ -420,22 +196,49 @@ const SCENARIOS = {
 };
 
 /**
- * Run load test
+ * Run load test using Worker Pool
  */
 export async function runLoadTest({ config, onProgress, signal }) {
     const startTime = Date.now();
-    const tracker = new MetricsTracker();
+    const metricsAggregator = new MetricsAggregator();
     const baseUrl = getApiBaseUrl('assessment') || window.location.origin;
     const scenario = config.type === 'scenario' ? SCENARIOS[config.scenarioId] : null;
 
+    if (config.type === 'scenario' && !scenario) {
+        throw new Error('Scenario not found');
+    }
+    if (config.type === 'endpoint' && !config.endpoint) {
+        throw new Error('Endpoint is required');
+    }
+    
+    // Определяем количество воркеров (по умолчанию 4, можно настроить)
+    const workerCount = config.workerCount || 4;
+    
+    // Инициализируем Worker Pool
+    const workerFactory = () => new Worker(
+        new URL('../workers/loadTestWorker.js', import.meta.url),
+        { type: 'module' }
+    );
+    const workerPool = new WorkerPool(workerFactory, workerCount);
+    
     try {
+        // Инициализируем пул воркеров
+        await workerPool.init();
+        
+        // Получаем access token один раз для всех запросов
+        const accessToken = await getAccessToken(false);
+
         if (config.loadType === 'rps') {
-            const rateLimiter = createRateLimiter(Math.max(1, config.rps || 1));
+            // Режим RPS: используем Token Bucket Rate Limiter
+            const rateLimiter = new TokenBucketRateLimiter(Math.max(1, config.rps || 1));
             const endTime = startTime + Math.max(1, config.duration || 1) * 1000;
 
             let index = 0;
+            
             while (Date.now() < endTime && !signal?.aborted) {
-                await rateLimiter();
+                // Ждем разрешения от rate limiter
+                await rateLimiter.acquire();
+                
                 if (signal?.aborted) break;
 
                 const context = {
@@ -444,32 +247,49 @@ export async function runLoadTest({ config, onProgress, signal }) {
                     randomId: crypto.randomUUID(),
                 };
 
-                if (scenario) {
-                    const scenarioResults = await executeScenario(scenario, context, baseUrl, signal);
-                    scenarioResults.forEach((r) => tracker.addResult(r));
-                } else if (config.type === 'endpoint') {
-                    const url = resolveUrl(replaceVariables(config.endpoint, context), baseUrl);
-                    const body = config.body ? replaceVariables(config.body, context) : undefined;
+                // Выполняем запрос через Worker Pool
+                const taskPromise = scenario
+                    ? workerPool.executeScenario({
+                          scenario,
+                          context,
+                          baseUrl,
+                          accessToken,
+                      })
+                    : workerPool.executeEndpoint({
+                          method: config.method,
+                          endpoint: config.endpoint,
+                          body: config.body,
+                          headers: parseJsonOrThrow(config.headers, '���������'),
+                          context,
+                          baseUrl,
+                          accessToken,
+                      });
 
-                    let headers = {};
-                    try {
-                        headers = config.headers ? JSON.parse(config.headers) : {};
-                    } catch (e) {
-                        console.warn('Invalid headers JSON');
+                // Обрабатываем результаты асинхронно
+                taskPromise.then(results => {
+                    metricsAggregator.addResults(results);
+                    
+                    if (metricsAggregator.shouldUpdate() && onProgress) {
+                        onProgress(metricsAggregator.getMetrics());
                     }
-
-                    const result = await executeRequest(config.method, url, body, headers, {signal});
-                    tracker.addResult(result);
-                }
-
-                if (tracker.shouldUpdate() && onProgress) {
-                    onProgress(tracker.getMetrics());
-                }
+                }).catch(error => {
+                    console.error('Task error:', error);
+                    metricsAggregator.addResult({
+                        success: false,
+                        responseTime: 0,
+                        error: error.message,
+                        timestamp: Date.now(),
+                    });
+                });
             }
-        } else if (config.loadType === 'cycles') {
-            const maxConcurrent = 50;
-            const inFlight = new Set();
 
+            // Ждем завершения всех активных задач
+            await workerPool.waitForIdle();
+
+        } else if (config.loadType === 'cycles') {
+            // Режим Cycles: выполняем заданное количество циклов
+            const promises = [];
+            
             for (let i = 0; i < config.cycles && !signal?.aborted; i++) {
                 const context = {
                     timestamp: Date.now(),
@@ -477,90 +297,81 @@ export async function runLoadTest({ config, onProgress, signal }) {
                     randomId: crypto.randomUUID(),
                 };
 
-                const task = (async () => {
-                    if (scenario) {
-                        const scenarioResults = await executeScenario(scenario, context, baseUrl, signal);
-                        scenarioResults.forEach((r) => tracker.addResult(r));
-                    } else if (config.type === 'endpoint') {
-                        const url = resolveUrl(replaceVariables(config.endpoint, context), baseUrl);
-                        const body = config.body ? replaceVariables(config.body, context) : undefined;
+                const taskPromise = scenario
+                    ? workerPool.executeScenario({
+                          scenario,
+                          context,
+                          baseUrl,
+                          accessToken,
+                      })
+                    : workerPool.executeEndpoint({
+                          method: config.method,
+                          endpoint: config.endpoint,
+                          body: config.body,
+                          headers: parseJsonOrThrow(config.headers, '���������'),
+                          context,
+                          baseUrl,
+                          accessToken,
+                      });
 
-                        let headers = {};
-                        try {
-                            headers = config.headers ? JSON.parse(config.headers) : {};
-                        } catch (e) {
-                            console.warn('Invalid headers JSON');
+                promises.push(
+                    taskPromise.then(results => {
+                        metricsAggregator.addResults(results);
+                        
+                        if (metricsAggregator.shouldUpdate() && onProgress) {
+                            onProgress(metricsAggregator.getMetrics());
                         }
-
-                        const result = await executeRequest(config.method, url, body, headers, {signal});
-                        tracker.addResult(result);
-                    }
-
-                    if (tracker.shouldUpdate() && onProgress) {
-                        onProgress(tracker.getMetrics());
-                    }
-                })();
-
-                inFlight.add(task);
-                task.finally(() => inFlight.delete(task));
-
-                if (inFlight.size >= maxConcurrent) {
-                    await Promise.race(inFlight);
-                }
+                    }).catch(error => {
+                        console.error('Task error:', error);
+                        metricsAggregator.addResult({
+                            success: false,
+                            responseTime: 0,
+                            error: error.message,
+                            timestamp: Date.now(),
+                        });
+                    })
+                );
             }
 
-            if (inFlight.size > 0) {
-                await Promise.all(Array.from(inFlight));
-            }
+            await Promise.all(promises);
         }
 
+        // Финальное обновление метрик
         if (onProgress) {
-            onProgress(tracker.getMetrics());
+            onProgress(metricsAggregator.getMetrics());
         }
+
     } catch (error) {
         console.error('Load test error:', error);
+        throw error;
+    } finally {
+        // Останавливаем Worker Pool
+        await workerPool.terminate();
     }
 
     const endTime = Date.now();
     const duration = endTime - startTime;
-    const results = tracker.getResults();
-
-    const successfulRequests = results.filter((r) => r.success).length;
-    const failedRequests = results.length - successfulRequests;
-
-    const responseTimes = results.map((r) => r.responseTime);
-    const averageResponseTime =
-        responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length || 0;
-    const minResponseTime = Math.min(...responseTimes, Infinity);
-    const maxResponseTime = Math.max(...responseTimes, 0);
-
-    const requestsPerSecond = duration > 0 ? (results.length / duration) * 1000 : 0;
-
-    const errors = results
-        .filter((r) => !r.success)
-        .map((r) => ({
-            timestamp: r.timestamp,
-            error: r.error || `HTTP ${r.statusCode}`,
-            statusCode: r.statusCode,
-        }));
 
     const targetLabel = scenario ? scenario.name : `${config.method} ${config.endpoint}`;
 
-    return {
-        id: `test-${Date.now()}`,
-        timestamp: new Date(startTime),
+    // Экспортируем финальный отчет
+    const report = metricsAggregator.exportReport({
+        type: config.type,
         testType: config.type,
         scenarioId: config.scenarioId || null,
         targetLabel,
         loadType: config.loadType,
+        rps: config.rps,
+        duration: config.duration,
+        cycles: config.cycles,
+        workerCount,
+    });
+
+    return {
+        ...report,
+        id: `test-${Date.now()}`,
+        timestamp: new Date(startTime),
         duration,
-        totalRequests: results.length,
-        successfulRequests,
-        failedRequests,
-        averageResponseTime,
-        minResponseTime: minResponseTime === Infinity ? 0 : minResponseTime,
-        maxResponseTime,
-        requestsPerSecond,
-        errors,
     };
 }
+
