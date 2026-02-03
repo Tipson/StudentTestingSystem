@@ -648,8 +648,8 @@ async function runTestPassFlowScenario({runStep, stopRef, assessmentClient, aiCl
                 method: 'PUT',
                 path: `/api/attempts/${attemptId}/answers/${questionRecords[3].id}/grade`,
                 data: {
-                    score: 2,
-                    feedback: 'Хороший ответ',
+                    points: 2,
+                    comment: 'Хороший ответ',
                 },
                 expectedStatuses: [200, 204, 400],
                 message: 'Оценка ответа вручную',
