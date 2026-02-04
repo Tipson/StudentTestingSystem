@@ -1,5 +1,6 @@
 using Application;
 using Assessment.Application.Interfaces;
+using Assessment.Infrastructure.Behaviors;
 using Assessment.Infrastructure.Common;
 using Assessment.Infrastructure.Data;
 using Assessment.Infrastructure.Grading.Clients;
@@ -8,10 +9,10 @@ using Assessment.Infrastructure.Options;
 using Assessment.Infrastructure.Repositories;
 using BuildingBlocks.Api.Http;
 using MassTransit;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-
 using Microsoft.Extensions.Options;
 
 namespace Assessment.Infrastructure;
@@ -34,9 +35,28 @@ public static class DependencyInjection
             dataSourceBuilder.ConnectionStringBuilder.MinPoolSize = dbOptions.MinPoolSize;
             dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime;
             dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = dbOptions.ConnectionPruningInterval;
+            dataSourceBuilder.ConnectionStringBuilder.ConnectionLifetime = dbOptions.ConnectionLifetime;
+            dataSourceBuilder.ConnectionStringBuilder.CommandTimeout = dbOptions.CommandTimeout;
             
+            // TCP KeepAlive - проверка "живости" подключения
+            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAlive = true;
+            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAliveTime = dbOptions.TcpKeepAliveTime;
+            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval;
+            
+            // PostgreSQL таймауты для предотвращения зависания
+            dataSourceBuilder.ConnectionStringBuilder.Options = 
+                $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
+                "-c idle_in_transaction_session_timeout=60000";  // Зависшие транзакции убиваются через 60с
+
             dataSourceBuilder.EnableDynamicJson();
-            options.UseNpgsql(dataSourceBuilder.Build());
+            //Todo
+            /*options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorCodesToAdd: null);
+            });       */ 
         });
         
         // Unit of Work
@@ -94,6 +114,9 @@ public static class DependencyInjection
         {
             services.AddScoped<IGradingClient, HttpGradingClient>();
         }
+        
+        // MediatR Pipeline Behavior для автоматического SaveChanges
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         return services;
     }

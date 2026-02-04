@@ -16,24 +16,23 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
         db.Users.AnyAsync(x => x.Id == id, ct);
 
     public Task<User?> GetByEmail(string email, CancellationToken ct) =>
-        db.Users.FirstOrDefaultAsync(x => x.Email == email, ct);
+        db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, ct);
 
-    public async Task AddAsync(User user, CancellationToken ct)
+    public Task AddAsync(User user, CancellationToken ct)
     {
-        await db.Users.AddAsync(user, ct);
-        await db.SaveChangesAsync(ct);
+        return db.Users.AddAsync(user, ct).AsTask();
     }
 
-    public async Task UpdateAsync(User user, CancellationToken ct)
+    public Task UpdateAsync(User user, CancellationToken ct)
     {
         db.Users.Update(user);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
     
-    public async Task RemoveAsync(User user, CancellationToken ct)
+    public Task RemoveAsync(User user, CancellationToken ct)
     {
         db.Users.Remove(user);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
     
     public Task<List<User>> GetListAsync(CancellationToken ct) =>

@@ -9,6 +9,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 {
     public Task<Question?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Questions
+            .AsNoTracking()
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
@@ -17,6 +18,7 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
 
     public Task<List<Question>> ListByTestIdAsync(Guid testId, CancellationToken ct) =>
         db.Questions
+            .AsNoTracking()
             .Include(q => q.Options)
                 .ThenInclude(o => o.Media)
             .Include(q => q.Media)
@@ -34,14 +36,14 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
         return (max ?? 0) + 1;
     }
 
-    public async Task AddAsync(Question question, CancellationToken ct)
+    public Task AddAsync(Question question, CancellationToken ct)
     {
-        await db.Questions.AddAsync(question, ct);
-        await db.SaveChangesAsync(ct);
+        return db.Questions.AddAsync(question, ct).AsTask();
     }
 
     public async Task UpdateAsync(Question question, CancellationToken ct)
     {
+        // Удаляем старые media (они будут пересозданы)
         var existingMedia = await db.QuestionMedia
             .Where(m => m.QuestionId == question.Id)
             .ToListAsync(ct);
@@ -54,18 +56,18 @@ public sealed class QuestionRepository(AssessmentDbContext db) : IQuestionReposi
         db.QuestionOptionMedia.RemoveRange(existingOptionMedia);
 
         db.Questions.Update(question);
-        await db.SaveChangesAsync(ct);
+        // SaveChanges будет вызван автоматически через TransactionBehavior
     }
 
-    public async Task UpdateRangeAsync(IEnumerable<Question> questions, CancellationToken ct)
+    public Task UpdateRangeAsync(IEnumerable<Question> questions, CancellationToken ct)
     {
         db.Questions.UpdateRange(questions);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(Question question, CancellationToken ct)
+    public Task DeleteAsync(Question question, CancellationToken ct)
     {
         db.Questions.Remove(question);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 }

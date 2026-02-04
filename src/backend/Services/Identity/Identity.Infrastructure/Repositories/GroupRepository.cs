@@ -11,6 +11,7 @@ public sealed class GroupRepository(IdentityDbContext context) : IGroupRepositor
     public async Task<Group?> GetById(Guid id, CancellationToken ct = default)
     {
         return await context.Groups
+            .AsNoTracking()
             .FirstOrDefaultAsync(g => g.Id == id, ct);
     }
 
@@ -50,21 +51,20 @@ public sealed class GroupRepository(IdentityDbContext context) : IGroupRepositor
             .ToListAsync(ct);
     }
 
-    public async Task AddAsync(Group group, CancellationToken ct = default)
+    public Task AddAsync(Group group, CancellationToken ct = default)
     {
-        await context.Groups.AddAsync(group, ct);
-        await context.SaveChangesAsync(ct);
+        return context.Groups.AddAsync(group, ct).AsTask();
     }
 
-    public async Task UpdateAsync(Group group, CancellationToken ct = default)
+    public Task UpdateAsync(Group group, CancellationToken ct = default)
     {
         context.Groups.Update(group);
-        await context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
     
-    public async Task RemoveAsync(Group group, CancellationToken ct = default)
+    public Task RemoveAsync(Group group, CancellationToken ct = default)
     {
         context.Groups.Remove(group);
-        await context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 }

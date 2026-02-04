@@ -13,4 +13,10 @@ public interface IUnitOfWork
     /// <param name="action">Действие для выполнения внутри транзакции</param>
     /// <param name="ct">Токен отмены</param>
     Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct);
+    
+    /// <summary>
+    /// Сохраняет изменения в БД с автоматическим retry при временных сбоях.
+    /// Использует ExecutionStrategy от EF Core.
+    /// </summary>
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

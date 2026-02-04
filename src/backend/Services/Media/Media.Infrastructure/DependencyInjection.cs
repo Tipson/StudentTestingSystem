@@ -1,8 +1,10 @@
 ﻿using Media.Application.Interfaces;
+using Media.Infrastructure.Behaviors;
 using Media.Infrastructure.Data;
 using Media.Infrastructure.Options;
 using Media.Infrastructure.Repositories;
 using Media.Infrastructure.Storage;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,7 @@ public static class DependencyInjection
             dataSourceBuilder.ConnectionStringBuilder.MinPoolSize = dbOptions.MinPoolSize;
             dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime;
             dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = dbOptions.ConnectionPruningInterval;
+            dataSourceBuilder.ConnectionStringBuilder.CommandTimeout = dbOptions.CommandTimeout;
             
             options.UseNpgsql(dataSourceBuilder.Build());
         });
@@ -63,6 +66,9 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IStorageProvider, StorageProvider>();
+        
+        // MediatR Pipeline Behavior для автоматического SaveChanges
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         return services;
     }

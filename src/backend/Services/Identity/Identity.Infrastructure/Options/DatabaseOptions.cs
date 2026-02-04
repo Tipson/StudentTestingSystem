@@ -8,4 +8,5 @@ public class DatabaseOptions
     public int MinPoolSize { get; set; } = 3;
     public int ConnectionIdleLifetime { get; set; } = 300;
     public int ConnectionPruningInterval { get; set; } = 10;
+    public int CommandTimeout { get; set; } = 30;
 }
