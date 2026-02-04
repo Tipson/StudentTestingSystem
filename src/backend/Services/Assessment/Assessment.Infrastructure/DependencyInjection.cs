@@ -4,12 +4,14 @@ using Assessment.Infrastructure.Common;
 using Assessment.Infrastructure.Data;
 using Assessment.Infrastructure.Grading.Clients;
 using Assessment.Infrastructure.Grading.Options;
+using Assessment.Infrastructure.Options;
 using Assessment.Infrastructure.Repositories;
 using BuildingBlocks.Api.Http;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Options;
 
 namespace Assessment.Infrastructure;
@@ -22,12 +24,19 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Assessment не задана.");
 
-        services.AddDbContext<AssessmentDbContext>(o => 
+        services.AddDbContext<AssessmentDbContext>((sp, options) =>
         {
+            var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
             var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs);
+            
+            // Настройка пула подключений
+            dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize = dbOptions.MaxPoolSize;
+            dataSourceBuilder.ConnectionStringBuilder.MinPoolSize = dbOptions.MinPoolSize;
+            dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime;
+            dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = dbOptions.ConnectionPruningInterval;
+            
             dataSourceBuilder.EnableDynamicJson();
-            var dataSource = dataSourceBuilder.Build();
-            o.UseNpgsql(dataSource);
+            options.UseNpgsql(dataSourceBuilder.Build());
         });
         
         // Unit of Work

@@ -67,3 +67,13 @@ spec:
                 secretKeyRef:
                   name: redis
                   key: redis-password
+
+            # Database Pool Configuration
+            - name: Database__MaxPoolSize
+              value: {{ .Values.identityApi.database.maxPoolSize | quote }}
+            - name: Database__MinPoolSize
+              value: {{ .Values.identityApi.database.minPoolSize | quote }}
+            - name: Database__ConnectionIdleLifetime
+              value: {{ .Values.identityApi.database.connectionIdleLifetime | quote }}
+            - name: Database__ConnectionPruningInterval
+              value: {{ .Values.identityApi.database.connectionPruningInterval | quote }}
