@@ -28,4 +28,12 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Api\BuildingBlocks.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Middleware\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Middleware\DatabaseExceptionHandler.cs" />
+  </ItemGroup>
+
 </Project>
