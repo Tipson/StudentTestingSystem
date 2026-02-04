@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Компонент ScenariosTab
  * Отображает сценарии тестирования с визуализацией процесса выполнения
  */
@@ -115,13 +115,13 @@ function DonutChart({
 
 export default function ScenariosTab({
                                          // Состояние
-                                         scenarioRunning,
-                                         scenarioResults,
-                                         activeScenarioId,
-                                         selectedScenarioId,
-                                         expandedScenarioRows,
-                                         expandedScenarioSteps,
-                                         scenarioAutoExpand,
+                                         scenarioRunning = false,
+                                         scenarioResults = [],
+                                         activeScenarioId = null,
+                                         selectedScenarioId = null,
+                                         expandedScenarioRows = {},
+                                         expandedScenarioSteps = {},
+                                         scenarioAutoExpand = false,
                                          // Обработчики
                                          onRunScenario,
                                          onStopScenario,
@@ -130,25 +130,44 @@ export default function ScenariosTab({
                                          onToggleRow,
                                          onToggleStep,
                                          onAutoExpandChange,
+                                         scenarios,
+                                         viewMode = 'full',
                                      }) {
     // Выбранный и активный сценарии
+    const scenarioList = useMemo(
+        () => (scenarios && scenarios.length ? scenarios : SCENARIO_DEFINITIONS),
+        [scenarios],
+    );
+    const isSelectorMode = viewMode === 'selector';
+
     const selectedScenario = useMemo(
-        () => SCENARIO_DEFINITIONS.find((s) => s.id === selectedScenarioId),
-        [selectedScenarioId],
+        () => scenarioList.find((s) => s.id === selectedScenarioId),
+        [selectedScenarioId, scenarioList],
     );
     const activeScenario = useMemo(
-        () => SCENARIO_DEFINITIONS.find((s) => s.id === activeScenarioId),
-        [activeScenarioId],
+        () => scenarioList.find((s) => s.id === activeScenarioId),
+        [activeScenarioId, scenarioList],
     );
 
     // Ожидаемое количество шагов для выбранного сценария
+    const resolveExpectedTotal = (scenarioId) => {
+        const scenario = scenarioList.find((item) => item.id === scenarioId);
+        if (scenario?.expectedTotal !== undefined && scenario?.expectedTotal !== null) {
+            return scenario.expectedTotal;
+        }
+        if (Array.isArray(scenario?.steps)) {
+            return scenario.steps.length;
+        }
+        return getScenarioExpectedTotal(scenarioId);
+    };
+
     const selectedScenarioExpectedTotal = useMemo(
-        () => getScenarioExpectedTotal(selectedScenarioId),
-        [selectedScenarioId],
+        () => resolveExpectedTotal(selectedScenarioId),
+        [selectedScenarioId, scenarioList],
     );
     const scenarioExpectedTotal = useMemo(
-        () => getScenarioExpectedTotal(activeScenarioId),
-        [activeScenarioId],
+        () => resolveExpectedTotal(activeScenarioId),
+        [activeScenarioId, scenarioList],
     );
 
     // Результаты только для активного сценария
@@ -169,8 +188,17 @@ export default function ScenariosTab({
     const scenarioRemaining = Math.max(scenarioExpectedTotal - scenarioCompleted, 0);
 
     // Прогресс по этапам для выбранного сценария
+    const resolveStepDefinitions = (scenarioId) => {
+        if (isSelectorMode) return [];
+        if (!scenarios || !scenarios.length) {
+            return getScenarioStepDefinitions(scenarioId);
+        }
+        const scenario = scenarioList.find((item) => item.id === scenarioId);
+        return scenario?.stepDefinitions || [];
+    };
+
     const scenarioStepProgress = useMemo(() => {
-        const definitions = getScenarioStepDefinitions(selectedScenarioId);
+        const definitions = resolveStepDefinitions(selectedScenarioId);
         const results = selectedScenarioId === activeScenarioId ? activeScenarioResults : [];
 
         return definitions.map((def) => {
@@ -193,7 +221,7 @@ export default function ScenariosTab({
                             : 'pending',
             };
         });
-    }, [selectedScenarioId, activeScenarioId, activeScenarioResults]);
+    }, [selectedScenarioId, activeScenarioId, activeScenarioResults, scenarioList, isSelectorMode]);
 
     // Сводка для отображения выбранного сценария
     const selectedScenarioSummary = useMemo(() => {
@@ -245,41 +273,45 @@ export default function ScenariosTab({
             <div className="swagger-panel">
                 <div className="swagger-tests-header">
                     <h2>Сценарии тестирования</h2>
-                    <div className="swagger-tests-controls">
-                        {scenarioRunning ? (
+                    {!isSelectorMode && (
+                        <div className="swagger-tests-controls">
+                            {scenarioRunning ? (
+                                <button
+                                    className="swagger-button secondary"
+                                    type="button"
+                                    onClick={onStopScenario}
+                                >
+                                    Остановить
+                                </button>
+                            ) : (
+                                <button
+                                    className="swagger-button"
+                                    type="button"
+                                    onClick={() => onRunScenario(selectedScenarioId)}
+                                    disabled={!selectedScenarioId}
+                                >
+                                    Запустить сценарий
+                                </button>
+                            )}
                             <button
-                                className="swagger-button secondary"
+                                className="swagger-button ghost"
                                 type="button"
-                                onClick={onStopScenario}
+                                onClick={onClearResults}
+                                disabled={scenarioRunning || !scenarioResults.length}
                             >
-                                Остановить
+                                Очистить
                             </button>
-                        ) : (
-                            <button
-                                className="swagger-button"
-                                type="button"
-                                onClick={() => onRunScenario(selectedScenarioId)}
-                                disabled={!selectedScenarioId}
-                            >
-                                Запустить сценарий
-                            </button>
-                        )}
-                        <button
-                            className="swagger-button ghost"
-                            type="button"
-                            onClick={onClearResults}
-                            disabled={scenarioRunning || !scenarioResults.length}
-                        >
-                            Очистить
-                        </button>
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Карточки сценариев */}
                 <div className="swagger-scenario-grid">
-                    {SCENARIO_DEFINITIONS.map((scenario) => {
+                    {scenarioList.map((scenario) => {
                         const isSelected = scenario.id === selectedScenarioId;
                         const isActive = scenario.id === activeScenarioId;
+                        const stepsCount = Array.isArray(scenario.steps) ? scenario.steps.length : Number(scenario.steps) || 0;
+                        const expectedTotal = Number.isFinite(scenario.expectedTotal) ? scenario.expectedTotal : stepsCount;
                         const cardClass = [
                             'swagger-scenario-card',
                             isSelected ? 'selected' : '',
@@ -290,17 +322,19 @@ export default function ScenariosTab({
                             <div
                                 key={scenario.id}
                                 className={cardClass}
-                                onClick={() => onSelectScenario(scenario.id)}
+                                onClick={() => onSelectScenario && onSelectScenario(scenario.id)}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
-                                        onSelectScenario(scenario.id);
+                                        onSelectScenario && onSelectScenario(scenario.id);
                                     }
                                 }}
                             >
                                 <div className="swagger-scenario-card-header">
-                                    <span className="swagger-scenario-tag">{scenario.tag}</span>
+                                    {scenario.tag && (
+                                        <span className="swagger-scenario-tag">{scenario.tag}</span>
+                                    )}
                                     {isActive && scenarioRunning && (
                                         <span className="swagger-scenario-running">Выполняется...</span>
                                     )}
@@ -308,8 +342,8 @@ export default function ScenariosTab({
                                 <h3 className="swagger-scenario-title">{scenario.title}</h3>
                                 <p className="swagger-scenario-desc">{scenario.description}</p>
                                 <div className="swagger-scenario-meta">
-                                    <span>{scenario.expectedTotal} шагов</span>
-                                    <span>{scenario.steps.length} этапов</span>
+                                    <span>{expectedTotal} шагов</span>
+                                    <span>{stepsCount} этапов</span>
                                 </div>
                             </div>
                         );
@@ -318,7 +352,7 @@ export default function ScenariosTab({
             </div>
 
             {/* Детали выбранного сценария */}
-            {selectedScenario && (
+            {!isSelectorMode && selectedScenario && (
                 <div className="swagger-panel">
                     <div className="swagger-scenario-detail">
                         <div className="swagger-scenario-detail-info">
@@ -424,53 +458,55 @@ export default function ScenariosTab({
             )}
 
             {/* Панель всех результатов */}
-            <div className="swagger-panel">
-                <div className="swagger-tests-header">
-                    <h2>Результаты сценария</h2>
-                    <div className="swagger-tests-controls">
-                        <label className="swagger-checkbox">
-                            <input
-                                type="checkbox"
-                                checked={scenarioAutoExpand}
-                                onChange={(e) => onAutoExpandChange(e.target.checked)}
-                            />
-                            <span>Открывать ответы заранее</span>
-                        </label>
-                        {activeScenario?.title && (
-                            <span className="swagger-hint">
-                                {selectedScenarioId === activeScenarioId
-                                    ? activeScenario.title
-                                    : `Результаты: ${activeScenario.title}`}
-                            </span>
-                        )}
+            {!isSelectorMode && (
+                <div className="swagger-panel">
+                    <div className="swagger-tests-header">
+                        <h2>Результаты сценария</h2>
+                        <div className="swagger-tests-controls">
+                            <label className="swagger-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={scenarioAutoExpand}
+                                    onChange={(e) => onAutoExpandChange(e.target.checked)}
+                                />
+                                <span>Открывать ответы заранее</span>
+                            </label>
+                            {activeScenario?.title && (
+                                <span className="swagger-hint">
+                                    {selectedScenarioId === activeScenarioId
+                                        ? activeScenario.title
+                                        : `Результаты: ${activeScenario.title}`}
+                                </span>
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                <div className="swagger-tests-summary">
-                    <span>Выполнено: {scenarioCompleted} из {scenarioExpectedTotal}</span>
-                    <span>В процессе: {scenarioRemaining}</span>
-                    <span>Успешно: {scenarioSummary.success}</span>
-                    <span>Ошибки: {scenarioSummary.failed}</span>
-                    <span>Пропущено: {scenarioSummary.skipped}</span>
-                </div>
-
-                {scenarioResults.length ? (
-                    <div className="swagger-tests-list">
-                        {scenarioResults.map((item, index) => (
-                            <ScenarioResultRow
-                                key={makeResultRowKey(item, index)}
-                                item={item}
-                                index={index}
-                                isExpanded={expandedScenarioRows?.[makeResultRowKey(item, index)]}
-                                onToggle={onToggleRow}
-                                autoExpand={scenarioAutoExpand}
-                            />
-                        ))}
+                    <div className="swagger-tests-summary">
+                        <span>Выполнено: {scenarioCompleted} из {scenarioExpectedTotal}</span>
+                        <span>В процессе: {scenarioRemaining}</span>
+                        <span>Успешно: {scenarioSummary.success}</span>
+                        <span>Ошибки: {scenarioSummary.failed}</span>
+                        <span>Пропущено: {scenarioSummary.skipped}</span>
                     </div>
-                ) : (
-                    <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
-                )}
-            </div>
+
+                    {scenarioResults.length ? (
+                        <div className="swagger-tests-list">
+                            {scenarioResults.map((item, index) => (
+                                <ScenarioResultRow
+                                    key={makeResultRowKey(item, index)}
+                                    item={item}
+                                    index={index}
+                                    isExpanded={expandedScenarioRows?.[makeResultRowKey(item, index)]}
+                                    onToggle={onToggleRow}
+                                    autoExpand={scenarioAutoExpand}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="swagger-subtitle">Нет результатов. Запустите сценарий.</p>
+                    )}
+                </div>
+            )}
         </section>
     );
 }

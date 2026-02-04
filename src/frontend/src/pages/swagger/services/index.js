@@ -4,3 +4,4 @@
 
 export {runAutoTestsSuite} from './autoTestRunner.js';
 export {runScenarioById} from './scenarioRunner.js';
+export {runLoadTest} from './loadTestRunner.js';

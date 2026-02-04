@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getAccessToken} from '@api/auth.js';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
 import {clearStoredTokens, startKeycloakLogin} from '@shared/auth/keycloak.js';
@@ -10,18 +10,21 @@ import {
     useProfile,
     useAutoTests,
     useScenarios,
+    useLoadTesting,
 } from './hooks';
 
 import {
     ConsoleTab,
     TestsTab,
     ScenariosTab,
+    LoadTestingTab,
     ProfileTab,
 } from './components';
 
 import {
     runAutoTestsSuite,
     runScenarioById,
+    runLoadTest,
 } from './services';
 
 import {SCENARIO_DEFINITIONS} from './constants';
@@ -32,6 +35,7 @@ const TABS = [
     {key: 'console', label: 'Консоль'},
     {key: 'tests', label: 'Тесты'},
     {key: 'scenarios', label: 'Сценарии'},
+    {key: 'loadtesting', label: 'Нагрузочное тестирование'},
     {key: 'profile', label: 'Профиль'},
 ];
 
@@ -176,6 +180,19 @@ export default function SwaggerPage() {
         endScenario,
         setScenarioRunning,
     } = useScenarios();
+
+
+    const {
+        loadTestRunning,
+        testResults,
+        liveMetrics,
+        startLoadTest,
+        stopLoadTest,
+        endLoadTest,
+        pushResult: pushLoadTestResult,
+        clearResults: clearLoadTestResults,
+        updateLiveMetrics,
+    } = useLoadTesting();
 
     const autoTestStopRef = useRef(false);
     const scenarioStopRef = useRef(false);
@@ -333,6 +350,44 @@ export default function SwaggerPage() {
     }, [setScenarioRunning]);
 
     // Выбор ендпоинта
+
+    const runLoadTesting = useCallback(async (config) => {
+        if (loadTestRunning) return;
+
+        const signal = startLoadTest();
+
+        try {
+            const result = await runLoadTest({
+                config,
+                onProgress: updateLiveMetrics,
+                signal,
+            });
+            if (result) {
+                pushLoadTestResult(result);
+            }
+            if (!signal?.aborted) {
+                notifyCustom({type: 'success', message: 'Нагрузочный тест завершён'});
+            }
+        } catch (error) {
+            if (!signal?.aborted) {
+                notifyCustom({type: 'error', message: `Нагрузочный тест прерван: ${error.message}`});
+            }
+        } finally {
+            endLoadTest();
+        }
+    }, [
+        loadTestRunning,
+        startLoadTest,
+        updateLiveMetrics,
+        pushLoadTestResult,
+        endLoadTest,
+    ]);
+
+    const stopLoadTesting = useCallback(() => {
+        stopLoadTest();
+        notifyCustom({type: 'info', message: 'Нагрузочный тест остановлен'});
+    }, [stopLoadTest]);
+
     const handleSelectEndpoint = useCallback((item, serviceKey) => {
         applyEndpoint(item, serviceKey);
     }, [applyEndpoint]);
@@ -498,6 +553,18 @@ export default function SwaggerPage() {
                     onToggleRow={toggleScenarioRow}
                     onToggleStep={toggleScenarioStep}
                     onAutoExpandChange={setScenarioAutoExpand}
+                />
+            )}
+
+
+            {activeTab === 'loadtesting' && (
+                <LoadTestingTab
+                    isRunning={loadTestRunning}
+                    testResults={testResults}
+                    liveMetrics={liveMetrics}
+                    onRunTest={runLoadTesting}
+                    onStopTest={stopLoadTesting}
+                    onClearResults={clearLoadTestResults}
                 />
             )}
 
