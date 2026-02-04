@@ -25,15 +25,24 @@ public static class DependencyInjection
         services.AddDbContext<MediaDbContext>((sp, options) =>
         {
             var dbOptions = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs);
-            
-            // Настройка пула подключений
-            dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize = dbOptions.MaxPoolSize;
-            dataSourceBuilder.ConnectionStringBuilder.MinPoolSize = dbOptions.MinPoolSize;
-            dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime;
-            dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = dbOptions.ConnectionPruningInterval;
-            dataSourceBuilder.ConnectionStringBuilder.CommandTimeout = dbOptions.CommandTimeout;
-            
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
+            {
+                ConnectionStringBuilder =
+                {
+                    // Настройка пула подключений
+                    MaxPoolSize = dbOptions.MaxPoolSize,
+                    MinPoolSize = dbOptions.MinPoolSize,
+                    ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
+                    ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
+                    ConnectionLifetime = dbOptions.ConnectionLifetime,
+                    CommandTimeout = dbOptions.CommandTimeout,
+                    TcpKeepAlive = true,
+                    TcpKeepAliveTime = dbOptions.TcpKeepAliveTime,
+                    TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval,
+                    Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} -c idle_in_transaction_session_timeout=60000"
+                }
+            };
+
             options.UseNpgsql(dataSourceBuilder.Build());
         });
 

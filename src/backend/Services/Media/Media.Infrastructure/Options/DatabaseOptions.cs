@@ -6,7 +6,10 @@ public class DatabaseOptions
 
     public int MaxPoolSize { get; set; } = 10;
     public int MinPoolSize { get; set; } = 2;
-    public int ConnectionIdleLifetime { get; set; } = 300;
-    public int ConnectionPruningInterval { get; set; } = 10;
+    public int ConnectionIdleLifetime { get; set; } = 60;
+    public int ConnectionPruningInterval { get; set; } = 5;
+    public int ConnectionLifetime { get; set; } = 120;
     public int CommandTimeout { get; set; } = 30;
+    public int TcpKeepAliveTime { get; set; } = 30;
+    public int TcpKeepAliveInterval { get; set; } = 10;
 }

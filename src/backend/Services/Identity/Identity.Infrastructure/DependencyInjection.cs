@@ -21,29 +21,26 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Identity не задана.");
 
+        services.Configure<DatabaseOptions>(cfg.GetSection(DatabaseOptions.SectionName));
+        
         services.AddDbContext<IdentityDbContext>((sp, options) =>
         {
-            var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+            var dbOptions = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            
             var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
             {
                 ConnectionStringBuilder =
                 {
-                    // Настройка пула подключений
                     MaxPoolSize = dbOptions.MaxPoolSize,
                     MinPoolSize = dbOptions.MinPoolSize,
                     ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
                     ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
+                    ConnectionLifetime = dbOptions.ConnectionLifetime,
                     CommandTimeout = dbOptions.CommandTimeout
                 }
             };
-            //Todo
-            /*options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions => 
-            {
-               npgsqlOptions.EnableRetryOnFailure(
-                   maxRetryCount: 3,
-                   maxRetryDelay: TimeSpan.FromSeconds(5),
-                   errorCodesToAdd: null);
-           });*/
+
+            options.UseNpgsql(dataSourceBuilder.Build());
         });
 
        // Unit of Work для массовых операций

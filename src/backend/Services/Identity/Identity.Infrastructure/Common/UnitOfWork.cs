@@ -17,26 +17,25 @@ public sealed class UnitOfWork(IdentityDbContext db) : IUnitOfWork
     }
 
     /// <summary>
-    /// Выполняет действие внутри транзакции с retry
+    /// Выполняет действие внутри транзакции.
+    /// TransactionBehavior уже вызовет SaveChanges.
     /// </summary>
     public async Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct)
     {
-        var strategy = db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        try
         {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            try
+            await action(ct);
+            if (db.ChangeTracker.HasChanges())
             {
-                await action(ct);
                 await db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
             }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
-        });
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 }
