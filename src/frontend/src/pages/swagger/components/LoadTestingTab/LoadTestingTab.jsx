@@ -52,13 +52,13 @@ const POPULAR_ENDPOINTS = [
 ];
 
 export default function LoadTestingTab({
-    isRunning,
-    testResults,
-    liveMetrics,
-    onRunTest,
-    onStopTest,
-    onClearResults,
-}) {
+                                           isRunning,
+                                           testResults,
+                                           liveMetrics,
+                                           onRunTest,
+                                           onStopTest,
+                                           onClearResults,
+                                       }) {
     const [activeSubTab, setActiveSubTab] = useState('scenarios');
     const [testConfig, setTestConfig] = useState({
         type: 'scenario',
@@ -74,6 +74,9 @@ export default function LoadTestingTab({
         rps: 10,
         cycles: 100,
         duration: 60,
+        workerCount: 4,
+        maxConcurrency: 32,
+        useWorkers: false,
 
         // Scenario config
         scenarioId: null,
@@ -199,6 +202,45 @@ export default function LoadTestingTab({
                             {renderScenarioLoadSummary()}
                         </div>
                     )}
+                </div>
+
+                <div className="swagger-form-grid">
+                    <div className="swagger-form-group">
+                        <label>Воркеры</label>
+                        <input
+                            type="number"
+                            value={testConfig.workerCount}
+                            onChange={(e) => handleConfigChange('workerCount', Number(e.target.value))}
+                            min="1"
+                            max="64"
+                            disabled={isRunning || !testConfig.useWorkers}
+                        />
+                        <small>Количество потоков Web Worker</small>
+                    </div>
+                    <div className="swagger-form-group">
+                        <label>Параллельность</label>
+                        <input
+                            type="number"
+                            value={testConfig.maxConcurrency}
+                            onChange={(e) => handleConfigChange('maxConcurrency', Number(e.target.value))}
+                            min="1"
+                            max="2000"
+                            disabled={isRunning}
+                        />
+                        <small>Макс. сценариев в работе одновременно</small>
+                    </div>
+                    <div className="swagger-form-group">
+                        <label>Использовать воркеры</label>
+                        <label className="swagger-checkbox">
+                            <input
+                                type="checkbox"
+                                checked={testConfig.useWorkers}
+                                onChange={(e) => handleConfigChange('useWorkers', e.target.checked)}
+                                disabled={isRunning}
+                            />
+                            <span>Запускать нагрузку в Web Worker</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div className="swagger-actions">
@@ -360,6 +402,45 @@ export default function LoadTestingTab({
                         />
                     </div>
                 )}
+
+                <div className="swagger-form-grid">
+                    <div className="swagger-form-group">
+                        <label>Воркеры</label>
+                        <input
+                            type="number"
+                            value={testConfig.workerCount}
+                            onChange={(e) => handleConfigChange('workerCount', Number(e.target.value))}
+                            min="1"
+                            max="64"
+                            disabled={isRunning || !testConfig.useWorkers}
+                        />
+                        <small>Количество потоков Web Worker</small>
+                    </div>
+                    <div className="swagger-form-group">
+                        <label>Параллельность</label>
+                        <input
+                            type="number"
+                            value={testConfig.maxConcurrency}
+                            onChange={(e) => handleConfigChange('maxConcurrency', Number(e.target.value))}
+                            min="1"
+                            max="2000"
+                            disabled={isRunning}
+                        />
+                        <small>Макс. запросов в полёте</small>
+                    </div>
+                    <div className="swagger-form-group">
+                        <label>Использовать воркеры</label>
+                        <label className="swagger-checkbox">
+                            <input
+                                type="checkbox"
+                                checked={testConfig.useWorkers}
+                                onChange={(e) => handleConfigChange('useWorkers', e.target.checked)}
+                                disabled={isRunning}
+                            />
+                            <span>Запускать нагрузку в Web Worker</span>
+                        </label>
+                    </div>
+                </div>
 
                 <div className="swagger-actions">
                     {!isRunning ? (
@@ -544,7 +625,7 @@ export default function LoadTestingTab({
                             </span>
                         </div>
                         <div className="swagger-metric">
-                            <span className="swagger-metric-label">Текущий RPS</span>
+                            <span className="swagger-metric-label">Текущий RPS (5s)</span>
                             <span className="swagger-metric-value">
                                 {liveMetrics.currentRPS.toFixed(1)}
                             </span>

@@ -78,6 +78,12 @@ function extractAttemptId(data) {
 function resolveCaptureValue(extractor, responseData, context) {
     if (!extractor) return null;
     if (typeof extractor === 'function') return extractor(responseData, context);
+    if (extractor && typeof extractor === 'object' && !Array.isArray(extractor)) {
+        const extractorType = extractor.type || extractor.fn;
+        if (extractorType === 'extractIdLike') return extractIdLike(responseData);
+        if (extractorType === 'extractAttemptId') return extractAttemptId(responseData);
+        if (extractor.path) return getValueByPath(responseData, extractor.path);
+    }
     if (Array.isArray(extractor)) {
         for (const item of extractor) {
             const value = resolveCaptureValue(item, responseData, context);

@@ -11,6 +11,9 @@ export class MetricsAggregator {
         this.lastUpdateTime = 0;
         this.updateInterval = 100; // обновление каждые 100ms
         this.responseTimes = [];
+        this.rpsWindowMs = 5000;
+        this.rpsTimestamps = [];
+        this.rpsCursor = 0;
     }
 
     /**
@@ -21,6 +24,9 @@ export class MetricsAggregator {
         this.results.push(result);
         if (result.success && result.responseTime) {
             this.responseTimes.push(result.responseTime);
+        }
+        if (result.timestamp) {
+            this.rpsTimestamps.push(result.timestamp);
         }
     }
 
@@ -101,7 +107,19 @@ export class MetricsAggregator {
             ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length
             : 0;
 
-        const currentRPS = elapsedSeconds > 0 ? totalRequests / elapsedSeconds : 0;
+        const averageRPS = elapsedSeconds > 0 ? totalRequests / elapsedSeconds : 0;
+
+        const windowMs = this.rpsWindowMs;
+        const cutoff = now - windowMs;
+        while (this.rpsCursor < this.rpsTimestamps.length && this.rpsTimestamps[this.rpsCursor] < cutoff) {
+            this.rpsCursor += 1;
+        }
+        if (this.rpsCursor > 1000) {
+            this.rpsTimestamps = this.rpsTimestamps.slice(this.rpsCursor);
+            this.rpsCursor = 0;
+        }
+        const rollingCount = this.rpsTimestamps.length - this.rpsCursor;
+        const currentRPS = rollingCount / (windowMs / 1000);
 
         // Percentiles
         const p50 = MetricsAggregator.calculatePercentile(this.responseTimes, 50);
@@ -131,9 +149,7 @@ export class MetricsAggregator {
         }
 
         // Скользящее окно RPS (последняя секунда)
-        const oneSecondAgo = now - 1000;
-        const recentRequests = this.results.filter(r => r.timestamp >= oneSecondAgo);
-        const recentRPS = recentRequests.length;
+        const recentRPS = currentRPS;
 
         return {
             totalRequests,
@@ -145,6 +161,7 @@ export class MetricsAggregator {
 
             // RPS метрики
             currentRPS,
+            averageRPS,
             recentRPS,
 
             // Latency метрики
@@ -251,6 +268,8 @@ export class MetricsAggregator {
         this.responseTimes = [];
         this.startTime = Date.now();
         this.lastUpdateTime = 0;
+        this.rpsTimestamps = [];
+        this.rpsCursor = 0;
     }
 
     /**
@@ -285,9 +304,9 @@ export class MetricsAggregator {
             successRate: metrics.successRate,
 
             // RPS
-            requestsPerSecond: metrics.currentRPS,
+            requestsPerSecond: metrics.averageRPS ?? metrics.currentRPS,
             targetRPS: config.rps,
-            rpsAccuracy: config.rps ? (metrics.currentRPS / config.rps) * 100 : 0,
+            rpsAccuracy: config.rps ? ((metrics.averageRPS ?? metrics.currentRPS) / config.rps) * 100 : 0,
 
             // Latency
             averageResponseTime: metrics.averageResponseTime,

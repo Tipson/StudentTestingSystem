@@ -8,13 +8,24 @@ export class WorkerPool {
      * @param {string} workerScript - Путь к скрипту воркера
      * @param {number} size - Количество воркеров в пуле
      */
-    constructor(workerSource, size = 4, workerOptions = undefined) {
+    constructor(workerSource, size = 4, workerOptions = undefined, poolOptions = {}) {
+        const {
+            maxTasksPerWorker = 8,
+            maxConcurrentTasks = null,
+        } = poolOptions;
+
         this.workerSource = workerSource;
         this.workerOptions = workerOptions;
         this.workerFactory = typeof workerSource === 'function'
             ? workerSource
             : () => new Worker(workerSource, workerOptions);
-        this.size = Math.max(1, Math.min(size, 16)); // от 1 до 16 воркеров
+        this.size = Math.max(1, Math.min(size, 64)); // от 1 до 64 воркеров
+        this.maxTasksPerWorker = Math.max(1, Number.isFinite(maxTasksPerWorker) ? maxTasksPerWorker : 8);
+        const defaultMaxConcurrent = this.size * this.maxTasksPerWorker;
+        this.maxConcurrentTasks = Math.max(
+            this.size,
+            Number.isFinite(maxConcurrentTasks) ? maxConcurrentTasks : defaultMaxConcurrent
+        );
         this.workers = [];
         this.taskQueue = [];
         this.activeWorkers = new Map();
@@ -23,6 +34,7 @@ export class WorkerPool {
         this.pendingTasks = new Map();
         this.initialized = false;
         this.terminated = false;
+        this.inFlight = 0;
     }
 
     /**
@@ -41,7 +53,7 @@ export class WorkerPool {
             worker.onerror = (error) => this.handleWorkerError(workerId, error);
 
             this.workers.push(worker);
-            this.activeWorkers.set(workerId, false);
+            this.activeWorkers.set(workerId, 0);
 
             // Пингуем воркер для проверки готовности
             workerPromises.push(this.pingWorker(worker, workerId));
@@ -85,7 +97,7 @@ export class WorkerPool {
 
             if (task) {
                 this.pendingTasks.delete(taskId);
-                this.activeWorkers.set(workerId, false);
+                this.releaseWorkerSlot(workerId);
 
                 if (type === 'TASK_COMPLETE') {
                     task.resolve(results);
@@ -109,11 +121,13 @@ export class WorkerPool {
         for (const [taskId, task] of this.pendingTasks.entries()) {
             if (task.workerId === workerId) {
                 this.pendingTasks.delete(taskId);
+                this.releaseWorkerSlot(workerId);
                 task.reject(new Error(`Worker ${workerId} crashed: ${error.message}`));
             }
         }
 
-        this.activeWorkers.set(workerId, false);
+        this.activeWorkers.set(workerId, 0);
+        this.processNextTask();
     }
 
     /**
@@ -121,8 +135,14 @@ export class WorkerPool {
      * @returns {number|null} - ID воркера или null если все заняты
      */
     getNextAvailableWorker() {
-        for (const [workerId, isActive] of this.activeWorkers.entries()) {
-            if (!isActive && !this.terminated) {
+        if (this.terminated || this.workers.length === 0) return null;
+
+        const totalWorkers = this.workers.length;
+        for (let i = 0; i < totalWorkers; i++) {
+            const workerId = (this.nextWorkerId + i) % totalWorkers;
+            const activeCount = this.activeWorkers.get(workerId) || 0;
+            if (activeCount < this.maxTasksPerWorker) {
+                this.nextWorkerId = (workerId + 1) % totalWorkers;
                 return workerId;
             }
         }
@@ -135,18 +155,24 @@ export class WorkerPool {
     processNextTask() {
         if (this.taskQueue.length === 0 || this.terminated) return;
 
-        const workerId = this.getNextAvailableWorker();
-        if (workerId === null) return;
+        while (this.taskQueue.length > 0 && !this.terminated) {
+            if (this.inFlight >= this.maxConcurrentTasks) return;
 
-        const task = this.taskQueue.shift();
-        this.executeTaskOnWorker(workerId, task);
+            const workerId = this.getNextAvailableWorker();
+            if (workerId === null) return;
+
+            const task = this.taskQueue.shift();
+            this.executeTaskOnWorker(workerId, task);
+        }
     }
 
     /**
      * Выполнить задачу на конкретном воркере
      */
     executeTaskOnWorker(workerId, task) {
-        this.activeWorkers.set(workerId, true);
+        this.inFlight += 1;
+        const activeCount = this.activeWorkers.get(workerId) || 0;
+        this.activeWorkers.set(workerId, activeCount + 1);
         task.workerId = workerId;
 
         const worker = this.workers[workerId];
@@ -166,6 +192,11 @@ export class WorkerPool {
         const taskId = `task-${this.taskId++}`;
 
         return new Promise((resolve, reject) => {
+            if (this.terminated) {
+                reject(new Error('Worker pool terminated'));
+                return;
+            }
+
             const task = {
                 taskId,
                 type: 'EXECUTE_ENDPOINT',
@@ -176,12 +207,18 @@ export class WorkerPool {
 
             this.pendingTasks.set(taskId, task);
 
-            const workerId = this.getNextAvailableWorker();
-            if (workerId !== null) {
-                this.executeTaskOnWorker(workerId, task);
-            } else {
+            if (this.inFlight >= this.maxConcurrentTasks) {
                 this.taskQueue.push(task);
+                return;
             }
+
+            const workerId = this.getNextAvailableWorker();
+            if (workerId === null) {
+                this.taskQueue.push(task);
+                return;
+            }
+
+            this.executeTaskOnWorker(workerId, task);
         });
     }
 
@@ -194,6 +231,11 @@ export class WorkerPool {
         const taskId = `task-${this.taskId++}`;
 
         return new Promise((resolve, reject) => {
+            if (this.terminated) {
+                reject(new Error('Worker pool terminated'));
+                return;
+            }
+
             const task = {
                 taskId,
                 type: 'EXECUTE_SCENARIO',
@@ -204,12 +246,18 @@ export class WorkerPool {
 
             this.pendingTasks.set(taskId, task);
 
-            const workerId = this.getNextAvailableWorker();
-            if (workerId !== null) {
-                this.executeTaskOnWorker(workerId, task);
-            } else {
+            if (this.inFlight >= this.maxConcurrentTasks) {
                 this.taskQueue.push(task);
+                return;
             }
+
+            const workerId = this.getNextAvailableWorker();
+            if (workerId === null) {
+                this.taskQueue.push(task);
+                return;
+            }
+
+            this.executeTaskOnWorker(workerId, task);
         });
     }
 
@@ -217,14 +265,18 @@ export class WorkerPool {
      * Получить статистику пула
      */
     getStats() {
-        const activeCount = Array.from(this.activeWorkers.values()).filter(Boolean).length;
+        const activeCount = Array.from(this.activeWorkers.values()).reduce((sum, count) => sum + count, 0);
+        const busyWorkers = Array.from(this.activeWorkers.values()).filter(count => count > 0).length;
 
         return {
             totalWorkers: this.size,
             activeWorkers: activeCount,
-            idleWorkers: this.size - activeCount,
+            idleWorkers: Math.max(this.size - busyWorkers, 0),
             queuedTasks: this.taskQueue.length,
             pendingTasks: this.pendingTasks.size,
+            inFlight: this.inFlight,
+            maxConcurrentTasks: this.maxConcurrentTasks,
+            maxTasksPerWorker: this.maxTasksPerWorker,
         };
     }
 
@@ -249,6 +301,7 @@ export class WorkerPool {
         }
         this.pendingTasks.clear();
         this.taskQueue = [];
+        this.inFlight = 0;
 
         // Останавливаем всех воркеров
         for (const worker of this.workers) {
@@ -258,5 +311,11 @@ export class WorkerPool {
         this.workers = [];
         this.activeWorkers.clear();
         this.initialized = false;
+    }
+
+    releaseWorkerSlot(workerId) {
+        this.inFlight = Math.max(0, this.inFlight - 1);
+        const activeCount = this.activeWorkers.get(workerId) || 0;
+        this.activeWorkers.set(workerId, Math.max(0, activeCount - 1));
     }
 }

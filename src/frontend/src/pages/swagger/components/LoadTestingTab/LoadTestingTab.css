@@ -139,6 +139,21 @@
     color: #475569;
 }
 
+.swagger-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.swagger-checkbox input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    accent-color: #0f766e;
+}
+
 .swagger-form-group input,
 .swagger-form-group select,
 .swagger-form-group textarea {
