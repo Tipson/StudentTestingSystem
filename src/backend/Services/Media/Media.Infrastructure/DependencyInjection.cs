@@ -29,21 +29,24 @@ public static class DependencyInjection
             {
                 ConnectionStringBuilder =
                 {
-                    // Настройка пула подключений
                     MaxPoolSize = dbOptions.MaxPoolSize,
                     MinPoolSize = dbOptions.MinPoolSize,
                     ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
                     ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
                     ConnectionLifetime = dbOptions.ConnectionLifetime,
                     CommandTimeout = dbOptions.CommandTimeout,
-                    TcpKeepAlive = true,
-                    TcpKeepAliveTime = dbOptions.TcpKeepAliveTime,
-                    TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval,
-                    Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} -c idle_in_transaction_session_timeout=60000"
+                    // Производительность
+                    Multiplexing = true,
+                    MaxAutoPrepare = 20,
+                    AutoPrepareMinUsages = 2
                 }
             };
 
-            options.UseNpgsql(dataSourceBuilder.Build());
+            options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+                npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
+            });
         });
 
         services.AddScoped<IMediaRepository, MediaRepository>();

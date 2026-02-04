@@ -28,35 +28,44 @@ public static class DependencyInjection
         services.AddDbContext<AssessmentDbContext>((sp, options) =>
         {
             var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs);
-            
-            // Настройка пула подключений
-            dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize = dbOptions.MaxPoolSize;
-            dataSourceBuilder.ConnectionStringBuilder.MinPoolSize = dbOptions.MinPoolSize;
-            dataSourceBuilder.ConnectionStringBuilder.ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime;
-            dataSourceBuilder.ConnectionStringBuilder.ConnectionPruningInterval = dbOptions.ConnectionPruningInterval;
-            dataSourceBuilder.ConnectionStringBuilder.ConnectionLifetime = dbOptions.ConnectionLifetime;
-            dataSourceBuilder.ConnectionStringBuilder.CommandTimeout = dbOptions.CommandTimeout;
-            
-            // TCP KeepAlive - проверка "живости" подключения
-            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAlive = true;
-            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAliveTime = dbOptions.TcpKeepAliveTime;
-            dataSourceBuilder.ConnectionStringBuilder.TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval;
-            
-            // PostgreSQL таймауты для предотвращения зависания
-            dataSourceBuilder.ConnectionStringBuilder.Options = 
-                $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
-                "-c idle_in_transaction_session_timeout=60000";  // Зависшие транзакции убиваются через 60с
+            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
+            {
+                ConnectionStringBuilder =
+                {
+                    // Настройка пула подключений
+                    MaxPoolSize = dbOptions.MaxPoolSize,
+                    MinPoolSize = dbOptions.MinPoolSize,
+                    ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
+                    ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
+                    ConnectionLifetime = dbOptions.ConnectionLifetime,
+                    CommandTimeout = dbOptions.CommandTimeout,
+                    // TCP KeepAlive - проверка "живости" подключения
+                    TcpKeepAlive = true,
+                    TcpKeepAliveTime = dbOptions.TcpKeepAliveTime,
+                    TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval,
+                    // PostgreSQL таймауты для предотвращения зависания
+                    Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
+                              "-c idle_in_transaction_session_timeout=60000", // Зависшие транзакции убиваются через 60с
+                    // Производительность: Multiplexing + Pipelining
+                    Multiplexing = true, // Одно физическое подключение для многих команд
+                    MaxAutoPrepare = 20, // Prepared statements кэш
+                    AutoPrepareMinUsages = 2 // Prepare после 2го использования
+                }
+            };
 
             dataSourceBuilder.EnableDynamicJson();
-            //Todo
-            /*options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            
+            options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
             {
+                // Retry для transient ошибок (сеть, таймауты)
                 npgsqlOptions.EnableRetryOnFailure(
                     maxRetryCount: 3,
-                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    maxRetryDelay: TimeSpan.FromSeconds(2),
                     errorCodesToAdd: null);
-            });       */ 
+                    
+                // Command Timeout на уровне EF Core
+                npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
+            });
         });
         
         // Unit of Work

@@ -8,19 +8,21 @@ public class AttemptConfiguration : IEntityTypeConfiguration<Attempt>
 {
     public void Configure(EntityTypeBuilder<Attempt> builder)
     {
-        // Индекс для поиска попыток по тесту
-        builder.HasIndex(x => x.TestId);
+        // Индексы для производительности
         
-        //Индекс один активный attempt на пользователя+тест
+        // GetActiveAsync + ListByUserAndTestAsync: WHERE UserId = X AND TestId = Y (AND Status = InProgress)
+        builder.HasIndex(x => new { x.UserId, x.TestId, x.Status });
+        
+        // Уникальность: один активный attempt на пользователя+тест
         builder.HasIndex(a => new { a.UserId, a.TestId, a.Status })
             .HasFilter("\"Status\" = 0") // 0 = InProgress
             .IsUnique();
         
-        // Композитный индекс для GetActiveAsync
-        builder.HasIndex(x => new { x.UserId, x.TestId, x.Status });
+        // ListByUserAsync: WHERE UserId = X ORDER BY StartedAt DESC
+        builder.HasIndex(x => new { x.UserId, x.StartedAt });
         
-        // Индекс для поиска попыток пользователя
-        builder.HasIndex(x => x.UserId);
+        // ListByTestAsync: WHERE TestId = X ORDER BY StartedAt DESC
+        builder.HasIndex(x => new { x.TestId, x.StartedAt });
 
         // Связь Attempt -> Answers
         builder.HasMany(x => x.Answers)

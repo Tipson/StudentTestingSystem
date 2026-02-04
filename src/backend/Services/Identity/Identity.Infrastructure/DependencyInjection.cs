@@ -36,11 +36,19 @@ public static class DependencyInjection
                     ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
                     ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
                     ConnectionLifetime = dbOptions.ConnectionLifetime,
-                    CommandTimeout = dbOptions.CommandTimeout
+                    CommandTimeout = dbOptions.CommandTimeout,
+                    // Производительность
+                    Multiplexing = true,
+                    MaxAutoPrepare = 20,
+                    AutoPrepareMinUsages = 2
                 }
             };
 
-            options.UseNpgsql(dataSourceBuilder.Build());
+            options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+                npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
+            });
         });
 
        // Unit of Work для массовых операций
