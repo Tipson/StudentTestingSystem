@@ -55,6 +55,9 @@ public static class DependencyInjection
                 {
                     npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
                 });
+                
+                // NoTracking по умолчанию - уменьшает overhead на 5-10%
+                options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
             },
             poolSize: 128  // Размер пула DbContext
         );

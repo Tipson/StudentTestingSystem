@@ -69,6 +69,10 @@ public static class DependencyInjection
                     // Command Timeout на уровне EF Core
                     npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
                 });
+                
+                // NoTracking по умолчанию - уменьшает overhead на 5-10%
+                // Commands явно используют tracking, Queries уже используют AsNoTracking
+                options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
             },
             poolSize: 128
         );
