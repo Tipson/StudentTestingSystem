@@ -38,7 +38,7 @@ public static class DependencyInjection
                     ConnectionLifetime = dbOptions.ConnectionLifetime,
                     CommandTimeout = dbOptions.CommandTimeout,
                     // Производительность
-                    Multiplexing = true,
+                    Multiplexing = false,
                     MaxAutoPrepare = 20,
                     AutoPrepareMinUsages = 2
                 }
