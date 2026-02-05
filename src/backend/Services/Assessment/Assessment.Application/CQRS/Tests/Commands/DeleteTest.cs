@@ -7,7 +7,7 @@ namespace Assessment.Application.CQRS.Tests.Commands;
 
 public sealed record DeleteTest(Guid TestId) : IRequest;
 
-public sealed class DeleteTestHandler(ITestRepository testRepository, IUserContext userContext) : IRequestHandler<DeleteTest>
+public sealed class DeleteTestHandler(ITestRepository testRepository, IUserContext userContext, IUnitOfWork unitOfWork) : IRequestHandler<DeleteTest>
 {
     public async Task Handle(DeleteTest request, CancellationToken cancellationToken)
     {
@@ -18,5 +18,6 @@ public sealed class DeleteTestHandler(ITestRepository testRepository, IUserConte
             throw new ForbiddenException("Недостаточно прав для удаления теста");
         
         await testRepository.DeleteAsync(test, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

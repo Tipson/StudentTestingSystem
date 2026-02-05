@@ -20,7 +20,8 @@ public sealed record CreateInviteLinkResult(Guid InviteCode, string Url);
 public sealed class CreateInviteLinkHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateInviteLink, CreateInviteLinkResult>
 {
     public async Task<CreateInviteLinkResult> Handle(CreateInviteLink request, CancellationToken ct)
@@ -42,6 +43,7 @@ public sealed class CreateInviteLinkHandler(
         );
 
         await testAccesses.AddAsync(access, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var url = $"/tests/join/{access.InviteCode}";
 

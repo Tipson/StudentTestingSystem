@@ -1,3 +1,4 @@
+using Application;
 using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
@@ -12,7 +13,7 @@ public sealed record UpdateGroup(
     int GroupNumber
 ) : IRequest;
 
-public sealed class UpdateGroupHandler(IGroupRepository groups)
+public sealed class UpdateGroupHandler(IGroupRepository groups, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateGroup>
 {
     public async Task Handle(UpdateGroup request, CancellationToken ct)
@@ -23,5 +24,6 @@ public sealed class UpdateGroupHandler(IGroupRepository groups)
         group.Update(request.Institution, request.Specialization, request.Course, request.GroupNumber);
 
         await groups.UpdateAsync(group, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

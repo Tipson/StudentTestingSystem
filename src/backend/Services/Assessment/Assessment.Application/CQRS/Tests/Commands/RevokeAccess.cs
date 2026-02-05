@@ -13,7 +13,8 @@ public sealed record RevokeAccess(Guid AccessId) : IRequest;
 public sealed class RevokeAccessHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<RevokeAccess>
 {
     public async Task Handle(RevokeAccess request, CancellationToken ct)
@@ -32,5 +33,6 @@ public sealed class RevokeAccessHandler(
 
         access.Revoke();
         await testAccesses.UpdateAsync(access, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

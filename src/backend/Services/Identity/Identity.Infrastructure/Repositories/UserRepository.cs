@@ -55,6 +55,11 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
             .ToListAsync(ct);
     }
     
+    /// <summary>
+    /// Атомарная операция получения или создания пользователя.
+    /// ВАЖНО: Вызывает SaveChanges напрямую для обработки race conditions через unique constraint.
+    /// Это исключение из правила "репозитории не сохраняют" - оправдано для атомарности.
+    /// </summary>
     public async Task<User> GetOrCreateAsync(User candidate, CancellationToken ct)
     {
         var existing = await db.Users.FindAsync([candidate.Id], ct);
@@ -65,6 +70,7 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
 
         try
         {
+            // Сохраняем сразу для проверки unique constraint и обработки race condition
             await db.SaveChangesAsync(ct);
             return candidate;
         }

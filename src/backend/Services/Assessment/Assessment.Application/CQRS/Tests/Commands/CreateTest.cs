@@ -14,7 +14,8 @@ public sealed record CreateTest(CreateTestDto Dto) : IRequest<TestDto>;
 
 public sealed class CreateTestHandler(
     IUserContext userContext,
-    ITestRepository tests)
+    ITestRepository tests,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateTest, TestDto>
 {
     public async Task<TestDto> Handle(CreateTest request, CancellationToken ct)
@@ -26,6 +27,7 @@ public sealed class CreateTestHandler(
             request.Dto.AllowAiHints);
 
         await tests.AddAsync(test, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return test.Adapt<TestDto>();
     }

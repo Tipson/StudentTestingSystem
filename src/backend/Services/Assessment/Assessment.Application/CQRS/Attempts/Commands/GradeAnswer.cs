@@ -25,7 +25,8 @@ public sealed class GradeAnswerHandler(
     ITestRepository tests,
     IQuestionRepository questions,
     IGradingClient gradingClient,
-    IMapper mapper)
+    IMapper mapper,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<GradeAnswer, AttemptScoreDto>
 {
     public async Task<AttemptScoreDto> Handle(GradeAnswer request, CancellationToken ct)
@@ -33,6 +34,7 @@ public sealed class GradeAnswerHandler(
         var userId = userContext.UserId
                      ?? throw new UnauthorizedApiException("Пользователь не авторизован.");
 
+        // Шаг 1: Валидация (без транзакции)
         var attempt = await attempts.GetWithAnswersAsync(request.AttemptId, ct)
                       ?? throw new EntityNotFoundException("Попытка не найдена");
 
@@ -65,7 +67,7 @@ public sealed class GradeAnswerHandler(
 
         var testQuestions = await questions.ListByTestIdAsync(attempt.TestId, ct);
 
-        // Формируем запрос на ручную проверку в Grading Service
+        // Шаг 2: Вызов внешнего Grading Service (ВНЕ транзакции)
         var gradingRequest = new ManualGradeRequest(
             AttemptId: request.AttemptId,
             QuestionId: request.QuestionId,
@@ -76,23 +78,35 @@ public sealed class GradeAnswerHandler(
             AllQuestions: mapper.Map<List<QuestionInfo>>(testQuestions)
         );
 
-        // Отправляем в Grading Service
         var gradingResponse = await gradingClient.GradeAnswerManuallyAsync(gradingRequest, ct);
 
-        // Сохраняем результат проверки
-        answer.SetManualGrade(gradingResponse.PointsAwarded, gradingResponse.Feedback);
+        // Шаг 3: Атомарное сохранение результата в БД (С транзакцией)
+        AttemptScoreDto result = null!;
+        await unitOfWork.ExecuteAsync(async (cancellationToken) =>
+        {
+            // Загружаем attempt заново с tracking для обновления
+            var trackedAttempt = await attempts.GetWithAnswersAsync(request.AttemptId, cancellationToken)
+                                 ?? throw new EntityNotFoundException("Попытка не найдена");
 
-        // Обновляем общий балл попытки
-        attempt.UpdateScore(gradingResponse.TotalEarnedPoints, test.PassScore);
+            var trackedAnswer = trackedAttempt.Answers.FirstOrDefault(a => a.QuestionId == request.QuestionId)
+                                ?? throw new EntityNotFoundException("Ответ не найден");
 
-        await attempts.UpdateAsync(attempt, ct);
+            // Применяем изменения к отслеживаемым сущностям
+            trackedAnswer.SetManualGrade(gradingResponse.PointsAwarded, gradingResponse.Feedback);
+            trackedAttempt.UpdateScore(gradingResponse.TotalEarnedPoints, test.PassScore);
 
-        return new AttemptScoreDto(
-            attempt.Id,
-            attempt.TestId,
-            gradingResponse.TotalEarnedPoints,
-            test.PassScore,
-            attempt.IsPassed ?? false
-        );
+            await attempts.UpdateAsync(trackedAttempt, cancellationToken);
+
+            result = new AttemptScoreDto(
+                trackedAttempt.Id,
+                trackedAttempt.TestId,
+                gradingResponse.TotalEarnedPoints,
+                test.PassScore,
+                trackedAttempt.IsPassed ?? false
+            );
+            // SaveChanges вызывается автоматически в конце ExecuteAsync
+        }, ct);
+
+        return result;
     }
 }

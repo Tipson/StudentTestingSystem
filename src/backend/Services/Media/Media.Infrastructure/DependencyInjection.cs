@@ -1,5 +1,4 @@
 ﻿using Media.Application.Interfaces;
-using Media.Infrastructure.Behaviors;
 using Media.Infrastructure.Data;
 using Media.Infrastructure.Options;
 using Media.Infrastructure.Repositories;
@@ -89,8 +88,6 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IStorageProvider, StorageProvider>();
-
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         return services;
     }

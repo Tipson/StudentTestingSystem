@@ -7,37 +7,45 @@ namespace Assessment.Infrastructure.Common;
 public sealed class UnitOfWork(AssessmentDbContext db) : IUnitOfWork
 {
     /// <summary>
-    /// Выполняет действие внутри транзакции.
-    /// TransactionBehavior уже вызовет SaveChanges, поэтому просто оборачиваем в транзакцию.
+    /// Выполняет действие внутри транзакции с автоматическим Commit/Rollback.
+    /// ВАЖНО: ExecutionStrategy несовместим с явными транзакциями - retry не применяется!
     /// </summary>
     public async Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct)
     {
-        // ВАЖНО: ExecutionStrategy несовместим с явными транзакциями!
-        // Поэтому используем простую транзакцию без retry
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
         {
             await action(ct);
-            // SaveChanges будет вызван автоматически через TransactionBehavior
-            // Но если нужна явная транзакция - вызываем вручную
-            if (db.ChangeTracker.HasChanges())
-            {
-                await db.SaveChangesAsync(ct);
-            }
+            await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         }
         catch
         {
-            await tx.RollbackAsync(ct);
+            // Явный rollback для ясности (автоматически произойдет при Dispose)
+            try
+            {
+                await tx.RollbackAsync(ct);
+            }
+            catch
+            {
+                // Игнорируем ошибки rollback
+            }
             throw;
         }
     }
     
     /// <summary>
-    /// Сохраняет изменения с автоматическим retry через EF Core ExecutionStrategy
+    /// Сохраняет изменения с автоматическим retry через EF Core ExecutionStrategy.
+    /// ВАЖНО: ExecutionStrategy НЕ применяется внутри явных транзакций!
     /// </summary>
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
+        // Если мы внутри транзакции - НЕ используем ExecutionStrategy
+        if (db.Database.CurrentTransaction is not null)
+        {
+            return await db.SaveChangesAsync(ct);
+        }
+
         // ExecutionStrategy автоматически обрабатывает transient ошибки
         var strategy = db.Database.CreateExecutionStrategy();
         

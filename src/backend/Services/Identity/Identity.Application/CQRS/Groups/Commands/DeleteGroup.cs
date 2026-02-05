@@ -1,3 +1,4 @@
+using Application;
 using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
@@ -6,7 +7,7 @@ namespace Identity.Application.CQRS.Groups.Commands;
 
 public sealed record DeleteGroup(Guid GroupId) : IRequest;
 
-public sealed class DeleteGroupHandler(IGroupRepository groups)
+public sealed class DeleteGroupHandler(IGroupRepository groups, IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteGroup>
 {
     public async Task Handle(DeleteGroup request, CancellationToken ct)
@@ -15,5 +16,6 @@ public sealed class DeleteGroupHandler(IGroupRepository groups)
                     ?? throw new EntityNotFoundException("Группа не найдена.");
 
         await groups.RemoveAsync(group, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

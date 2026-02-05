@@ -1,6 +1,5 @@
 using Application;
 using Identity.Application.Interfaces;
-using Identity.Infrastructure.Behaviors;
 using Identity.Infrastructure.Common;
 using Identity.Infrastructure.Data;
 using Identity.Infrastructure.Options;
@@ -21,9 +20,7 @@ public static class DependencyInjection
             throw new Exception("Строка подключения к БД Identity не задана.");
 
         services.Configure<DatabaseOptions>(cfg.GetSection(DatabaseOptions.SectionName));
-
-        // ===== КРИТИЧНО: NpgsqlDataSource должен быть SINGLETON! =====
-        // Один DataSource = Один connection pool на всё приложение
+        
         var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
@@ -67,9 +64,6 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IGroupRepository, GroupRepository>();
-
-        // MediatR Pipeline Behavior для автоматического SaveChanges
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         return services;
     }

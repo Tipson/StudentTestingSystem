@@ -1,6 +1,5 @@
 using Application;
 using Assessment.Application.Interfaces;
-using Assessment.Infrastructure.Behaviors;
 using Assessment.Infrastructure.Common;
 using Assessment.Infrastructure.Data;
 using Assessment.Infrastructure.Grading.Clients;
@@ -24,10 +23,7 @@ public static class DependencyInjection
         var cs = cfg.GetConnectionString("Default") ?? cfg["DB_CONNECTION"];
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Assessment не задана.");
-
-        // ===== КРИТИЧНО: NpgsqlDataSource должен быть SINGLETON! =====
-        // Если создавать DataSource на каждый DbContext - будет N пулов вместо одного!
-        // Один DataSource = Один connection pool на всё приложение
+        
         var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
         
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
@@ -138,9 +134,6 @@ public static class DependencyInjection
             services.AddScoped<IGradingClient, HttpGradingClient>();
         }
         
-        // MediatR Pipeline Behavior для автоматического SaveChanges
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
-
         return services;
     }
 }

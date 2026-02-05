@@ -15,7 +15,8 @@ public sealed record JoinTestByInvite(Guid InviteCode) : IRequest<Guid>;
 public sealed class JoinTestByInviteHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<JoinTestByInvite, Guid>
 {
     public async Task<Guid> Handle(JoinTestByInvite request, CancellationToken ct)
@@ -54,6 +55,7 @@ public sealed class JoinTestByInviteHandler(
         // Увеличиваем счётчик использований
         invite.IncrementUsage();
         await testAccesses.UpdateAsync(invite, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return test.Id;
     }
