@@ -57,11 +57,13 @@ public static class DependencyInjection
             
             options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
             {
-                // Retry для transient ошибок (сеть, таймауты)
-                npgsqlOptions.EnableRetryOnFailure(
-                    maxRetryCount: 3,
-                    maxRetryDelay: TimeSpan.FromSeconds(2),
-                    errorCodesToAdd: null);
+                // ❌ ВРЕМЕННО ОТКЛЮЧЕНО - retry усугубляет "too many clients"
+                // При переполнении пула: 1 запрос × 4 попытки = 4x нагрузка!
+                // TODO: Включить после оптимизации запросов и добавления индексов
+                // npgsqlOptions.EnableRetryOnFailure(
+                //     maxRetryCount: 3,
+                //     maxRetryDelay: TimeSpan.FromSeconds(2),
+                //     errorCodesToAdd: null);
                     
                 // Command Timeout на уровне EF Core
                 npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);

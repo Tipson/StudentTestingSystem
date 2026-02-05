@@ -44,7 +44,8 @@ public static class DependencyInjection
 
             options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
             {
-                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+                // ❌ ВРЕМЕННО ОТКЛЮЧЕНО
+                // npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
                 npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
             });
         });
