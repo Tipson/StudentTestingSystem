@@ -25,42 +25,52 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(cs))
             throw new Exception("Строка подключения к БД Assessment не задана.");
 
+        // ===== КРИТИЧНО: NpgsqlDataSource должен быть SINGLETON! =====
+        // Если создавать DataSource на каждый DbContext - будет N пулов вместо одного!
+        // Один DataSource = Один connection pool на всё приложение
+        var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+        
+        var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
+        {
+            ConnectionStringBuilder =
+            {
+                // Настройка пула подключений
+                MaxPoolSize = dbOptions.MaxPoolSize,
+                MinPoolSize = dbOptions.MinPoolSize,
+                ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
+                ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
+                ConnectionLifetime = dbOptions.ConnectionLifetime,
+                CommandTimeout = dbOptions.CommandTimeout,
+                // TCP KeepAlive - проверка "живости" подключения
+                TcpKeepAlive = true,
+                TcpKeepAliveTime = dbOptions.TcpKeepAliveTime,
+                TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval,
+                // PostgreSQL таймауты для предотвращения зависания
+                Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
+                          "-c idle_in_transaction_session_timeout=60000", // Зависшие транзакции убиваются через 60с
+                // MULTIPLEXING ОТКЛЮЧЕН - вызывал утечку физических подключений
+                // ConnectionIdleLifetime не контролирует физические подключения при Multiplexing=true
+                // С обычным пулом: 1 DbContext = 1 физическое подключение (проще отладка)
+                Multiplexing = false,
+                MaxAutoPrepare = 20, // Prepared statements кэш
+                AutoPrepareMinUsages = 2 // Prepare после 2го использования
+            }
+        };
+
+        dataSourceBuilder.EnableDynamicJson();
+        
+        // Создаём DataSource ОДИН РАЗ и регистрируем как Singleton
+        var dataSource = dataSourceBuilder.Build();
+        services.AddSingleton(dataSource);
+
+        // DbContext использует готовый Singleton DataSource
         services.AddDbContext<AssessmentDbContext>((sp, options) =>
         {
-            var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
-            {
-                ConnectionStringBuilder =
-                {
-                    // Настройка пула подключений
-                    MaxPoolSize = dbOptions.MaxPoolSize,
-                    MinPoolSize = dbOptions.MinPoolSize,
-                    ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
-                    ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
-                    ConnectionLifetime = dbOptions.ConnectionLifetime,
-                    CommandTimeout = dbOptions.CommandTimeout,
-                    // TCP KeepAlive - проверка "живости" подключения
-                    TcpKeepAlive = true,
-                    TcpKeepAliveTime = dbOptions.TcpKeepAliveTime,
-                    TcpKeepAliveInterval = dbOptions.TcpKeepAliveInterval,
-                    // PostgreSQL таймауты для предотвращения зависания
-                    Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
-                              "-c idle_in_transaction_session_timeout=60000", // Зависшие транзакции убиваются через 60с
-                    // MULTIPLEXING ОТКЛЮЧЕН - вызывал утечку физических подключений
-                    // ConnectionIdleLifetime не контролирует физические подключения при Multiplexing=true
-                    // С обычным пулом: 1 DbContext = 1 физическое подключение (проще отладка)
-                    Multiplexing = false,
-                    MaxAutoPrepare = 20, // Prepared statements кэш
-                    AutoPrepareMinUsages = 2 // Prepare после 2го использования
-                }
-            };
-
-            dataSourceBuilder.EnableDynamicJson();
+            var sharedDataSource = sp.GetRequiredService<Npgsql.NpgsqlDataSource>();
             
-            options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            options.UseNpgsql(sharedDataSource, npgsqlOptions =>
             {
-                // ❌ ВРЕМЕННО ОТКЛЮЧЕНО - retry усугубляет "too many clients"
-                // При переполнении пула: 1 запрос × 4 попытки = 4x нагрузка!
+                // ВРЕМЕННО ОТКЛЮЧЕНО - retry усугубляет "too many clients"
                 // TODO: Включить после оптимизации запросов и добавления индексов
                 // npgsqlOptions.EnableRetryOnFailure(
                 //     maxRetryCount: 3,

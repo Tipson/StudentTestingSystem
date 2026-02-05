@@ -22,38 +22,48 @@ public static class DependencyInjection
         var cs = cfg.GetConnectionString("Default")
                  ?? throw new Exception("Строка подключения к БД Media не задана.");
 
+        // Чтобы sp.GetRequiredService<IOptions<DatabaseOptions>>() работал
+        services.Configure<DatabaseOptions>(cfg.GetSection(DatabaseOptions.SectionName));
+
+        // ===== DataSource должен быть SINGLETON =====
+        var dbOptions = cfg.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+
+        var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
+        {
+            ConnectionStringBuilder =
+            {
+                MaxPoolSize = dbOptions.MaxPoolSize,
+                MinPoolSize = dbOptions.MinPoolSize,
+                ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
+                ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
+                ConnectionLifetime = dbOptions.ConnectionLifetime,
+                CommandTimeout = dbOptions.CommandTimeout,
+
+                Multiplexing = false,
+                MaxAutoPrepare = 20,
+                AutoPrepareMinUsages = 2
+            }
+        };
+
+        var dataSource = dataSourceBuilder.Build();
+        services.AddSingleton(dataSource);
+
         services.AddDbContext<MediaDbContext>((sp, options) =>
         {
-            var dbOptions = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(cs)
-            {
-                ConnectionStringBuilder =
-                {
-                    MaxPoolSize = dbOptions.MaxPoolSize,
-                    MinPoolSize = dbOptions.MinPoolSize,
-                    ConnectionIdleLifetime = dbOptions.ConnectionIdleLifetime,
-                    ConnectionPruningInterval = dbOptions.ConnectionPruningInterval,
-                    ConnectionLifetime = dbOptions.ConnectionLifetime,
-                    CommandTimeout = dbOptions.CommandTimeout,
-                    // Производительность
-                    Multiplexing = false,
-                    MaxAutoPrepare = 20,
-                    AutoPrepareMinUsages = 2
-                }
-            };
+            var sharedDataSource = sp.GetRequiredService<Npgsql.NpgsqlDataSource>();
 
-            options.UseNpgsql(dataSourceBuilder.Build(), npgsqlOptions =>
+            options.UseNpgsql(sharedDataSource, npgsqlOptions =>
             {
                 // ❌ ВРЕМЕННО ОТКЛЮЧЕНО
                 // npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+
                 npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
             });
         });
 
         services.AddScoped<IMediaRepository, MediaRepository>();
 
-        services.Configure<StorageOptions>(
-            cfg.GetSection("StorageOptions"));
+        services.Configure<StorageOptions>(cfg.GetSection("StorageOptions"));
 
         services.AddSingleton<IMinioClient>(sp =>
         {
@@ -79,8 +89,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IStorageProvider, StorageProvider>();
-        
-        // MediatR Pipeline Behavior для автоматического SaveChanges
+
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         return services;
