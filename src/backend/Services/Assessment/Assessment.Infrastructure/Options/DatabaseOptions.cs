@@ -4,16 +4,17 @@ public class DatabaseOptions
 {
     public const string SectionName = "Database";
 
-    // Размер пула
+    // Размер пула (переопределяется через Helm values.yaml)
     public int MaxPoolSize { get; set; } = 20;
-    public int MinPoolSize { get; set; } = 5;
+    public int MinPoolSize { get; set; } = 2;
     
     // БЫСТРОЕ ВОССТАНОВЛЕНИЕ ПОСЛЕ ПЕРЕГРУЗКИ
-    // Idle подключения живут максимум 60 секунд (вместо 300s)
+    // Idle подключения живут максимум 60 секунд
+    // Работает ТОЛЬКО без Multiplexing=true!
     public int ConnectionIdleLifetime { get; set; } = 60;
     
-    // Проверка и очистка каждые 5 секунд (вместо 10s)
-    public int ConnectionPruningInterval { get; set; } = 5;
+    // Проверка и очистка каждые 10 секунд
+    public int ConnectionPruningInterval { get; set; } = 10;
     
     // Любое подключение принудительно закрывается через 2 минуты
     // Даже если активное - защита от утечек

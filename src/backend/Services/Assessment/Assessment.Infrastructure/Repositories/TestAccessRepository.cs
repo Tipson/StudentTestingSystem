@@ -10,13 +10,11 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
     public Task<TestAccess?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.TestAccesses
             .AsNoTracking()
-            .Include(a => a.Test)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
 
     public Task<TestAccess?> GetByInviteCodeAsync(Guid inviteCode, CancellationToken ct) =>
         db.TestAccesses
             .AsNoTracking()
-            .Include(a => a.Test)
             .FirstOrDefaultAsync(a => a.InviteCode == inviteCode, ct);
 
     public Task<List<TestAccess>> GetByTestIdAsync(Guid testId, CancellationToken ct) =>
@@ -31,7 +29,6 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
     
         return db.TestAccesses
             .AsNoTracking()
-            .Include(a => a.Test)
             .Where(a => a.UserId == userId && 
                         (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);
@@ -43,7 +40,6 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
     
         return db.TestAccesses
             .AsNoTracking()
-            .Include(a => a.Test)
             .Where(a => a.GroupId == groupId && 
                         (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);

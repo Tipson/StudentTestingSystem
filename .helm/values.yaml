@@ -15,10 +15,10 @@ assessmentApi:
     host: "postgres-postgresql.lms.svc.cluster.local"
     port: "5432"
     name: "assessment"
-    # Параметры пула подключений (высокая нагрузка)
+    # Параметры пула подключений - оптимизировано для быстрого освобождения
     maxPoolSize: "20"
-    minPoolSize: "5"
-    connectionIdleLifetime: "300"
+    minPoolSize: "2"
+    connectionIdleLifetime: "60"
     connectionPruningInterval: "10"
   redis:
     host: "redis-master.lms.svc.cluster.local"

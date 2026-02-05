@@ -46,8 +46,10 @@ public static class DependencyInjection
                     // PostgreSQL таймауты для предотвращения зависания
                     Options = $"-c statement_timeout={dbOptions.CommandTimeout * 1000} " +  // Макс время на запрос
                               "-c idle_in_transaction_session_timeout=60000", // Зависшие транзакции убиваются через 60с
-                    // Производительность: Multiplexing + Pipelining
-                    Multiplexing = true, // Одно физическое подключение для многих команд
+                    // MULTIPLEXING ОТКЛЮЧЕН - вызывал утечку физических подключений
+                    // ConnectionIdleLifetime не контролирует физические подключения при Multiplexing=true
+                    // С обычным пулом: 1 DbContext = 1 физическое подключение (проще отладка)
+                    Multiplexing = false,
                     MaxAutoPrepare = 20, // Prepared statements кэш
                     AutoPrepareMinUsages = 2 // Prepare после 2го использования
                 }
