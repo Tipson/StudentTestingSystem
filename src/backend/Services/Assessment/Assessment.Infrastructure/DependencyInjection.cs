@@ -59,24 +59,19 @@ public static class DependencyInjection
         var dataSource = dataSourceBuilder.Build();
         services.AddSingleton(dataSource);
 
-        // DbContext использует готовый Singleton DataSource
-        services.AddDbContext<AssessmentDbContext>((sp, options) =>
-        {
-            var sharedDataSource = sp.GetRequiredService<Npgsql.NpgsqlDataSource>();
-            
-            options.UseNpgsql(sharedDataSource, npgsqlOptions =>
+        services.AddDbContextPool<AssessmentDbContext>(
+            (sp, options) =>
             {
-                // ВРЕМЕННО ОТКЛЮЧЕНО - retry усугубляет "too many clients"
-                // TODO: Включить после оптимизации запросов и добавления индексов
-                // npgsqlOptions.EnableRetryOnFailure(
-                //     maxRetryCount: 3,
-                //     maxRetryDelay: TimeSpan.FromSeconds(2),
-                //     errorCodesToAdd: null);
-                    
-                // Command Timeout на уровне EF Core
-                npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
-            });
-        });
+                var sharedDataSource = sp.GetRequiredService<Npgsql.NpgsqlDataSource>();
+                
+                options.UseNpgsql(sharedDataSource, npgsqlOptions =>
+                {
+                    // Command Timeout на уровне EF Core
+                    npgsqlOptions.CommandTimeout(dbOptions.CommandTimeout);
+                });
+            },
+            poolSize: 128
+        );
         
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
