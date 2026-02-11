@@ -60,7 +60,7 @@ export default function TestEditPage() {
     const {testId} = useParams();
     const navigate = useNavigate();
 
-    // ── Step state: 1 = basic info, 2 = questions ──
+    // ── Step state: 1 = basic info, 2 = questions, 3 = settings + publish ──
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(true);
 
@@ -77,6 +77,14 @@ export default function TestEditPage() {
     const [activeIdx, setActiveIdx] = useState(0);
     const [saving, setSaving] = useState(false);
 
+    // ── Step 3: settings ──
+    const [settings, setSettings] = useState({
+        timeLimitMinutes: '',
+        passScore: '',
+        attemptsLimit: '',
+        allowAiHints: false,
+    });
+
     const fileInputRef = useRef(null);
     const [uploadingFor, setUploadingFor] = useState(null);
 
@@ -90,6 +98,13 @@ export default function TestEditPage() {
                 title: test.title || test.name || '',
                 description: test.description || '',
                 accessType: test.accessType || 'public',
+            });
+            // Load existing settings if available
+            setSettings({
+                timeLimitMinutes: test.timeLimitSeconds ? String(Math.round(test.timeLimitSeconds / 60)) : '',
+                passScore: test.passScore ? String(test.passScore) : '',
+                attemptsLimit: test.attemptsLimit ? String(test.attemptsLimit) : '',
+                allowAiHints: test.allowAiHints || false,
             });
         } catch (e) {
             console.error('Failed to fetch test:', e);
@@ -115,6 +130,10 @@ export default function TestEditPage() {
 
     const handleChange = (field, value) => {
         setForm(prev => ({...prev, [field]: value}));
+    };
+
+    const handleSettingsChange = (field, value) => {
+        setSettings(prev => ({...prev, [field]: value}));
     };
 
     /* ═══════════════ STEP 1: Save meta → go to STEP 2 ═══════════════ */
@@ -212,8 +231,8 @@ export default function TestEditPage() {
         setActiveIdx(idx);
     }, [activeIdx, current, questions, testId, saveQuestion]);
 
-    /* ═══════════════ SAVE TEST (final) ═══════════════ */
-    const handleSaveTest = async () => {
+    /* ═══════════════ STEP 2 → STEP 3: Save all questions ═══════════════ */
+    const handleGoToSettings = async () => {
         setSavingTest(true);
         try {
             // Save current question first
@@ -231,9 +250,39 @@ export default function TestEditPage() {
                 }
             }
 
+            setStep(3);
+        } catch (e) {
+            console.error('Failed to save questions:', e);
+        } finally {
+            setSavingTest(false);
+        }
+    };
+
+    /* ═══════════════ STEP 3: Publish ═══════════════ */
+    const handlePublish = async (e) => {
+        e.preventDefault();
+
+        setSavingTest(true);
+        try {
+            const timeLimitSeconds = settings.timeLimitMinutes
+                ? parseInt(settings.timeLimitMinutes) * 60
+                : 0;
+
+            await assessmentApi.tests.update(testId, {
+                title: form.title.trim(),
+                description: form.description.trim(),
+                passScore: parseInt(settings.passScore) || 0,
+                attemptsLimit: parseInt(settings.attemptsLimit) || 0,
+                timeLimitSeconds,
+                allowAiHints: settings.allowAiHints,
+            });
+
+            // Publish test
+            await assessmentApi.tests.publish(testId);
+
             navigate('/tests');
         } catch (e) {
-            console.error('Failed to save test:', e);
+            console.error('Failed to publish test:', e);
         } finally {
             setSavingTest(false);
         }
@@ -390,6 +439,7 @@ export default function TestEditPage() {
 
     const progress = questions.length > 0 ? ((activeIdx + 1) / questions.length) * 100 : 0;
     const isChoice = current && (current.type === 0 || current.type === 1);
+    const maxScore = questions.reduce((sum, q) => sum + (q.points || 1), 0);
 
     /* ═══════════════ RENDER ═══════════════ */
 
@@ -487,6 +537,110 @@ export default function TestEditPage() {
         );
     }
 
+    // ── STEP 3: Settings + Publish ──
+    if (step === 3) {
+        return (
+            <Layout>
+                <div className="test-create">
+                    <h1 className="test-create__page-title">Настройки теста</h1>
+
+                    <form className="test-create__form" onSubmit={handlePublish}>
+                        {/* Score info banner */}
+                        <div className="tc-score-info">
+                            <div className="tc-score-info__icon">★</div>
+                            <div className="tc-score-info__text">
+                                Для успешного прохождения необходимо набрать{' '}
+                                <span className="tc-score-info__value">
+                                    {parseInt(settings.passScore) || 0}
+                                </span>{' '}
+                                из{' '}
+                                <span className="tc-score-info__value">{maxScore}</span>{' '}
+                                баллов
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h2 className="form-section__title">Параметры прохождения</h2>
+
+                            <div className="form-group">
+                                <label className="form-group__label">Ограничение по времени (минуты)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="Без ограничения"
+                                    min={0}
+                                    value={settings.timeLimitMinutes}
+                                    onChange={(e) => handleSettingsChange('timeLimitMinutes', e.target.value)}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-group__label">
+                                    Проходной балл
+                                    <span style={{color: 'var(--color-text-muted)', fontWeight: 400}}>
+                                        {' '}(макс. {maxScore})
+                                    </span>
+                                </label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="0"
+                                    min={0}
+                                    max={maxScore}
+                                    value={settings.passScore}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value) || 0;
+                                        handleSettingsChange('passScore', val > maxScore ? String(maxScore) : e.target.value);
+                                    }}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-group__label">Количество попыток</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="Без ограничения"
+                                    min={0}
+                                    value={settings.attemptsLimit}
+                                    onChange={(e) => handleSettingsChange('attemptsLimit', e.target.value)}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="tc-meta__checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.allowAiHints}
+                                        onChange={(e) => handleSettingsChange('allowAiHints', e.target.checked)}
+                                    />
+                                    Разрешить ИИ подсказки
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="test-create__actions">
+                            <button
+                                type="submit"
+                                className="btn btn--primary"
+                                disabled={savingTest}
+                            >
+                                {savingTest ? 'Публикация...' : 'Опубликовать тест'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn--outline"
+                                onClick={() => setStep(2)}
+                            >
+                                Назад
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </Layout>
+        );
+    }
+
     // ── STEP 2: Questions editor ──
     return (
         <Layout>
@@ -499,12 +653,19 @@ export default function TestEditPage() {
             />
 
             <div className="tc-page">
-                {/* Header */}
+                {/* Header: test title + save button */}
                 <div className="tc-header">
-                    <h1 className="tc-header__title">Вопросы</h1>
+                    <h1 className="tc-header__title">{form.title || 'Редактирование теста'}</h1>
+                    <button
+                        className="btn btn--primary tc-header__save"
+                        onClick={handleGoToSettings}
+                        disabled={savingTest || saving}
+                    >
+                        {savingTest ? 'Сохранение...' : 'Сохранить тест'}
+                    </button>
                 </div>
 
-                {/* Body: sidebar + question card */}
+                {/* Body: sidebar + main (80%) + add button */}
                 <div className="tc-body">
                     <QuestionSidebar
                         questions={questions}
@@ -635,26 +796,23 @@ export default function TestEditPage() {
                                     </svg>
                                 </button>
                             </div>
-
-                            {/* Save test button */}
-                            <button
-                                className="btn btn--primary btn--block"
-                                onClick={handleSaveTest}
-                                disabled={savingTest || saving}
-                            >
-                                {savingTest ? 'Сохранение...' : 'Сохранить тест'}
-                            </button>
                         </div>
                     </div>
-                </div>
 
-                {/* FAB: add question */}
-                <button className="fab" onClick={handleAddQuestion} title="Добавить вопрос">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                </button>
+                    {/* Add question button — справа по центру */}
+                    <div className="tc-aside">
+                        <button
+                            className="tc-aside__add"
+                            onClick={handleAddQuestion}
+                            title="Добавить вопрос"
+                        >
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </Layout>
     );
