@@ -1,4 +1,4 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {assessmentApi} from '@api/assessment.js';
 import {mediaApi} from '@api/media.js';
@@ -75,6 +75,7 @@ export default function TestCreatePage() {
     const [questions, setQuestions] = useState([makeEmptyQuestion()]);
     const [activeIdx, setActiveIdx] = useState(0);
     const [saving, setSaving] = useState(false);
+    const questionsRef = useRef(questions);
 
     // ── Step 3: settings ──
     const [settings, setSettings] = useState({
@@ -88,6 +89,10 @@ export default function TestCreatePage() {
     const [uploadingFor, setUploadingFor] = useState(null);
 
     const current = questions[activeIdx] || null;
+
+    useEffect(() => {
+        questionsRef.current = questions;
+    }, [questions]);
 
     // ── Update a field on the current question ──
     const updateQ = useCallback((field, value) => {
@@ -136,8 +141,9 @@ export default function TestCreatePage() {
     };
 
     /* ═══════════════ SAVE SINGLE QUESTION ═══════════════ */
-    const saveQuestion = useCallback(async (tId, idx, qList) => {
-        const q = qList ? qList[idx] : questions[idx];
+    const saveQuestion = useCallback(async (tId, idx) => {
+        const source = questionsRef.current;
+        const q = source[idx];
         if (!q || !q.text.trim()) return;
 
         const payload = {
@@ -156,20 +162,20 @@ export default function TestCreatePage() {
 
         if (q._isNew || !q.id) {
             const res = await assessmentApi.questions.create(tId, payload);
-            setQuestions(prev => {
-                const copy = [...prev];
-                copy[idx] = {...copy[idx], ...res.data, _isNew: false};
-                return copy;
-            });
+            const updated = {...q, ...res.data, _isNew: false};
+            const next = [...questionsRef.current];
+            next[idx] = updated;
+            questionsRef.current = next;
+            setQuestions(next);
         } else {
             await assessmentApi.questions.update(q.id, payload);
-            setQuestions(prev => {
-                const copy = [...prev];
-                copy[idx] = {...copy[idx], _isNew: false};
-                return copy;
-            });
+            const updated = {...q, _isNew: false};
+            const next = [...questionsRef.current];
+            next[idx] = updated;
+            questionsRef.current = next;
+            setQuestions(next);
         }
-    }, [questions]);
+    }, []);
 
     /* ═══════════════ AUTO-SAVE ON QUESTION NAVIGATION ═══════════════ */
     const goToQuestion = useCallback(async (idx) => {
@@ -179,7 +185,7 @@ export default function TestCreatePage() {
         if (testId && current && current.text.trim()) {
             setSaving(true);
             try {
-                await saveQuestion(testId, activeIdx, questions);
+                await saveQuestion(testId, activeIdx);
             } catch (e) {
                 console.error('Auto-save failed:', e);
             } finally {
@@ -198,16 +204,16 @@ export default function TestCreatePage() {
         try {
             // Save current question first
             if (current && current.text.trim()) {
-                await saveQuestion(testId, activeIdx, questions);
+                await saveQuestion(testId, activeIdx);
             }
 
             // Save all unsaved questions
-            for (let i = 0; i < questions.length; i++) {
+            for (let i = 0; i < questionsRef.current.length; i++) {
                 if (i === activeIdx) continue;
-                const q = questions[i];
+                const q = questionsRef.current[i];
                 if (!q.text.trim()) continue;
                 if (q._isNew || !q.id) {
-                    await saveQuestion(testId, i, questions);
+                    await saveQuestion(testId, i);
                 }
             }
 

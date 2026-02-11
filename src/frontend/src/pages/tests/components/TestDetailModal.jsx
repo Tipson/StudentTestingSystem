@@ -3,7 +3,7 @@ import StatusBadge from './StatusBadge.jsx';
 import './TestDetailModal.css';
 
 export default function TestDetailModal({test, onClose, onStart}) {
-    const canStart = test.status === 'available' || test.status === 'published';
+    const canStart = test.status === 'Published';
 
     const handleOverlayClick = (e) => {
         if (e.target === e.currentTarget) onClose();

@@ -11,12 +11,13 @@ const STATUS_MAP = {
 };
 
 export default function StatusBadge({status}) {
-    const config = STATUS_MAP[status] || STATUS_MAP.unavailable;
+    const key = String(status ?? '').trim().toLowerCase();
+    const config = STATUS_MAP[key] || STATUS_MAP.unavailable;
 
     return (
         <span className={`badge ${config.className}`}>
-            {config.icon && <span className="badge__icon">{config.icon}</span>}
+      {config.icon && <span className="badge__icon">{config.icon}</span>}
             {config.label}
-        </span>
+    </span>
     );
 }

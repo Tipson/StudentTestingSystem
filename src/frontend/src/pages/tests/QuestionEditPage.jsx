@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {assessmentApi} from '@api/assessment.js';
 import Layout from '@shared/components/Layout/Layout.jsx';
@@ -28,6 +28,7 @@ export default function QuestionEditPage() {
     const [loading, setLoading] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const questionsRef = useRef(questions);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -55,6 +56,10 @@ export default function QuestionEditPage() {
         fetchData();
     }, [fetchData]);
 
+    useEffect(() => {
+        questionsRef.current = questions;
+    }, [questions]);
+
     const currentQuestion = questions[activeIndex] || null;
 
     const handleUpdateQuestion = (field, value) => {
@@ -71,30 +76,29 @@ export default function QuestionEditPage() {
     };
 
     const handleSaveQuestion = async () => {
-        if (!currentQuestion) return;
+        const question = questionsRef.current[activeIndex] || currentQuestion;
+        if (!question) return;
         setSaving(true);
         try {
             const payload = {
-                text: currentQuestion.text,
-                type: currentQuestion.type,
-                options: currentQuestion.options,
-                points: currentQuestion.points,
+                text: question.text,
+                type: question.type,
+                options: question.options,
+                points: question.points,
             };
 
-            if (currentQuestion._isNew) {
+            if (question._isNew || !question.id) {
                 const res = await assessmentApi.questions.create(testId, payload);
-                setQuestions(prev => {
-                    const updated = [...prev];
-                    updated[activeIndex] = {...res.data, _isNew: false};
-                    return updated;
-                });
+                const next = [...questionsRef.current];
+                next[activeIndex] = {...question, ...res.data, _isNew: false};
+                questionsRef.current = next;
+                setQuestions(next);
             } else {
-                await assessmentApi.questions.update(currentQuestion.id, payload);
-                setQuestions(prev => {
-                    const updated = [...prev];
-                    updated[activeIndex] = {...updated[activeIndex], _isNew: false};
-                    return updated;
-                });
+                await assessmentApi.questions.update(question.id, payload);
+                const next = [...questionsRef.current];
+                next[activeIndex] = {...question, _isNew: false};
+                questionsRef.current = next;
+                setQuestions(next);
             }
         } catch (e) {
             console.error('Failed to save question:', e);
