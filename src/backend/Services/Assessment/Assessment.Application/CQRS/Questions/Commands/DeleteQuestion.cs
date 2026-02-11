@@ -11,7 +11,8 @@ public sealed record DeleteQuestion(Guid QuestionId) : IRequest;
 public sealed class DeleteQuestionHander(
     IQuestionRepository questionRepository,
     ITestRepository testRepository,
-    IUserContext userContext) : IRequestHandler<DeleteQuestion>
+    IUserContext userContext,
+    IUnitOfWork unitOfWork) : IRequestHandler<DeleteQuestion>
 {
     public async Task Handle(DeleteQuestion request, CancellationToken cancellationToken)
     {
@@ -28,5 +29,6 @@ public sealed class DeleteQuestionHander(
             throw new InvalidOperationException("Нельзя удалять вопросы опубликованного теста");
 
         await questionRepository.DeleteAsync(question, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

@@ -15,7 +15,8 @@ public sealed record UpdateQuestion(Guid QuestionId, UpdateQuestionDto Dto) : IR
 public sealed class UpdateQuestionHandler(
     IQuestionRepository questionRepository,
     ITestRepository testRepository,
-    IUserContext userContext)
+    IUserContext userContext,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateQuestion, QuestionDto>
 {
     public async Task<QuestionDto> Handle(UpdateQuestion request, CancellationToken ct)
@@ -47,6 +48,7 @@ public sealed class UpdateQuestionHandler(
         }
 
         await questionRepository.UpdateAsync(question, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return question.Adapt<QuestionDto>();
     }

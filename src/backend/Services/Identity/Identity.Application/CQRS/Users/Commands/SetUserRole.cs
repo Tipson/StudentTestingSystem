@@ -1,3 +1,4 @@
+using Application;
 using BuildingBlocks.Api.Exceptions;
 using Contracts.Identity;
 using Identity.Application.Interfaces;
@@ -10,7 +11,8 @@ public sealed record SetUserRole(string UserId, UserRole Role) : IRequest;
 
 public sealed class SetUserRoleHandler(
     IUserRepository users,
-    IKeycloakService keycloak
+    IKeycloakService keycloak,
+    IUnitOfWork unitOfWork
 ) : IRequestHandler<SetUserRole>
 {
     public async Task Handle(SetUserRole request, CancellationToken ct)
@@ -25,6 +27,7 @@ public sealed class SetUserRoleHandler(
 
         user.SetRole(request.Role);
         await users.UpdateAsync(user, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         // Метрики: роль изменена
         var roleLabel = request.Role.ToString().ToLower();

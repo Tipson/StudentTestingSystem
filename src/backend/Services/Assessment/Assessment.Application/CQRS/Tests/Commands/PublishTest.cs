@@ -13,7 +13,8 @@ public sealed record PublishTest(Guid TestId) : IRequest;
 
 public sealed class PublishTestHandler(
     IUserContext userContext,
-    ITestRepository tests)
+    ITestRepository tests,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PublishTest>
 {
     public async Task Handle(PublishTest request, CancellationToken ct)
@@ -27,5 +28,6 @@ public sealed class PublishTestHandler(
         test.Publish();
 
         await tests.UpdateAsync(test, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

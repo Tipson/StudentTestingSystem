@@ -15,7 +15,8 @@ public sealed record UpdateTestSettings(Guid TestId, UpdateTestSettingsDto Dto) 
 
 public sealed class UpdateTestSettingsHandler(
     IUserContext userContext,
-    ITestRepository tests)
+    ITestRepository tests,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateTestSettings, TestDto>
 {
     public async Task<TestDto> Handle(UpdateTestSettings request, CancellationToken ct)
@@ -39,6 +40,7 @@ public sealed class UpdateTestSettingsHandler(
         );
 
         await tests.UpdateAsync(test, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return test.Adapt<TestDto>();
     }

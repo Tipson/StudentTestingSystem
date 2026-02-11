@@ -12,7 +12,8 @@ public sealed record ReorderQuestions(Guid TestId, List<Guid> QuestionIds) : IRe
 public sealed class ReorderQuestionsHandler(
     IQuestionRepository questionRepository,
     ITestRepository testRepository,
-    IUserContext userContext)
+    IUserContext userContext,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<ReorderQuestions>
 {
     public async Task Handle(ReorderQuestions request, CancellationToken ct)
@@ -41,5 +42,6 @@ public sealed class ReorderQuestionsHandler(
         }
 
         await questionRepository.UpdateRangeAsync(questions, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

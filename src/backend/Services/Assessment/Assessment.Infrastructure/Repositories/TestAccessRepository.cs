@@ -9,16 +9,17 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
 {
     public Task<TestAccess?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.TestAccesses
-            .Include(a => a.Test)
+            .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id, ct);
 
     public Task<TestAccess?> GetByInviteCodeAsync(Guid inviteCode, CancellationToken ct) =>
         db.TestAccesses
-            .Include(a => a.Test)
+            .AsNoTracking()
             .FirstOrDefaultAsync(a => a.InviteCode == inviteCode, ct);
 
     public Task<List<TestAccess>> GetByTestIdAsync(Guid testId, CancellationToken ct) =>
         db.TestAccesses
+            .AsNoTracking()
             .Where(a => a.TestId == testId)
             .ToListAsync(ct);
 
@@ -27,7 +28,7 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
         var now = DateTimeOffset.UtcNow;
     
         return db.TestAccesses
-            .Include(a => a.Test)
+            .AsNoTracking()
             .Where(a => a.UserId == userId && 
                         (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);
@@ -38,7 +39,7 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
         var now = DateTimeOffset.UtcNow;
     
         return db.TestAccesses
-            .Include(a => a.Test)
+            .AsNoTracking()
             .Where(a => a.GroupId == groupId && 
                         (!a.ExpiresAt.HasValue || a.ExpiresAt.Value >= now))
             .ToListAsync(ct);
@@ -46,10 +47,12 @@ public sealed class TestAccessRepository(AssessmentDbContext db) : ITestAccessRe
     
     public Task<TestAccess?> GetByTestAndUserAsync(Guid testId, string userId, CancellationToken ct) =>
         db.TestAccesses
+            .AsNoTracking()
             .FirstOrDefaultAsync(a => a.TestId == testId && a.UserId == userId, ct);
 
     public Task<TestAccess?> GetByTestAndGroupAsync(Guid testId, Guid groupId, CancellationToken ct) =>
         db.TestAccesses
+            .AsNoTracking()
             .FirstOrDefaultAsync(a => a.TestId == testId && a.GroupId == groupId, ct);
 
     public async Task AddAsync(TestAccess access, CancellationToken ct)

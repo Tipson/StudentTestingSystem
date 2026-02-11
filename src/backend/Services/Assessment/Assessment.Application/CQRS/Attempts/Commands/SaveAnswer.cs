@@ -18,7 +18,8 @@ public sealed class SaveAnswerHandler(
     IUserContext userContext,
     IAttemptRepository attempts,
     ITestRepository tests,
-    IQuestionRepository questions) : IRequestHandler<SaveAnswer, AttemptAnswerDto>
+    IQuestionRepository questions,
+    IUnitOfWork unitOfWork) : IRequestHandler<SaveAnswer, AttemptAnswerDto>
 {
     public async Task<AttemptAnswerDto> Handle(SaveAnswer request, CancellationToken cancellationToken)
     {
@@ -57,6 +58,7 @@ public sealed class SaveAnswerHandler(
 
         var saved = attempt.SetAnswer(request.QuestionId, payload);
         await attempts.UpdateAsync(attempt, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return saved.Adapt<AttemptAnswerDto>();
     }

@@ -16,24 +16,23 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
         db.Users.AnyAsync(x => x.Id == id, ct);
 
     public Task<User?> GetByEmail(string email, CancellationToken ct) =>
-        db.Users.FirstOrDefaultAsync(x => x.Email == email, ct);
+        db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, ct);
 
-    public async Task AddAsync(User user, CancellationToken ct)
+    public Task AddAsync(User user, CancellationToken ct)
     {
-        await db.Users.AddAsync(user, ct);
-        await db.SaveChangesAsync(ct);
+        return db.Users.AddAsync(user, ct).AsTask();
     }
 
-    public async Task UpdateAsync(User user, CancellationToken ct)
+    public Task UpdateAsync(User user, CancellationToken ct)
     {
         db.Users.Update(user);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
     
-    public async Task RemoveAsync(User user, CancellationToken ct)
+    public Task RemoveAsync(User user, CancellationToken ct)
     {
         db.Users.Remove(user);
-        await db.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
     
     public Task<List<User>> GetListAsync(CancellationToken ct) =>
@@ -56,6 +55,11 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
             .ToListAsync(ct);
     }
     
+    /// <summary>
+    /// Атомарная операция получения или создания пользователя.
+    /// ВАЖНО: Вызывает SaveChanges напрямую для обработки race conditions через unique constraint.
+    /// Это исключение из правила "репозитории не сохраняют" - оправдано для атомарности.
+    /// </summary>
     public async Task<User> GetOrCreateAsync(User candidate, CancellationToken ct)
     {
         var existing = await db.Users.FindAsync([candidate.Id], ct);
@@ -66,6 +70,7 @@ public sealed class UserRepository(IdentityDbContext db) : IUserRepository
 
         try
         {
+            // Сохраняем сразу для проверки unique constraint и обработки race condition
             await db.SaveChangesAsync(ct);
             return candidate;
         }

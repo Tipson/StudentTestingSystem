@@ -19,7 +19,8 @@ public sealed record GrantAccessToGroup(
 public sealed class GrantAccessToGroupHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<GrantAccessToGroup, Guid>
 {
     public async Task<Guid> Handle(GrantAccessToGroup request, CancellationToken ct)
@@ -46,6 +47,7 @@ public sealed class GrantAccessToGroupHandler(
         );
 
         await testAccesses.AddAsync(access, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return access.Id;
     }

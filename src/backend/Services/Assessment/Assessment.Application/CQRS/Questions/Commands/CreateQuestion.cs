@@ -18,7 +18,8 @@ public sealed record CreateQuestion(Guid TestId, CreateQuestionDto Dto) : IReque
 public sealed class CreateQuestionHandler(
     IUserContext userContext,
     ITestRepository tests,
-    IQuestionRepository questions)
+    IQuestionRepository questions,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateQuestion, QuestionDto>
 {
     public async Task<QuestionDto> Handle(CreateQuestion request, CancellationToken ct)
@@ -57,6 +58,7 @@ public sealed class CreateQuestionHandler(
         }
 
         await questions.AddAsync(question, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return question.Adapt<QuestionDto>();
     }

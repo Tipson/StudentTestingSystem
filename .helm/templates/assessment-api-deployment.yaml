@@ -104,3 +104,13 @@ spec:
               value: {{ .Values.assessmentApi.grading.useMessageBus | quote }}
             - name: GradingService__Url
               value: {{ .Values.assessmentApi.grading.serviceUrl | quote }}
+
+            # Database Pool Configuration
+            - name: Database__MaxPoolSize
+              value: {{ .Values.assessmentApi.database.maxPoolSize | quote }}
+            - name: Database__MinPoolSize
+              value: {{ .Values.assessmentApi.database.minPoolSize | quote }}
+            - name: Database__ConnectionIdleLifetime
+              value: {{ .Values.assessmentApi.database.connectionIdleLifetime | quote }}
+            - name: Database__ConnectionPruningInterval
+              value: {{ .Values.assessmentApi.database.connectionPruningInterval | quote }}

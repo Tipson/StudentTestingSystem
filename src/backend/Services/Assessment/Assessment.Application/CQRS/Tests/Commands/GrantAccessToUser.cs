@@ -19,7 +19,8 @@ public sealed record GrantAccessToUser(
 public sealed class GrantAccessToUserHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<GrantAccessToUser, Guid>
 {
     public async Task<Guid> Handle(GrantAccessToUser request, CancellationToken ct)
@@ -46,6 +47,7 @@ public sealed class GrantAccessToUserHandler(
         );
 
         await testAccesses.AddAsync(access, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return access.Id;
     }

@@ -79,3 +79,13 @@ spec:
                 secretKeyRef:
                   name: redis
                   key: redis-password
+
+            # Database Pool Configuration
+            - name: Database__MaxPoolSize
+              value: {{ .Values.mediaApi.database.maxPoolSize | quote }}
+            - name: Database__MinPoolSize
+              value: {{ .Values.mediaApi.database.minPoolSize | quote }}
+            - name: Database__ConnectionIdleLifetime
+              value: {{ .Values.mediaApi.database.connectionIdleLifetime | quote }}
+            - name: Database__ConnectionPruningInterval
+              value: {{ .Values.mediaApi.database.connectionPruningInterval | quote }}

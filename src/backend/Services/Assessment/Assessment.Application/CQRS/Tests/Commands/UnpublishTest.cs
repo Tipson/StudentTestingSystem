@@ -8,7 +8,7 @@ namespace Assessment.Application.CQRS.Tests.Commands;
 
 public sealed record UnpublishTest(Guid TestId) : IRequest;
 
-public sealed class UnpublishTestHander(ITestRepository testRepository, IUserContext userContext) : IRequestHandler<UnpublishTest>
+public sealed class UnpublishTestHander(ITestRepository testRepository, IUserContext userContext, IUnitOfWork unitOfWork) : IRequestHandler<UnpublishTest>
 {
     public async Task Handle(UnpublishTest request, CancellationToken cancellationToken)
     {
@@ -24,5 +24,6 @@ public sealed class UnpublishTestHander(ITestRepository testRepository, IUserCon
         test.Unpublish();
 
         await testRepository.UpdateAsync(test, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

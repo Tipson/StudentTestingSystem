@@ -11,7 +11,8 @@ public sealed record SelectGroup(Guid GroupId) : IRequest;
 public sealed class SelectGroupHandler(
     IUserContext userContext,
     IUserRepository users,
-    IGroupRepository groups
+    IGroupRepository groups,
+    IUnitOfWork unitOfWork
 ) : IRequestHandler<SelectGroup>
 {
     public async Task Handle(SelectGroup request, CancellationToken ct)
@@ -35,5 +36,6 @@ public sealed class SelectGroupHandler(
 
         user.SetGroupId(request.GroupId);
         await users.UpdateAsync(user, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

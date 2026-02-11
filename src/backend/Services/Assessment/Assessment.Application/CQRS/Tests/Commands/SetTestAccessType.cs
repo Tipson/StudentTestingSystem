@@ -14,7 +14,8 @@ public sealed record SetTestAccessType(Guid TestId, TestAccessType AccessType) :
 
 public sealed class SetTestAccessTypeHandler(
     IUserContext userContext,
-    ITestRepository tests)
+    ITestRepository tests,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<SetTestAccessType>
 {
     public async Task Handle(SetTestAccessType request, CancellationToken ct)
@@ -31,5 +32,6 @@ public sealed class SetTestAccessTypeHandler(
         test.SetAccessType(request.AccessType);
 
         await tests.UpdateAsync(test, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

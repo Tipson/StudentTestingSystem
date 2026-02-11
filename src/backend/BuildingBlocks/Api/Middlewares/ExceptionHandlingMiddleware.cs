@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace BuildingBlocks.Api.Middlewares;
 
@@ -42,6 +43,12 @@ public class ExceptionHandlerMiddleware(RequestDelegate next)
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/json";
 
+        // Добавляем Retry-After заголовок для 503 Service Unavailable
+        if (statusCode == HttpStatusCode.ServiceUnavailable)
+        {
+            context.Response.Headers.Append("Retry-After", "5");
+        }
+
         await context.Response.WriteAsJsonAsync(exceptionResponse);
     }
 
@@ -50,6 +57,16 @@ public class ExceptionHandlerMiddleware(RequestDelegate next)
     /// </summary>
     private static (HttpStatusCode StatusCode, string ErrorCode, string Message) MapException(Exception ex)
     {
+        // ВАЖНО: Проверяем connection pool exhausted ДО switch (приоритет)
+        if (IsConnectionPoolExhausted(ex))
+        {
+            return (
+                HttpStatusCode.ServiceUnavailable,
+                "DATABASE_CONNECTION_POOL_EXHAUSTED",
+                "База данных временно перегружена. Попробуйте повторить запрос через несколько секунд."
+            );
+        }
+
         return ex switch
         {
             // Кастомные API-исключения (приоритет)
@@ -185,5 +202,47 @@ public class ExceptionHandlerMiddleware(RequestDelegate next)
             "DATABASE_ERROR",
             "Ошибка при сохранении данных"
         );
+    }
+
+    /// <summary>
+    /// Проверяет является ли исключение ошибкой исчерпания пула подключений PostgreSQL.
+    /// Проверяет всю цепочку исключений (включая DbUpdateException -> PostgresException).
+    /// </summary>
+    private static bool IsConnectionPoolExhausted(Exception ex)
+    {
+        var currentException = ex;
+        
+        // Проходим по всей цепочке исключений
+        while (currentException != null)
+        {
+            // PostgresException с SqlState 53300 (too many clients already)
+            if (currentException is PostgresException pgEx && pgEx.SqlState == "53300")
+                return true;
+
+            // NpgsqlException с сообщением о превышении пула
+            if (currentException is NpgsqlException npgsqlEx)
+            {
+                var message = npgsqlEx.Message.ToLowerInvariant();
+                if (message.Contains("too many clients") ||
+                    message.Contains("connection pool") ||
+                    message.Contains("timeout") && message.Contains("pool") ||
+                    message.Contains("53300"))
+                {
+                    return true;
+                }
+            }
+
+            // TimeoutException при ожидании подключения из пула
+            if (currentException is TimeoutException timeoutEx)
+            {
+                var message = timeoutEx.Message.ToLowerInvariant();
+                if (message.Contains("pool") || message.Contains("connection"))
+                    return true;
+            }
+            
+            currentException = currentException.InnerException;
+        }
+
+        return false;
     }
 }

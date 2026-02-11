@@ -16,7 +16,8 @@ public sealed record SetTestAvailability(
 
 public sealed class SetTestAvailabilityHandler(
     IUserContext userContext,
-    ITestRepository tests)
+    ITestRepository tests,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<SetTestAvailability>
 {
     public async Task Handle(SetTestAvailability request, CancellationToken ct)
@@ -33,5 +34,6 @@ public sealed class SetTestAvailabilityHandler(
         test.SetAvailability(request.AvailableFrom, request.AvailableUntil);
 
         await tests.UpdateAsync(test, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

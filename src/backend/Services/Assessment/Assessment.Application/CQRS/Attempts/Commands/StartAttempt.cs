@@ -18,7 +18,8 @@ public sealed class StartAttemptHandler(
     IUserContext userContext,
     ITestRepository tests,
     IAttemptRepository attempts,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<StartAttempt, AttemptDetailDto>
 {
     public async Task<AttemptDetailDto> Handle(StartAttempt request, CancellationToken ct)
@@ -63,6 +64,7 @@ public sealed class StartAttemptHandler(
         try
         {
             await attempts.AddAsync(newAttempt, ct);
+            await unitOfWork.SaveChangesAsync(ct);
             
             // Метрики: попытка успешно начата
             AssessmentMetrics.AttemptsStarted.Inc();

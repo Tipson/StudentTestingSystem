@@ -9,7 +9,8 @@ public sealed record LeaveGroup : IRequest;
 
 public sealed class LeaveGroupHandler(
     IUserRepository users,
-    IUserContext userContext
+    IUserContext userContext,
+    IUnitOfWork unitOfWork
 ) : IRequestHandler<LeaveGroup>
 {
     public async Task Handle(LeaveGroup request, CancellationToken ct)
@@ -24,5 +25,6 @@ public sealed class LeaveGroupHandler(
 
         user.SetGroupId(null);
         await users.UpdateAsync(user, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

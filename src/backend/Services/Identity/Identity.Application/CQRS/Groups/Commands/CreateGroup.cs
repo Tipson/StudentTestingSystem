@@ -1,3 +1,4 @@
+using Application;
 using Identity.Application.Interfaces;
 using Identity.Domain.Groups;
 using MediatR;
@@ -11,7 +12,8 @@ public sealed record CreateGroup(
     int GroupNumber) : IRequest<Guid>;
 
 public sealed class CreateGroupHandler(
-    IGroupRepository groups
+    IGroupRepository groups,
+    IUnitOfWork unitOfWork
 ) : IRequestHandler<CreateGroup, Guid>
 {
     public async Task<Guid> Handle(CreateGroup request, CancellationToken ct)
@@ -36,6 +38,7 @@ public sealed class CreateGroupHandler(
         );
 
         await groups.AddAsync(group, ct);
+        await unitOfWork.SaveChangesAsync(ct);
         return group.Id;
     }
 }

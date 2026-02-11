@@ -1,3 +1,4 @@
+using Application;
 using BuildingBlocks.Api.Exceptions;
 using Identity.Application.Interfaces;
 using MediatR;
@@ -6,7 +7,7 @@ namespace Identity.Application.CQRS.Groups.Commands;
 
 public sealed record SetGroupActive(Guid GroupId, bool IsActive) : IRequest;
 
-public sealed class SetGroupActiveHandler(IGroupRepository groups)
+public sealed class SetGroupActiveHandler(IGroupRepository groups, IUnitOfWork unitOfWork)
     : IRequestHandler<SetGroupActive>
 {
     public async Task Handle(SetGroupActive request, CancellationToken ct)
@@ -18,5 +19,6 @@ public sealed class SetGroupActiveHandler(IGroupRepository groups)
         else group.Deactivate();
 
         await groups.UpdateAsync(group, ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }
