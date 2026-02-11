@@ -1,5 +1,5 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {useNavigate, useParams} from 'react-router-dom';
+import React, {useCallback, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {assessmentApi} from '@api/assessment.js';
 import {mediaApi} from '@api/media.js';
 import {API_BASE_URLS} from '@api/config.js';
@@ -45,13 +45,11 @@ function makeEmptyQuestion() {
         options: [makeEmptyOption(0), makeEmptyOption(1)],
         mediaIds: [],
         _isNew: true,
-        // local-only: uploaded media preview data
         _media: [],
         _optionMedia: [[], []],
     };
 }
 
-/* ─────────── helper: get download URL for media ─────────── */
 function getMediaDownloadUrl(mediaId) {
     const base = API_BASE_URLS.media || '';
     return `${base}/api/files/${mediaId}`;
@@ -60,57 +58,26 @@ function getMediaDownloadUrl(mediaId) {
 /* ═══════════════════════════════════════════════════════════ */
 export default function TestCreatePage() {
     const navigate = useNavigate();
-    const {testId: editTestId} = useParams(); // if editing existing test
+
+    // ── Step state: 1 = basic info, 2 = questions ──
+    const [step, setStep] = useState(1);
 
     // ── Test-level state ──
     const [testMeta, setTestMeta] = useState({
         title: '',
         description: '',
-        allowAiHints: false,
+        accessType: 'public',
     });
-    const [testId, setTestId] = useState(editTestId || null);
-    const [testSaved, setTestSaved] = useState(!!editTestId);
+    const [testId, setTestId] = useState(null);
+    const [savingTest, setSavingTest] = useState(false);
 
     // ── Questions state ──
     const [questions, setQuestions] = useState([makeEmptyQuestion()]);
     const [activeIdx, setActiveIdx] = useState(0);
     const [saving, setSaving] = useState(false);
-    const [savingTest, setSavingTest] = useState(false);
 
     const fileInputRef = useRef(null);
-    const [uploadingFor, setUploadingFor] = useState(null); // null | 'question' | optionIndex
-
-    // ── Load existing test data when editing ──
-    useEffect(() => {
-        if (!editTestId) return;
-        (async () => {
-            try {
-                const [testRes, questionsRes] = await Promise.all([
-                    assessmentApi.tests.get(editTestId),
-                    assessmentApi.questions.list(editTestId),
-                ]);
-                const t = testRes.data;
-                setTestMeta({
-                    title: t.title || t.name || '',
-                    description: t.description || '',
-                    allowAiHints: t.allowAiHints ?? false,
-                });
-                const fetched = questionsRes.data || [];
-                if (fetched.length > 0) {
-                    setQuestions(fetched.map(q => ({
-                        ...q,
-                        _isNew: false,
-                        _media: (q.mediaIds || []).map(id => ({id, type: 'unknown', name: id})),
-                        _optionMedia: (q.options || []).map(
-                            opt => (opt.mediaIds || []).map(id => ({id, type: 'unknown', name: id})),
-                        ),
-                    })));
-                }
-            } catch (e) {
-                console.error('Failed to load test:', e);
-            }
-        })();
-    }, [editTestId]);
+    const [uploadingFor, setUploadingFor] = useState(null);
 
     const current = questions[activeIdx] || null;
 
@@ -128,116 +95,38 @@ export default function TestCreatePage() {
         setTestMeta(prev => ({...prev, [field]: value}));
     };
 
-    /* ═══════════════ SAVE TEST ═══════════════ */
-    const handleSaveTest = async () => {
+    /* ═══════════════ STEP 1 → STEP 2 ═══════════════ */
+    const handleNextStep = async (e) => {
+        e.preventDefault();
         if (!testMeta.title.trim()) return;
+
         setSavingTest(true);
         try {
-            let currentId = testId;
-            if (currentId) {
-                await assessmentApi.tests.update(currentId, {
-                    title: testMeta.title.trim(),
-                    description: testMeta.description.trim(),
-                    allowAiHints: testMeta.allowAiHints,
-                });
-            } else {
-                const res = await assessmentApi.tests.create({
-                    title: testMeta.title.trim(),
-                    description: testMeta.description.trim(),
-                    allowAiHints: testMeta.allowAiHints,
-                });
-                currentId = res.data?.id || res.data;
-                setTestId(currentId);
+            const res = await assessmentApi.tests.create({
+                title: testMeta.title.trim(),
+                description: testMeta.description.trim(),
+            });
+            const newId = res.data?.id || res.data;
+            setTestId(newId);
+
+            // Set access type
+            if (testMeta.accessType !== 'public') {
+                await assessmentApi.tests.updateAccessType(newId, testMeta.accessType);
             }
-            setTestSaved(true);
 
-            // now save all questions
-            await saveAllQuestions(currentId);
-
-            navigate('/tests');
+            setStep(2);
         } catch (e) {
-            console.error('Failed to save test:', e);
+            console.error('Failed to create test:', e);
         } finally {
             setSavingTest(false);
         }
     };
 
-    /* ═══════════════ SAVE ALL QUESTIONS ═══════════════ */
-    const saveAllQuestions = async (tId) => {
-        const currentTestId = tId || testId;
-        if (!currentTestId) return;
-
-        for (let i = 0; i < questions.length; i++) {
-            const q = questions[i];
-            if (!q.text.trim()) continue;
-
-            const payload = {
-                text: q.text,
-                type: q.type,
-                isRequired: q.isRequired ?? true,
-                points: q.points || 1,
-                options: (q.options || []).map((opt, idx) => ({
-                    text: opt.text,
-                    isCorrect: opt.isCorrect,
-                    order: idx,
-                    mediaIds: opt.mediaIds || [],
-                })),
-                mediaIds: q.mediaIds || [],
-            };
-
-            try {
-                if (q._isNew || !q.id) {
-                    const res = await assessmentApi.questions.create(currentTestId, payload);
-                    setQuestions(prev => {
-                        const copy = [...prev];
-                        copy[i] = {...copy[i], ...res.data, _isNew: false};
-                        return copy;
-                    });
-                } else {
-                    await assessmentApi.questions.update(q.id, payload);
-                }
-            } catch (e) {
-                console.error(`Failed to save question ${i + 1}:`, e);
-            }
-        }
-    };
-
     /* ═══════════════ SAVE SINGLE QUESTION ═══════════════ */
-    const handleSaveCurrentQuestion = async () => {
-        if (!current || !current.text.trim()) return;
-        if (!testId) {
-            // create test first
-            if (!testMeta.title.trim()) return;
-            setSaving(true);
-            try {
-                const res = await assessmentApi.tests.create({
-                    title: testMeta.title.trim(),
-                    description: testMeta.description.trim(),
-                    allowAiHints: testMeta.allowAiHints,
-                });
-                const newId = res.data?.id || res.data;
-                setTestId(newId);
-                setTestSaved(true);
-                await saveQuestion(newId, activeIdx);
-            } catch (e) {
-                console.error('Failed to create test:', e);
-            } finally {
-                setSaving(false);
-            }
-            return;
-        }
-        setSaving(true);
-        try {
-            await saveQuestion(testId, activeIdx);
-        } catch (e) {
-            console.error('Failed to save question:', e);
-        } finally {
-            setSaving(false);
-        }
-    };
+    const saveQuestion = useCallback(async (tId, idx, qList) => {
+        const q = qList ? qList[idx] : questions[idx];
+        if (!q || !q.text.trim()) return;
 
-    const saveQuestion = async (tId, idx) => {
-        const q = questions[idx];
         const payload = {
             text: q.text,
             type: q.type,
@@ -266,6 +155,54 @@ export default function TestCreatePage() {
                 copy[idx] = {...copy[idx], _isNew: false};
                 return copy;
             });
+        }
+    }, [questions]);
+
+    /* ═══════════════ AUTO-SAVE ON QUESTION NAVIGATION ═══════════════ */
+    const goToQuestion = useCallback(async (idx) => {
+        if (idx < 0 || idx >= questions.length || idx === activeIdx) return;
+
+        // Save current question before switching
+        if (testId && current && current.text.trim()) {
+            setSaving(true);
+            try {
+                await saveQuestion(testId, activeIdx, questions);
+            } catch (e) {
+                console.error('Auto-save failed:', e);
+            } finally {
+                setSaving(false);
+            }
+        }
+
+        setActiveIdx(idx);
+    }, [activeIdx, current, questions, testId, saveQuestion]);
+
+    /* ═══════════════ SAVE TEST (final) ═══════════════ */
+    const handleSaveTest = async () => {
+        if (!testId) return;
+
+        setSavingTest(true);
+        try {
+            // Save current question first
+            if (current && current.text.trim()) {
+                await saveQuestion(testId, activeIdx, questions);
+            }
+
+            // Save all unsaved questions
+            for (let i = 0; i < questions.length; i++) {
+                if (i === activeIdx) continue;
+                const q = questions[i];
+                if (!q.text.trim()) continue;
+                if (q._isNew || !q.id) {
+                    await saveQuestion(testId, i, questions);
+                }
+            }
+
+            navigate('/tests');
+        } catch (e) {
+            console.error('Failed to save test:', e);
+        } finally {
+            setSavingTest(false);
         }
     };
 
@@ -300,7 +237,6 @@ export default function TestCreatePage() {
     const handleAddOption = () => {
         const opts = [...(current.options || []), makeEmptyOption((current.options || []).length)];
         updateQ('options', opts);
-        // also extend _optionMedia
         setQuestions(prev => {
             const copy = [...prev];
             copy[activeIdx] = {
@@ -325,14 +261,13 @@ export default function TestCreatePage() {
 
     /* ═══════════════ FILE UPLOAD ═══════════════ */
     const handleUploadFile = async (file, target) => {
-        // target: 'question' or number (option index)
         const formData = new FormData();
         formData.append('files', file);
         try {
             const res = await mediaApi.files.create(formData, {
                 headers: {'Content-Type': 'multipart/form-data'},
             });
-            const uploaded = res.data; // expect array or single object
+            const uploaded = res.data;
             const items = Array.isArray(uploaded) ? uploaded : [uploaded];
 
             items.forEach(item => {
@@ -420,15 +355,98 @@ export default function TestCreatePage() {
         }
     };
 
-    /* ═══════════════ NAVIGATION ═══════════════ */
-    const goToQuestion = (idx) => { if (idx >= 0 && idx < questions.length) setActiveIdx(idx); };
     const progress = questions.length > 0 ? ((activeIdx + 1) / questions.length) * 100 : 0;
     const isChoice = current && (current.type === 0 || current.type === 1);
 
     /* ═══════════════ RENDER ═══════════════ */
+
+    // ── STEP 1: Basic test info ──
+    if (step === 1) {
+        return (
+            <Layout>
+                <div className="test-create">
+                    <h1 className="test-create__page-title">Новый тест</h1>
+
+                    <form className="test-create__form" onSubmit={handleNextStep}>
+                        <div className="form-section">
+                            <h2 className="form-section__title">Основная информация</h2>
+
+                            <div className="form-group">
+                                <label className="form-group__label">Название</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Введите название теста"
+                                    value={testMeta.title}
+                                    onChange={(e) => handleMetaChange('title', e.target.value)}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-group__label">Описание</label>
+                                <textarea
+                                    className="form-input form-textarea"
+                                    placeholder="Введите описание теста"
+                                    rows={5}
+                                    value={testMeta.description}
+                                    onChange={(e) => handleMetaChange('description', e.target.value)}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-group__label">Тип теста</label>
+                                <div className="radio-group">
+                                    <label className="radio">
+                                        <input
+                                            type="radio"
+                                            name="accessType"
+                                            value="public"
+                                            checked={testMeta.accessType === 'public'}
+                                            onChange={() => handleMetaChange('accessType', 'public')}
+                                        />
+                                        <span className="radio__mark"/>
+                                        <span className="radio__label">Публичный</span>
+                                    </label>
+                                    <label className="radio">
+                                        <input
+                                            type="radio"
+                                            name="accessType"
+                                            value="private"
+                                            checked={testMeta.accessType === 'private'}
+                                            onChange={() => handleMetaChange('accessType', 'private')}
+                                        />
+                                        <span className="radio__mark"/>
+                                        <span className="radio__label">Приватный</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="test-create__actions">
+                            <button
+                                type="submit"
+                                className="btn btn--primary"
+                                disabled={savingTest || !testMeta.title.trim()}
+                            >
+                                {savingTest ? 'Создание...' : 'Далее'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn--outline"
+                                onClick={() => navigate('/tests')}
+                            >
+                                Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </Layout>
+        );
+    }
+
+    // ── STEP 2: Questions editor ──
     return (
         <Layout>
-            {/* Hidden file input */}
             <input
                 ref={fileInputRef}
                 type="file"
@@ -438,53 +456,13 @@ export default function TestCreatePage() {
             />
 
             <div className="tc-page">
-                {/* ── Header ── */}
+                {/* Header */}
                 <div className="tc-header">
-                    <h1 className="tc-header__title">
-                        {editTestId ? 'Редактирование теста' : 'Новый тест'}
-                    </h1>
-                    <button
-                        className="btn btn--primary tc-header__save"
-                        onClick={handleSaveTest}
-                        disabled={savingTest || !testMeta.title.trim()}
-                    >
-                        {savingTest ? 'Сохранение...' : 'Сохранить тест'}
-                    </button>
+                    <h1 className="tc-header__title">Вопросы</h1>
                 </div>
 
-                {/* ── Test meta section ── */}
-                <div className="tc-meta">
-                    <div className="tc-meta__row">
-                        <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Название теста"
-                            value={testMeta.title}
-                            onChange={(e) => handleMetaChange('title', e.target.value)}
-                        />
-                    </div>
-                    <div className="tc-meta__row">
-                        <textarea
-                            className="form-input form-textarea form-textarea--sm"
-                            placeholder="Описание теста"
-                            rows={2}
-                            value={testMeta.description}
-                            onChange={(e) => handleMetaChange('description', e.target.value)}
-                        />
-                    </div>
-                    <label className="tc-meta__checkbox">
-                        <input
-                            type="checkbox"
-                            checked={testMeta.allowAiHints}
-                            onChange={(e) => handleMetaChange('allowAiHints', e.target.checked)}
-                        />
-                        <span>Разрешить AI-подсказки</span>
-                    </label>
-                </div>
-
-                {/* ── Body: sidebar + question card ── */}
+                {/* Body: sidebar + question card */}
                 <div className="tc-body">
-                    {/* Left sidebar with question list */}
                     <QuestionSidebar
                         questions={questions}
                         activeIndex={activeIdx}
@@ -493,10 +471,9 @@ export default function TestCreatePage() {
                         onDelete={handleDeleteQuestion}
                     />
 
-                    {/* Main question card */}
                     <div className="tc-main">
                         <div className="tc-card">
-                            {/* Progress section */}
+                            {/* Progress */}
                             <div className="tc-progress">
                                 <span className="tc-progress__label">{activeIdx + 1}/{questions.length}</span>
                                 <div className="tc-progress__bar">
@@ -604,7 +581,6 @@ export default function TestCreatePage() {
                                         onRemove={() => removeMedia('question', m.id)}
                                     />
                                 ))}
-                                {/* Add media card */}
                                 <button
                                     className="tc-media-grid__add"
                                     onClick={() => triggerFileUpload('question')}
@@ -617,18 +593,19 @@ export default function TestCreatePage() {
                                 </button>
                             </div>
 
-                            {/* Attach file button (text link) */}
-                            <button className="tc-attach" onClick={() => triggerFileUpload('question')}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                                </svg>
-                                Прикрепить файл
+                            {/* Save test button */}
+                            <button
+                                className="btn btn--primary btn--block"
+                                onClick={handleSaveTest}
+                                disabled={savingTest || saving}
+                            >
+                                {savingTest ? 'Сохранение...' : 'Сохранить тест'}
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* ── FAB: add question ── */}
+                {/* FAB: add question */}
                 <button className="fab" onClick={handleAddQuestion} title="Добавить вопрос">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <line x1="12" y1="5" x2="12" y2="19"/>
@@ -640,7 +617,7 @@ export default function TestCreatePage() {
     );
 }
 
-/* ═══════════════ Media Card Component (grid style) ═══════════════ */
+/* ═══════════════ Media Card Component ═══════════════ */
 function MediaCard({media, onRemove}) {
     const isImage = media.url || isImageMime(media.mime);
     const isVideo = isVideoMime(media.mime);

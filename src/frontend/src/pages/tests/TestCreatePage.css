@@ -1,6 +1,20 @@
-/* ═══════════════ Test Create Page ═══════════════ */
+.test-create__page-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 24px;
+}
 
-/* ── Header ── */
+.test-create__form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.test-create__actions {
+    display: flex;
+    gap: 12px;
+}
+
 .tc-header {
     display: flex;
     align-items: center;
@@ -19,7 +33,6 @@
     font-size: 14px;
 }
 
-/* ── Test meta section ── */
 .tc-meta {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -55,7 +68,6 @@
     min-height: 60px;
 }
 
-/* ── Body: sidebar + main ── */
 .tc-body {
     display: flex;
     gap: 24px;
@@ -67,7 +79,6 @@
     min-width: 0;
 }
 
-/* ── Question Card ── */
 .tc-card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -75,7 +86,6 @@
     padding: 28px 32px 32px;
 }
 
-/* ── Progress ── */
 .tc-progress {
     text-align: center;
     margin-bottom: 20px;
@@ -103,7 +113,6 @@
     transition: width 0.3s ease;
 }
 
-/* ── Fields ── */
 .tc-field {
     margin-bottom: 24px;
 }
@@ -135,7 +144,6 @@
     color: var(--color-primary);
 }
 
-/* ── Options ── */
 .tc-options {
     display: flex;
     flex-direction: column;
@@ -208,7 +216,6 @@
     opacity: 1;
 }
 
-/* ── Add Option ── */
 .tc-add-option {
     display: inline-flex;
     align-items: center;
@@ -229,7 +236,6 @@
     font-weight: 700;
 }
 
-/* ── Attach file ── */
 .tc-attach {
     display: inline-flex;
     align-items: center;
@@ -248,7 +254,6 @@
     background: var(--color-primary-transparent);
 }
 
-/* ── Media Grid (card-style thumbnails) ── */
 .tc-media-grid {
     display: flex;
     flex-wrap: wrap;
@@ -352,7 +357,6 @@
     background: var(--color-primary-transparent);
 }
 
-/* ── FAB ── */
 .fab {
     position: fixed;
     bottom: 32px;
@@ -375,7 +379,6 @@
     transform: scale(1.05);
 }
 
-/* ═══════════════ Shared form styles ═══════════════ */
 
 .form-section {
     background: var(--color-surface);
@@ -461,7 +464,6 @@
     border-color: var(--color-primary);
 }
 
-/* ── Radio ── */
 .radio-group {
     display: flex;
     gap: 24px;
