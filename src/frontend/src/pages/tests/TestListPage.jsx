@@ -65,14 +65,8 @@ export default function TestListPage() {
     const handleCardClick = (test) => setSelectedTest(test);
     const handleCloseModal = () => setSelectedTest(null);
 
-    const handleStartTest = async (testId) => {
-        try {
-            const response = await assessmentApi.attempts.start(testId);
-            const attemptId = response.data?.id || response.data;
-            navigate(`/tests/${testId}/attempt/${attemptId}`);
-        } catch (e) {
-            console.error('Failed to start test:', e);
-        }
+    const handleStartTest = (testId) => {
+        navigate(`/tests/${testId}/attempt`);
     };
 
     const handleContextMenu = (e, test) => {

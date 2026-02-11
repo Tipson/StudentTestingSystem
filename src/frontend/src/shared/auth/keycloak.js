@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
     pkceVerifier: 'swagger:pkce_verifier',
     pkceState: 'swagger:pkce_state',
     pkceTimestamp: 'swagger:pkce_created_at',
+    postLoginRedirect: 'swagger:post_login_redirect',
 };
 
 export const TOKENS_UPDATED_EVENT = 'swagger:tokens_updated';
@@ -97,6 +98,31 @@ const persistPkceState = ({verifier, state}) => {
     window.localStorage.setItem(STORAGE_KEYS.pkceVerifier, verifier);
     window.localStorage.setItem(STORAGE_KEYS.pkceState, state);
     window.localStorage.setItem(STORAGE_KEYS.pkceTimestamp, String(timestamp));
+};
+
+const persistPostLoginRedirect = (value) => {
+    if (typeof window === 'undefined' || !value) return;
+    window.sessionStorage.setItem(STORAGE_KEYS.postLoginRedirect, value);
+    window.localStorage.setItem(STORAGE_KEYS.postLoginRedirect, value);
+};
+
+const readPostLoginRedirect = () => {
+    if (typeof window === 'undefined') return '';
+    return window.sessionStorage.getItem(STORAGE_KEYS.postLoginRedirect)
+        || window.localStorage.getItem(STORAGE_KEYS.postLoginRedirect)
+        || '';
+};
+
+const clearPostLoginRedirect = () => {
+    if (typeof window === 'undefined') return;
+    window.sessionStorage.removeItem(STORAGE_KEYS.postLoginRedirect);
+    window.localStorage.removeItem(STORAGE_KEYS.postLoginRedirect);
+};
+
+export const consumePostLoginRedirect = () => {
+    const value = readPostLoginRedirect();
+    clearPostLoginRedirect();
+    return value;
 };
 
 const clearPkceState = () => {
@@ -217,6 +243,9 @@ export const startKeycloakLogin = async () => {
     if (!window.crypto?.subtle) {
         throw new Error('Браузер не поддерживает PKCE.');
     }
+
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    persistPostLoginRedirect(returnTo);
 
     const config = getKeycloakConfig();
     const verifier = createRandomString(64);

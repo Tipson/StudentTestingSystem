@@ -90,40 +90,53 @@ export default function TestAttemptPage() {
     const [hints, setHints] = useState({});
     const [hintLoading, setHintLoading] = useState({});
     const [timeLeftSec, setTimeLeftSec] = useState(null);
+    const [activeAttemptId, setActiveAttemptId] = useState(attemptId || null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
         setError('');
 
         try {
-            const [attemptRes, testRes, questionsRes] = await Promise.all([
-                assessmentApi.attempts.get(attemptId),
+            const [testRes, questionsRes] = await Promise.all([
                 assessmentApi.tests.get(testId),
                 assessmentApi.questions.list(testId),
             ]);
 
-            const attemptData = attemptRes?.data ?? attemptRes;
             const testData = testRes?.data ?? testRes;
-            const attemptQuestions = attemptData?.questions || attemptData?.items || attemptData?.questionList;
-            const questionList = Array.isArray(attemptQuestions) && attemptQuestions.length > 0
-                ? attemptQuestions
-                : (questionsRes?.data || []);
+            const questionList = questionsRes?.data || [];
 
-            setAttempt(attemptData);
             setTest(testData);
             setQuestions(questionList);
-            setAnswers(extractAnswers(attemptData));
+
+            const attemptKey = attemptId || activeAttemptId;
+            if (attemptKey) {
+                const attemptRes = await assessmentApi.attempts.get(attemptKey);
+                const attemptData = attemptRes?.data ?? attemptRes;
+                const attemptQuestions = attemptData?.questions || attemptData?.items || attemptData?.questionList;
+                if (Array.isArray(attemptQuestions) && attemptQuestions.length > 0) {
+                    setQuestions(attemptQuestions);
+                }
+                setAttempt(attemptData);
+                setAnswers(extractAnswers(attemptData));
+            }
         } catch (e) {
             console.error('Failed to load attempt:', e);
             setError('Не удалось загрузить тест. Попробуйте позже.');
         } finally {
             setLoading(false);
         }
-    }, [attemptId, testId]);
+    }, [attemptId, activeAttemptId, testId]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        if (attemptId) {
+            setActiveAttemptId(attemptId);
+            setStage('question');
+        }
+    }, [attemptId]);
 
     const isPublished = useMemo(() => {
         if (!test) return false;
@@ -163,7 +176,7 @@ export default function TestAttemptPage() {
     const progress = totalQuestions > 0 ? ((currentIndex + 1) / totalQuestions) * 100 : 0;
 
     useEffect(() => {
-        if (!timeLimitSeconds) {
+        if (!activeAttemptId || !timeLimitSeconds) {
             setTimeLeftSec(null);
             return undefined;
         }
@@ -180,7 +193,7 @@ export default function TestAttemptPage() {
         tick();
         const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [attempt, timeLimitSeconds]);
+    }, [activeAttemptId, attempt, timeLimitSeconds]);
 
     const timeLeftLabel = useMemo(() => {
         if (timeLeftSec == null) return '';
@@ -234,23 +247,27 @@ export default function TestAttemptPage() {
         }));
     };
 
+    const hasAnswerForQuestion = (question, answer) => {
+        const type = resolveQuestionType(question);
+        if (type === 'text') {
+            return Boolean(answer?.text?.trim());
+        }
+        if (type === 'multiple') {
+            return Array.isArray(answer?.optionIds) && answer.optionIds.length > 0;
+        }
+        return Boolean(answer?.optionId);
+    };
+
     const saveCurrentAnswer = async () => {
+        if (!activeAttemptId) return;
         if (!currentQuestion?.id) return;
         const answer = answers[currentQuestion.id];
-        const type = resolveQuestionType(currentQuestion);
-
-        const hasAnswer = type === 'text'
-            ? Boolean(answer?.text?.trim())
-            : type === 'multiple'
-                ? Array.isArray(answer?.optionIds) && answer.optionIds.length > 0
-                : Boolean(answer?.optionId);
-
-        if (!hasAnswer) return;
+        if (!hasAnswerForQuestion(currentQuestion, answer)) return;
 
         setSavingAnswer(true);
         try {
             const payload = buildAnswerPayload(currentQuestion, answer);
-            await assessmentApi.attempts.saveAnswer(attemptId, currentQuestion.id, payload);
+            await assessmentApi.attempts.saveAnswer(activeAttemptId, currentQuestion.id, payload);
         } catch (e) {
             console.error('Failed to save answer:', e);
         } finally {
@@ -258,16 +275,47 @@ export default function TestAttemptPage() {
         }
     };
 
+    const saveAllAnswers = async () => {
+        if (!activeAttemptId) return;
+        setSavingAnswer(true);
+        try {
+            for (const question of questions) {
+                if (!question?.id) continue;
+                const answer = answers[question.id];
+                if (!hasAnswerForQuestion(question, answer)) continue;
+                const payload = buildAnswerPayload(question, answer);
+                await assessmentApi.attempts.saveAnswer(activeAttemptId, question.id, payload);
+            }
+            return true;
+        } catch (e) {
+            console.error('Failed to save answers:', e);
+            return false;
+        } finally {
+            setSavingAnswer(false);
+        }
+    };
+
     const handleHint = async () => {
-        if (!currentQuestion?.id || !test?.allowAiHints) return;
+        if (!activeAttemptId || !currentQuestion?.id || !test?.allowAiHints) return;
         setHintLoading((prev) => ({...prev, [currentQuestion.id]: true}));
         try {
-            const res = await assessmentApi.ai.hint(attemptId, currentQuestion.id);
+            const res = await assessmentApi.ai.hint(activeAttemptId, currentQuestion.id);
             const data = res?.data ?? res;
-            const hintText = typeof data === 'string'
-                ? data
-                : data?.hint || data?.text || data?.message || data?.answer || 'Подсказка получена.';
-            setHints((prev) => ({...prev, [currentQuestion.id]: hintText}));
+            const hintText = data?.hintText
+                || data?.hint
+                || data?.text
+                || data?.message
+                || data?.answer
+                || (typeof data === 'string' ? data : 'Подсказка получена.');
+            setHints((prev) => ({
+                ...prev,
+                [currentQuestion.id]: {
+                    text: hintText,
+                    level: data?.hintLevel,
+                    used: data?.usedCount,
+                    remaining: data?.remainingCount,
+                },
+            }));
         } catch (e) {
             console.error('Failed to load hint:', e);
         } finally {
@@ -277,11 +325,12 @@ export default function TestAttemptPage() {
 
     const handleNext = async () => {
         if (!currentQuestion) return;
-        await saveCurrentAnswer();
 
         if (currentIndex >= totalQuestions - 1) {
             try {
-                await assessmentApi.attempts.submit(attemptId);
+                const saved = await saveAllAnswers();
+                if (!saved) return;
+                await assessmentApi.attempts.submit(activeAttemptId);
             } catch (e) {
                 console.error('Failed to submit attempt:', e);
             }
@@ -289,6 +338,7 @@ export default function TestAttemptPage() {
             return;
         }
 
+        await saveCurrentAnswer();
         setCurrentIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
     };
 
@@ -299,6 +349,30 @@ export default function TestAttemptPage() {
         }
         await saveCurrentAnswer();
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    };
+
+    const handleStartAttempt = async () => {
+        if (activeAttemptId) {
+            setStage('question');
+            return;
+        }
+        try {
+            setSavingAnswer(true);
+            const response = await assessmentApi.attempts.start(testId);
+            const attemptData = response?.data ?? response;
+            const newAttemptId = attemptData?.id || attemptData?.attemptId || attemptData;
+            if (newAttemptId) {
+                setActiveAttemptId(newAttemptId);
+                setAttempt(attemptData);
+                setAnswers(extractAnswers(attemptData));
+                navigate(`/tests/${testId}/attempt/${newAttemptId}`, {replace: true});
+                setStage('question');
+            }
+        } catch (e) {
+            console.error('Failed to start attempt:', e);
+        } finally {
+            setSavingAnswer(false);
+        }
     };
 
     if (loading) {
@@ -382,8 +456,8 @@ export default function TestAttemptPage() {
                             <div className="attempt-actions">
                                 <button
                                     className="attempt-btn attempt-btn--primary"
-                                    onClick={() => setStage('question')}
-                                    disabled={totalQuestions === 0}
+                                    onClick={handleStartAttempt}
+                                    disabled={totalQuestions === 0 || savingAnswer}
                                 >
                                     Начать тест
                                 </button>
@@ -479,7 +553,19 @@ export default function TestAttemptPage() {
 
                                 {hints[currentQuestion.id] && (
                                     <div className="attempt-hint">
-                                        {hints[currentQuestion.id]}
+                                        <div>{hints[currentQuestion.id].text}</div>
+                                        {(hints[currentQuestion.id].level != null
+                                            || hints[currentQuestion.id].remaining != null
+                                            || hints[currentQuestion.id].used != null) && (
+                                            <div className="attempt-hint-meta">
+                                                {hints[currentQuestion.id].used != null && (
+                                                    <span>Использовано: {hints[currentQuestion.id].used}</span>
+                                                )}
+                                                {hints[currentQuestion.id].remaining != null && (
+                                                    <span>Осталось: {hints[currentQuestion.id].remaining}</span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

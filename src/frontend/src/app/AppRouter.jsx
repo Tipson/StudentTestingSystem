@@ -30,6 +30,7 @@ export default function AppRouter() {
                     <Route path="/tests/create" element={<TestCreatePage/>}/>
                     <Route path="/tests/:testId/edit" element={<TestEditPage/>}/>
                     <Route path="/tests/:testId/questions" element={<QuestionEditPage/>}/>
+                    <Route path="/tests/:testId/attempt" element={<TestAttemptPage/>}/>
                     <Route path="/tests/:testId/attempt/:attemptId" element={<TestAttemptPage/>}/>
                     <Route path = "/profile" element={<ProfilePage/>}/>
                 </Route>
