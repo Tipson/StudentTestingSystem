@@ -11,7 +11,6 @@ public class AttemptRepository(AssessmentDbContext db) : IAttemptRepository
     public Task<Attempt?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Attempts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
 
-
     public Task<Attempt?> GetWithAnswersAsync(Guid id, CancellationToken ct) =>
         db.Attempts
             .AsNoTracking()
@@ -22,6 +21,24 @@ public class AttemptRepository(AssessmentDbContext db) : IAttemptRepository
     public Task<int> CountByUserAndTestAsync(string userId, Guid testId, CancellationToken ct) =>
         db.Attempts.CountAsync(x => x.UserId == userId && x.TestId == testId, ct);
 
+    public async Task<Dictionary<Guid, int>> GetAttemptsCountByTestsAsync(
+        IEnumerable<Guid> testIds,
+        string userId,
+        CancellationToken ct)
+    {
+        var testIdsList = testIds.ToList();
+
+        if (!testIdsList.Any())
+            return new Dictionary<Guid, int>();
+
+        return await db.Attempts
+            .AsNoTracking()
+            .Where(a => testIdsList.Contains(a.TestId) && a.UserId == userId)
+            .GroupBy(a => a.TestId)
+            .Select(g => new { TestId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TestId, x => x.Count, ct);
+    }
+
     public Task<Attempt?> GetActiveAsync(string userId, Guid testId, CancellationToken ct) =>
         db.Attempts
             .AsNoTracking()
@@ -30,19 +47,17 @@ public class AttemptRepository(AssessmentDbContext db) : IAttemptRepository
                 x.TestId == testId &&
                 x.Status == AttemptStatus.InProgress, ct);
 
-
     public Task<List<Attempt>> ListByUserAndTestAsync(string userId, Guid testId, CancellationToken ct) =>
         db.Attempts
             .AsNoTracking()
             .Where(x => x.UserId == userId && x.TestId == testId)
             .OrderByDescending(x => x.StartedAt)
             .ToListAsync(ct);
-    
 
     public Task<List<Attempt>> ListByUserAsync(string userId, CancellationToken ct) => 
         db.Attempts
             .AsNoTracking()
-            .Where(x => x.UserId == userId )
+            .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.StartedAt)
             .ToListAsync(ct);
 

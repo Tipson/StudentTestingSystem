@@ -1,9 +1,9 @@
-﻿using Application;
+using Application;
 using Assessment.Application.DTOs.Test;
 using Assessment.Application.Interfaces;
 using Assessment.Domain.Tests;
 using Contracts.Assessment.Enums;
-using Mapster;
+using MapsterMapper;
 using MediatR;
 
 namespace Assessment.Application.CQRS.Tests.Queries;
@@ -16,7 +16,9 @@ public sealed record GetTests : IRequest<List<TestDto>>;
 public sealed class GetTestsHandler(
     IUserContext userContext,
     ITestRepository tests,
-    ITestAccessRepository testAccesses)
+    ITestAccessRepository testAccesses,
+    IAttemptRepository attempts,
+    IMapper mapper)
     : IRequestHandler<GetTests, List<TestDto>>
 {
     public async Task<List<TestDto>> Handle(GetTests request, CancellationToken ct)
@@ -61,6 +63,17 @@ public sealed class GetTestsHandler(
             .Where(t => t.Status == TestStatus.Published && t.IsAvailable())
             .ToList();
 
-        return uniqueTests.Adapt<List<TestDto>>();
+        if (!uniqueTests.Any())
+            return new List<TestDto>();
+
+        var testIds = uniqueTests.Select(t => t.Id).ToList();
+        var attemptsCount = await attempts.GetAttemptsCountByTestsAsync(testIds, userId, ct);
+
+        // Создаем кортежи (Test, usedAttempts) и маппим через Mapster
+        var testsWithAttempts = uniqueTests
+            .Select(test => (test, usedAttempts: attemptsCount.GetValueOrDefault(test.Id, 0)))
+            .ToList();
+
+        return mapper.Map<List<TestDto>>(testsWithAttempts);
     }
 }
