@@ -62,7 +62,7 @@ public sealed class UpdateQuestionHandler(
             {
                 Text = dto.Text,
                 IsCorrect = dto.IsCorrect,
-                Order = dto.Order > 0 ? dto.Order : order++
+                Order = order++
             };
 
             if (dto.MediaIds is { Count: > 0 })

@@ -65,14 +65,14 @@ public sealed class CreateQuestionHandler(
 
     private static IEnumerable<QuestionOption> CreateOptions(List<CreateQuestionOptionDto> optionDtos)
     {
-        var optionOrder = 1;
+        var order = 1;
         foreach (var dto in optionDtos)
         {
             var option = new QuestionOption
             {
                 Text = dto.Text,
                 IsCorrect = dto.IsCorrect,
-                Order = dto.Order > 0 ? dto.Order : optionOrder++
+                Order = order++
             };
 
             if (dto.MediaIds is { Count: > 0 })
