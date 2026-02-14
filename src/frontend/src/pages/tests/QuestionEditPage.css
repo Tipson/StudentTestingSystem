@@ -1,0 +1,28 @@
+.question-edit__loading {
+    color: var(--color-text-secondary);
+    padding: 40px 0;
+    text-align: center;
+}
+
+.question-edit__header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.question-edit__title {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.question-edit__body {
+    display: flex;
+    gap: 24px;
+    min-height: calc(100vh - 160px);
+}
+
+.question-edit__main {
+    flex: 1;
+    min-width: 0;
+}

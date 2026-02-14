@@ -1,6 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
-import {exchangeCodeForTokens, getStoredTokens, persistTokens} from '@shared/auth/keycloak.js';
+import {
+    consumePostLoginRedirect,
+    exchangeCodeForTokens,
+    getStoredTokens,
+    persistTokens,
+} from '@shared/auth/keycloak.js';
 import {notifyCustom} from '@shared/notifications/notificationCenter.js';
 import './SwaggerPage.css';
 
@@ -34,6 +39,18 @@ const isTokenUsable = (tokens) => {
     if (!tokens?.accessToken) return false;
     if (!tokens.expiresAt) return true;
     return tokens.expiresAt > Date.now() + 10_000;
+};
+
+let cachedRedirectPath = null;
+const resolveRedirectPath = () => {
+    if (cachedRedirectPath !== null) return cachedRedirectPath;
+    const stored = consumePostLoginRedirect();
+    if (!stored || stored.includes('/swagger/oauth2-redirect')) {
+        cachedRedirectPath = '/swagger';
+        return cachedRedirectPath;
+    }
+    cachedRedirectPath = stored;
+    return cachedRedirectPath;
 };
 
 export default function SwaggerOAuthRedirect() {
@@ -86,7 +103,7 @@ export default function SwaggerOAuthRedirect() {
                     message: 'Код уже обработан. Перенаправляем в Swagger...',
                 });
                 redirectTimer = window.setTimeout(() => {
-                    navigate('/swagger', {replace: true});
+                    navigate(resolveRedirectPath(), {replace: true});
                 }, 400);
                 return;
             }
@@ -119,7 +136,7 @@ export default function SwaggerOAuthRedirect() {
                                 message: 'Код уже обработан. Перенаправляем в Swagger...',
                             });
                             redirectTimer = window.setTimeout(() => {
-                                navigate('/swagger', {replace: true});
+                                navigate(resolveRedirectPath(), {replace: true});
                             }, 400);
                             return;
                         }
@@ -170,7 +187,7 @@ export default function SwaggerOAuthRedirect() {
                 });
 
                 redirectTimer = window.setTimeout(() => {
-                    navigate('/swagger', {replace: true});
+                    navigate(resolveRedirectPath(), {replace: true});
                 }, 800);
             } catch (error) {
                 window.sessionStorage.removeItem(inflightKey);
@@ -191,7 +208,7 @@ export default function SwaggerOAuthRedirect() {
                             duration: 2500,
                         });
                         redirectTimer = window.setTimeout(() => {
-                            navigate('/swagger', {replace: true});
+                            navigate(resolveRedirectPath(), {replace: true});
                         }, 800);
                         return;
                     }
@@ -219,7 +236,7 @@ export default function SwaggerOAuthRedirect() {
                     <button
                         className="swagger-button"
                         type="button"
-                        onClick={() => navigate('/swagger', {replace: true})}
+                        onClick={() => navigate(resolveRedirectPath(), {replace: true})}
                     >
                         Вернуться в Swagger
                     </button>

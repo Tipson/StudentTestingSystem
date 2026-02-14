@@ -1,0 +1,69 @@
+.test-card {
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 2px var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.test-card:hover {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.test-card__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.test-card__title {
+    font-size: 18px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.test-card__menu-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--color-text-secondary);
+    transition: all var(--transition);
+}
+
+.test-card__menu-btn:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+}
+
+.test-card__description {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    max-height: 120px;
+    overflow: auto;
+}
+
+.test-card__attempts {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin-top: auto;
+}
+
+.test-card__attempts-count {
+    color: var(--color-primary);
+    font-weight: 600;
+}

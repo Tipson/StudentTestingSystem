@@ -1,0 +1,13 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.layout__content {
+    flex: 1;
+    /* sidebar-margin(30) + sidebar-width(72) + sidebar-gap(48) = 150px */
+    margin-left: var(--content-offset);
+    padding: 40px 30px 30px 0;
+    overflow-y: auto;
+    min-height: 100vh;
+}
