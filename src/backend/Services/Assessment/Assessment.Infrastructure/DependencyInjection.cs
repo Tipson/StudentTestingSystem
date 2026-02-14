@@ -91,6 +91,9 @@ public static class DependencyInjection
         services.Configure<GradingServiceOptions>(
             cfg.GetSection(GradingServiceOptions.SectionName));
 
+        // Регистрируем BearerTokenDelegatingHandler для межсервисной коммуникации
+        services.AddTransient<BearerTokenDelegatingHandler>();
+
         // HTTP клиент к Grading Service (ручная проверка при MessageBus или все операции без MessageBus). Токен подкладывает BearerTokenDelegatingHandler.
         services.AddHttpClient<HttpGradingClient>()
             .AddHttpMessageHandler<BearerTokenDelegatingHandler>()
