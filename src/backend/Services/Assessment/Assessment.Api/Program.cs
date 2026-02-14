@@ -59,7 +59,19 @@ try
 
     var app = builder.Build();
 
-    app.UseSerilogRequestLogging();
+    app.UseSerilogRequestLogging(options =>
+    {
+        // Не логируем health checks и metrics чтобы не захламлять логи
+        options.GetLevel = (httpContext, elapsed, ex) =>
+        {
+            var path = httpContext.Request.Path.Value?.ToLower() ?? "";
+            if (path.Contains("/health") || path.Contains("/metrics"))
+                return Serilog.Events.LogEventLevel.Verbose; // Verbose почти никогда не логируется
+            
+            if (ex != null) return Serilog.Events.LogEventLevel.Error;
+            return Serilog.Events.LogEventLevel.Information;
+        };
+    });
     
     if (!app.Environment.IsDevelopment())
         app.UseHttpsRedirection();
